@@ -1,0 +1,206 @@
+package com.expensetracker.app.data
+
+import com.expensetracker.app.parser.AmountFormatter
+import com.expensetracker.app.parser.DedupKeyGenerator
+import com.expensetracker.app.parser.ParsedExpense
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.util.Calendar
+import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class ExpenseRepository @Inject constructor(
+    private val expenseDao: ExpenseDao,
+    private val categoryRepository: CategoryRepository,
+    private val merchantCategoryRepository: MerchantCategoryRepository
+) {
+    companion object {
+        private const val RECENT_IN_PERIOD = 5
+
+        /** How far either side of a notification the same amount counts as the same payment. */
+        private const val AMOUNT_DEDUP_WINDOW_MS = 5 * 60 * 1000L
+    }
+
+    /** Serialises dedup check + insert so racing notifications cannot both pass the check. */
+    private val saveMutex = Mutex()
+
+    fun observeAllActive(): Flow<List<ExpenseEntity>> = expenseDao.observeAllActive()
+
+    fun observeTotalForRange(start: Long, end: Long): Flow<BigDecimal?> =
+        expenseDao.observeTotalForRange(start, end)
+
+    fun observeInRange(start: Long, end: Long): Flow<List<ExpenseEntity>> =
+        expenseDao.observeInRange(start, end)
+
+    fun observeMonthlySummaries(): Flow<List<MonthSummary>> {
+        return expenseDao.observeMonthlyTotals().map { rows ->
+            rows.map { row ->
+                val (year, month) = PeriodCalculator.decodeYearMonth(row.yearMonth)
+                MonthSummary(
+                    year = year,
+                    month = month,
+                    label = PeriodCalculator.monthLabel(year, month),
+                    total = row.total
+                )
+            }
+        }
+    }
+
+    suspend fun weekSummariesForMonth(year: Int, month: Int): List<WeekSummary> {
+        val weeks = PeriodCalculator.weeksInMonth(year, month)
+        return weeks.map { (start, end) ->
+            WeekSummary(
+                startMs = start,
+                endMs = end,
+                label = PeriodCalculator.weekLabel(start, end),
+                total = getTotalForRangeOnce(start, end)
+            )
+        }
+    }
+
+    suspend fun getMonthTotalOnce(start: Long, end: Long): BigDecimal =
+        getTotalForRangeOnce(start, end)
+
+    fun observeCurrentPeriodSummary(period: SpendingPeriod): Flow<PeriodSummary> {
+        val (start, end) = PeriodCalculator.range(period)
+        val anchor = Calendar.getInstance()
+        return combine(
+            expenseDao.observeTotalForRange(start, end),
+            observeCategoryBreakdown(start, end),
+            expenseDao.observeInRange(start, end)
+        ) { total, breakdown, expenses ->
+            PeriodSummary(
+                title = PeriodCalculator.title(period),
+                subtitle = PeriodCalculator.label(period, anchor),
+                total = total ?: BigDecimal.ZERO,
+                breakdown = breakdown,
+                recentExpenses = expenses.take(RECENT_IN_PERIOD),
+                periodStart = start,
+                periodEnd = end
+            )
+        }
+    }
+
+    fun observeCategoryBreakdown(start: Long, end: Long): Flow<List<CategoryBreakdown>> {
+        return combine(
+            expenseDao.observeTotalsByCategory(start, end),
+            categoryRepository.observeAll()
+        ) { rows, categories ->
+            val categoryMap = categories.associateBy { it.id }
+            val absSum = rows.fold(BigDecimal.ZERO) { acc, row -> acc + row.total.abs() }
+            rows.map { row ->
+                val category = row.categoryId?.let { categoryMap[it] }
+                val name = category?.name ?: DefaultCategories.UNCATEGORIZED_NAME
+                val color = category?.colorHex ?: DefaultCategories.UNCATEGORIZED_COLOR
+                val fraction = if (absSum > BigDecimal.ZERO) {
+                    row.total.abs().divide(absSum, 4, RoundingMode.HALF_UP).toFloat()
+                } else {
+                    0f
+                }
+                CategoryBreakdown(
+                    categoryId = row.categoryId,
+                    name = name,
+                    colorHex = color,
+                    total = row.total,
+                    fraction = fraction
+                )
+            }
+        }
+    }
+
+    suspend fun saveFromNotification(
+        parsed: ParsedExpense,
+        rawText: String,
+        sourcePackage: String,
+        notificationPostTime: Long,
+        notificationKey: String?
+    ): Boolean {
+        val dedupKey = DedupKeyGenerator.generate(
+            packageName = sourcePackage,
+            amount = parsed.amount,
+            merchant = parsed.merchant,
+            postTime = notificationPostTime
+        )
+        val amount = AmountFormatter.toMoney(parsed.amount)
+
+        return saveMutex.withLock {
+            if (notificationKey != null) {
+                val sameNotification = expenseDao.findByNotificationKey(notificationKey)
+                if (sameNotification != null) return@withLock false
+            }
+
+            val lookback = System.currentTimeMillis() - DedupKeyGenerator.dedupLookbackMs()
+            val existing = expenseDao.findByDedupKeySince(dedupKey, lookback)
+            if (existing != null) return@withLock false
+
+            val sameAmountNearby = expenseDao.findByAmountInWindow(
+                amount = amount,
+                transactionType = parsed.transactionType,
+                windowStart = notificationPostTime - AMOUNT_DEDUP_WINDOW_MS,
+                windowEnd = notificationPostTime + AMOUNT_DEDUP_WINDOW_MS
+            )
+            if (sameAmountNearby != null) return@withLock false
+
+            val categoryId = merchantCategoryRepository.categoryIdForMerchant(parsed.merchant)
+
+            val entity = ExpenseEntity(
+                id = UUID.randomUUID().toString(),
+                amount = amount,
+                currency = parsed.currency,
+                merchant = parsed.merchant,
+                rawNotificationText = rawText,
+                sourcePackage = sourcePackage,
+                notificationPostTime = notificationPostTime,
+                createdAt = System.currentTimeMillis(),
+                dedupKey = dedupKey,
+                status = ExpenseStatus.AUTO_SAVED,
+                confidence = parsed.confidence,
+                notificationKey = notificationKey,
+                categoryId = categoryId,
+                notes = null,
+                transactionType = parsed.transactionType
+            )
+            expenseDao.insert(entity) != -1L
+        }
+    }
+
+    suspend fun updateExpense(
+        id: String,
+        amount: BigDecimal,
+        merchant: String?,
+        notificationPostTime: Long,
+        categoryId: String?,
+        notes: String?,
+        transactionType: TransactionType
+    ) {
+        val existing = expenseDao.getById(id) ?: return
+        merchantCategoryRepository.saveMapping(merchant, categoryId)
+        expenseDao.update(
+            existing.copy(
+                amount = AmountFormatter.toMoney(amount),
+                merchant = merchant,
+                notificationPostTime = notificationPostTime,
+                categoryId = categoryId,
+                notes = notes?.trim()?.ifBlank { null },
+                transactionType = transactionType,
+                status = ExpenseStatus.EDITED
+            )
+        )
+    }
+
+    suspend fun dismissExpense(id: String) {
+        val existing = expenseDao.getById(id) ?: return
+        expenseDao.update(existing.copy(status = ExpenseStatus.DISMISSED))
+    }
+
+    private suspend fun getTotalForRangeOnce(start: Long, end: Long): BigDecimal {
+        return expenseDao.getTotalForRangeOnce(start, end) ?: BigDecimal.ZERO
+    }
+}

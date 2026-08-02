@@ -1,0 +1,29 @@
+*.iml
+.gradle/
+.kotlin/
+**/build/
+/local.properties
+/.idea/
+.DS_Store
+/captures
+.externalNativeBuild
+.cxx
+
+# Built packages
+*.apk
+*.ap_
+*.aab
+
+# Keystore files
+*.jks
+*.keystore
+
+# Secrets / local env (copy from .env.example — never commit real keys)
+.env
+.env.*
+!.env.example
+*.env.local
+
+# Log/OS
+*.log
+Thumbs.db
