@@ -78,7 +78,7 @@ class OpenRouterClient @Inject constructor(
     companion object {
         private const val TAG = "OpenRouterClient"
         private const val CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
-        private const val DEFAULT_MODEL = "openai/gpt-4o-mini"
+        private const val DEFAULT_MODEL = "openrouter/free"
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
         val SYSTEM_PROMPT = """
@@ -103,7 +103,11 @@ Rules:
 - When isTransaction is true:
   - amount: the transaction amount as a number (no currency symbol). Prefer the payment amount over balances.
   - currency: default "MYR" when RM/MYR or Malaysian context; otherwise use the stated ISO-like code.
-  - merchant: clean human-readable merchant, recipient, or counterparty name. Strip quotes, account numbers, refs, and trailing punctuation. null if unknown.
+  - merchant: ONLY the merchant, shop, recipient, or counterparty name.
+    Examples: "KK - SUPER MART - UMN", "Starbucks", "VINCENT WESLEY LIEM".
+    NEVER include card/account tails such as "with your Maybank Debit Card Visa ending with 3729",
+    "using your debit card", "ending with 1234", account numbers, refs, or payment method text.
+    Strip quotes and trailing punctuation. null if unknown.
   - transactionType: WITHDRAW for spent/paid/debited/transferred out/purchase; RECEIVE for received/credited/refund/incoming.
   - confidence: HIGH when amount and type are clear; MEDIUM if merchant is uncertain; LOW if amount or type is ambiguous.
   - reason: null (or omit).

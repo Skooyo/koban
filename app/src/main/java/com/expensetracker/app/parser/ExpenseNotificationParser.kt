@@ -31,8 +31,11 @@ class ExpenseNotificationParser @Inject constructor(
             }
             when (llmResult) {
                 is LlmParseResult.Success -> {
-                    Log.d(TAG, "LLM parse OK: ${llmResult.expense.merchant} ${llmResult.expense.amount}")
-                    return ExpenseParseResult.Success(llmResult.expense)
+                    val cleaned = llmResult.expense.copy(
+                        merchant = MerchantNormalizer.clean(llmResult.expense.merchant)
+                    )
+                    Log.d(TAG, "LLM parse OK: ${cleaned.merchant} ${cleaned.amount}")
+                    return ExpenseParseResult.Success(cleaned, ParseSource.LLM)
                 }
                 is LlmParseResult.NotTransaction -> {
                     Log.d(TAG, "LLM: not a transaction (${llmResult.reason ?: "no reason"})")
@@ -46,7 +49,7 @@ class ExpenseNotificationParser @Inject constructor(
 
         val regexParsed = NotificationParser.parse(body)
         return if (regexParsed != null) {
-            ExpenseParseResult.Success(regexParsed)
+            ExpenseParseResult.Success(regexParsed, ParseSource.REGEX)
         } else {
             ExpenseParseResult.NoAmount
         }

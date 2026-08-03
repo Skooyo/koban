@@ -76,7 +76,7 @@ LLM parsing improves merchant names and filters promotional RM amounts. Without 
 
    ```env
    OPENROUTER_API_KEY=sk-or-v1-...
-   OPENROUTER_MODEL=openai/gpt-4o-mini
+   OPENROUTER_MODEL=openrouter/free
    ```
 
 3. Rebuild the app so Gradle injects the key into `BuildConfig`.

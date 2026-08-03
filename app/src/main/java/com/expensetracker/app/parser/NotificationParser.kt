@@ -15,14 +15,18 @@ object NotificationParser {
         """\b(received|credited|refund|refunded|incoming|transfer\s+from|money\s+in)\b""",
         RegexOption.IGNORE_CASE
     )
+    /** Stop before card/account tails that banks append after the merchant. */
+    private const val MERCHANT_STOP =
+        """(?:\s+with\s+your\b|\s+using\s+your\b|\s+via\s+your\b|\s+from\s+your\b|\.|$)"""
+
     private val merchantPatterns = listOf(
         Regex("""\bto\s+"([^"]+)""", RegexOption.IGNORE_CASE),
         Regex("""\bto\s+'([^']+)'""", RegexOption.IGNORE_CASE),
-        Regex("""\btransferred\s+to\s+(.+?)(?:\.|$)""", RegexOption.IGNORE_CASE),
-        Regex("""\bpaid\s+to\s+(.+?)(?:\.|$)""", RegexOption.IGNORE_CASE),
-        Regex("""\bpayment\s+to\s+(.+?)(?:\.|$)""", RegexOption.IGNORE_CASE),
-        Regex("""\bto\s+(.+?)(?:\.|$)""", RegexOption.IGNORE_CASE),
-        Regex("""\bat\s+(.+?)(?:\.|$)""", RegexOption.IGNORE_CASE)
+        Regex("""\btransferred\s+to\s+(.+?)$MERCHANT_STOP""", RegexOption.IGNORE_CASE),
+        Regex("""\bpaid\s+to\s+(.+?)$MERCHANT_STOP""", RegexOption.IGNORE_CASE),
+        Regex("""\bpayment\s+to\s+(.+?)$MERCHANT_STOP""", RegexOption.IGNORE_CASE),
+        Regex("""\bto\s+(.+?)$MERCHANT_STOP""", RegexOption.IGNORE_CASE),
+        Regex("""\bat\s+(.+?)$MERCHANT_STOP""", RegexOption.IGNORE_CASE)
     )
 
     fun parse(notificationBody: String): ParsedExpense? {
@@ -91,7 +95,8 @@ object NotificationParser {
                 .replace(amount.toPlainString(), "")
                 .trim()
                 .trim('-', ':', '·', '•', '"', '\'')
-            if (candidate.length >= 2) return candidate
+            val cleaned = MerchantNormalizer.clean(candidate)
+            if (cleaned != null) return cleaned
         }
         return fallbackMerchantFromBody(body, amount)
     }
@@ -106,7 +111,8 @@ object NotificationParser {
                     .trim()
                     .trim('-', ':', '·', '•', '"', '\'')
             }
-            .firstOrNull { it.length >= 2 }
+            .mapNotNull { MerchantNormalizer.clean(it) }
+            .firstOrNull()
     }
 
     private fun determineConfidence(

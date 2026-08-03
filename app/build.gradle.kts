@@ -30,7 +30,7 @@ fun escapeBuildConfig(value: String): String =
 val rootEnv = loadDotEnv(rootProject.file(".env"))
 val openRouterApiKey = rootEnv["OPENROUTER_API_KEY"].orEmpty()
 val openRouterModel = rootEnv["OPENROUTER_MODEL"]?.takeIf { it.isNotBlank() }
-    ?: "openai/gpt-4o-mini"
+    ?: "openrouter/free"
 
 android {
     namespace = "com.expensetracker.app"

@@ -9,6 +9,7 @@ import com.expensetracker.app.di.NotificationListenerEntryPoint
 import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.ExpenseNotificationParser
 import com.expensetracker.app.parser.ExpenseParseResult
+import com.expensetracker.app.parser.ParseSource
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -245,8 +246,12 @@ class ExpenseNotificationListener : NotificationListenerService() {
                         notificationKey = sbn.key
                     )
                     if (saved) {
+                        val via = when (parseResult.source) {
+                            ParseSource.LLM -> "via LLM"
+                            ParseSource.REGEX -> "via regex"
+                        }
                         val summary =
-                            "${parsed.merchant ?: "Unknown"} · RM ${AmountFormatter.formatDisplay(parsed.amount)}"
+                            "${parsed.merchant ?: "Unknown"} · RM ${AmountFormatter.formatDisplay(parsed.amount)} · $via"
                         RecentNotificationsStore.update(captureId, NotificationDisposition.SAVED, summary)
                         NotificationAccessHelper.logDebug("Saved expense: $summary")
                     } else {

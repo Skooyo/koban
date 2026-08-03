@@ -80,7 +80,7 @@ object LlmResponseParser {
             else -> currencyRaw.uppercase()
         }
 
-        val merchant = readOptionalString(json, "merchant")
+        val merchant = MerchantNormalizer.clean(readOptionalString(json, "merchant"))
 
         val transactionType = parseTransactionType(json.optString("transactionType", "WITHDRAW"))
         val confidence = parseConfidence(json.optString("confidence", "MEDIUM"))

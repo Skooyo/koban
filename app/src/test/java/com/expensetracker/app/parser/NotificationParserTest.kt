@@ -127,6 +127,16 @@ class NotificationParserTest {
     }
 
     @Test
+    fun parse_maybankSpendAt_stripsCardTail() {
+        val result = NotificationParser.parse(
+            "RM 12.50 spent at KK - SUPER MART - UMN with your Maybank Debit Card Visa ending with 3729"
+        )
+        assertNotNull(result)
+        assertEquals(BigDecimal("12.50"), result!!.amount)
+        assertEquals("KK - SUPER MART - UMN", result.merchant)
+    }
+
+    @Test
     fun findAllAmounts_deduplicates() {
         val amounts = NotificationParser.findAllAmounts("RM 10.00 and RM 10.00 again")
         assertEquals(1, amounts.size)

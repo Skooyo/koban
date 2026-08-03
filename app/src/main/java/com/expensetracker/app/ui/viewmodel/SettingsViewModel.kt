@@ -14,6 +14,7 @@ import com.expensetracker.app.listener.RecentNotificationsStore
 import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.ExpenseNotificationParser
 import com.expensetracker.app.parser.ExpenseParseResult
+import com.expensetracker.app.parser.ParseSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
@@ -180,10 +181,15 @@ class SettingsViewModel @Inject constructor(
             regexResult.value = when (val parsed = expenseNotificationParser.parse(input)) {
                 is ExpenseParseResult.Success -> {
                     val expense = parsed.expense
+                    val via = when (parsed.source) {
+                        ParseSource.LLM -> "LLM"
+                        ParseSource.REGEX -> "regex"
+                    }
                     "Amount: ${expense.currency} ${AmountFormatter.formatDisplay(expense.amount)}\n" +
                         "Merchant: ${expense.merchant ?: "—"}\n" +
                         "Type: ${expense.transactionType.name.lowercase()}\n" +
-                        "Confidence: ${expense.confidence.name.lowercase()}"
+                        "Confidence: ${expense.confidence.name.lowercase()}\n" +
+                        "Parser: $via"
                 }
                 is ExpenseParseResult.SkippedNotTransaction -> {
                     val reason = parsed.reason?.takeIf { it.isNotBlank() } ?: "not a money transaction"
