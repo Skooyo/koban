@@ -89,6 +89,7 @@ interface ExpenseDao {
     /**
      * Package-agnostic duplicate lookup: the same payment can be announced by two different
      * apps (e.g. bank app and wallet app), so only amount, direction and time are compared.
+     * [matchMerchant] also compares the merchant (the sender of a RECEIVE).
      */
     @Query(
         """
@@ -96,6 +97,7 @@ interface ExpenseDao {
         WHERE status != 'DISMISSED'
         AND amount = :amount
         AND transactionType = :transactionType
+        AND (:matchMerchant = 0 OR merchant IS :merchant)
         AND notificationPostTime >= :windowStart AND notificationPostTime <= :windowEnd
         ORDER BY notificationPostTime DESC
         LIMIT 1
@@ -104,6 +106,8 @@ interface ExpenseDao {
     suspend fun findByAmountInWindow(
         amount: BigDecimal,
         transactionType: TransactionType,
+        matchMerchant: Boolean,
+        merchant: String?,
         windowStart: Long,
         windowEnd: Long
     ): ExpenseEntity?

@@ -147,6 +147,9 @@ class ExpenseRepository @Inject constructor(
             val sameAmountNearby = expenseDao.findByAmountInWindow(
                 amount = amount,
                 transactionType = parsed.transactionType,
+                // Two transfers of one amount from different senders are not duplicates.
+                matchMerchant = parsed.transactionType == TransactionType.RECEIVE,
+                merchant = parsed.merchant,
                 windowStart = notificationPostTime - AMOUNT_DEDUP_WINDOW_MS,
                 windowEnd = notificationPostTime + AMOUNT_DEDUP_WINDOW_MS
             )

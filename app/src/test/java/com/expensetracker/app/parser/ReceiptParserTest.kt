@@ -60,6 +60,12 @@ class ReceiptParserTest {
     }
 
     @Test
+    fun parse_skipsZeroPriceItems() {
+        val draft = parse("""{"items":[{"name":"Bag","price":0},{"name":"Tea","price":2.50}]}""")!!
+        assertEquals(listOf(ReceiptItemDraft("Tea", 1, BigDecimal("2.50"))), draft.items)
+    }
+
+    @Test
     fun parse_quantityDefaultsToOne() {
         val draft = parse(
             """{"items":[{"name":"A","price":1},{"name":"B","quantity":0,"price":2},

@@ -45,6 +45,7 @@ class SplitRepository @Inject constructor(
 ) {
     companion object {
         private const val PAYMENT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000L
+        private const val REPAYMENT_LEAD_MS = 24 * 60 * 60 * 1000L
         private val ZERO_MONEY = BigDecimal("0.00")
     }
 
@@ -65,6 +66,8 @@ class SplitRepository @Inject constructor(
                 )
             }
         }
+
+    suspend fun billForExpense(expenseId: String): SplitBillEntity? = splitDao.getBillByLinkedExpense(expenseId)
 
     suspend fun isLocked(billId: String): Boolean =
         splitDao.getDebts(billId).any { it.status == DebtStatus.PAID }
@@ -171,6 +174,9 @@ class SplitRepository @Inject constructor(
     private suspend fun applyLink(billId: String, expenseId: String?) {
         val bill = splitDao.getBill(billId) ?: return
         val oldId = bill.linkedExpenseId
+        if (expenseId != null && splitDao.getBillByLinkedExpense(expenseId)?.id.let { it != null && it != billId }) {
+            throw IllegalStateException("This payment already belongs to another split.")
+        }
         if (oldId != null && oldId != expenseId) {
             expenseDao.getById(oldId)?.let { expenseDao.update(it.copy(countedAmount = null)) }
         }
@@ -193,28 +199,33 @@ class SplitRepository @Inject constructor(
     suspend fun deleteSplit(billId: String) {
         db.withTransaction {
             val bill = splitDao.getBill(billId) ?: return@withTransaction
-            val ids = listOfNotNull(bill.linkedExpenseId) +
-                splitDao.getDebts(billId).mapNotNull { it.repaymentExpenseId }
-            for (id in ids.distinct()) {
-                expenseDao.getById(id)?.let { expenseDao.update(it.copy(countedAmount = null)) }
-            }
+            val repaymentIds = splitDao.getDebts(billId).mapNotNull { it.repaymentExpenseId }
             splitDao.deleteSharesByBill(billId)
             splitDao.deleteItemsByBill(billId)
             splitDao.deleteDebtsByBill(billId)
             splitDao.deleteBill(billId)
+            // A repayment that still pays a debt in another bill stays used.
+            val freed = repaymentIds.filter { splitDao.getDebtsByRepayment(it).isEmpty() }
+            for (id in (listOfNotNull(bill.linkedExpenseId) + freed).distinct()) {
+                expenseDao.getById(id)?.let { expenseDao.update(it.copy(countedAmount = null)) }
+            }
         }
     }
 
-    suspend fun paymentCandidates(total: BigDecimal, now: Long): List<ExpenseEntity> =
-        expenseDao.getRecentByType(TransactionType.WITHDRAW, now - PAYMENT_WINDOW_MS)
-            .filter { it.amount.compareTo(total) == 0 }
+    /** Unlinked withdrawals within 3 days of the bill: exact-amount ones first, newest first. */
+    suspend fun paymentCandidates(billId: String?, total: BigDecimal, billTime: Long): List<ExpenseEntity> =
+        expenseDao.getRecentByType(TransactionType.WITHDRAW, billTime - PAYMENT_WINDOW_MS)
+            .filter { it.notificationPostTime <= billTime + PAYMENT_WINDOW_MS }
+            .filter { splitDao.getBillByLinkedExpense(it.id).let { b -> b == null || b.id == billId } }
+            .partition { it.amount.compareTo(total) == 0 }
+            .let { it.first + it.second }
 
     suspend fun repaymentCandidates(debtId: String): List<ExpenseEntity> {
         val debt = splitDao.getDebt(debtId) ?: return emptyList()
         val bill = splitDao.getBill(debt.billId) ?: return emptyList()
         val personOpen = splitDao.getOpenDebts().filter { it.personId == debt.personId }
             .fold(BigDecimal.ZERO) { sum, d -> sum + d.amount }
-        return expenseDao.getRecentByType(TransactionType.RECEIVE, bill.billTime).filter {
+        return expenseDao.getRecentByType(TransactionType.RECEIVE, bill.billTime - REPAYMENT_LEAD_MS).filter {
             it.amount.compareTo(debt.amount) == 0 || it.amount.compareTo(personOpen) == 0
         }
     }

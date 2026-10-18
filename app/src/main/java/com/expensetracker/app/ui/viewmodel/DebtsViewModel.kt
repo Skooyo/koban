@@ -49,6 +49,7 @@ class DebtsViewModel @Inject constructor(
     /** A null [expenseId] means paid in cash. */
     fun markPaid(expenseId: String?) {
         val debtId = _paying.value?.debt?.debt?.id ?: return
+        if (busy) return
         _paying.value = null
         run("Couldn't mark it paid. Try again.") { splitRepository.markPaid(debtId, expenseId) }
     }

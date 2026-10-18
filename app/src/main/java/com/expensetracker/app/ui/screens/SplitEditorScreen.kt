@@ -310,6 +310,7 @@ private fun ItemEditor(row: ItemRow, vm: SplitEditorViewModel) {
                 value = row.price,
                 onValueChange = { v -> vm.updateItem(row.key) { it.copy(price = v) } },
                 label = { Text("Line price (RM)") },
+                isError = row.price.isNotBlank() && (AmountFormatter.parseInput(row.price)?.signum() ?: 0) <= 0,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.weight(1f)

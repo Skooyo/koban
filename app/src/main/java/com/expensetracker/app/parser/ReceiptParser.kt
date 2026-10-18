@@ -58,7 +58,7 @@ object ReceiptParser {
         for (i in 0 until (array?.length() ?: 0)) {
             val item = array?.optJSONObject(i) ?: continue
             val name = readString(item, "name") ?: continue
-            val price = readAmount(item, "price") ?: continue
+            val price = readAmount(item, "price")?.takeIf { it.signum() > 0 } ?: continue
             val quantity = item.optInt("quantity", 1).takeIf { it > 0 } ?: 1
             items += ReceiptItemDraft(name, quantity, price)
         }

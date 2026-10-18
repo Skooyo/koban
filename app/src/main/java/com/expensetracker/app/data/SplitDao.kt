@@ -45,6 +45,9 @@ interface SplitDao {
     @Query("SELECT * FROM split_debts WHERE billId = :billId")
     suspend fun getDebts(billId: String): List<SplitDebtEntity>
 
+    @Query("SELECT * FROM split_debts WHERE repaymentExpenseId = :expenseId")
+    suspend fun getDebtsByRepayment(expenseId: String): List<SplitDebtEntity>
+
     @Query("SELECT * FROM split_debts WHERE id = :debtId")
     suspend fun getDebt(debtId: String): SplitDebtEntity?
 

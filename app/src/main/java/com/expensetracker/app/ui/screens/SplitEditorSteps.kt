@@ -317,23 +317,28 @@ internal fun SummaryStep(
         state.error?.let {
             item { Text(it, color = MaterialTheme.colorScheme.error) }
         }
-        if (state.locked) {
+        item {
+            OutlinedButton(
+                onClick = { SplitEditorViewModel.shareText(state)?.let(onShare) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Share summary") }
+        }
+        if (state.billId != null) {
             item {
-                OutlinedButton(onClick = vm::changePayment, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
-                    Text("Change payment")
+                if (state.locked) {
+                    OutlinedButton(onClick = vm::changePayment, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
+                        Text("Change payment")
+                    }
+                } else {
+                    OutlinedButton(onClick = vm::editItems, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
+                        Text("Edit items")
+                    }
                 }
                 TextButton(
                     onClick = { confirmDelete = true },
                     enabled = !state.saving,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Delete split", color = MaterialTheme.colorScheme.error) }
-            }
-        } else {
-            item {
-                OutlinedButton(
-                    onClick = { SplitEditorViewModel.shareText(state)?.let(onShare) },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Share summary") }
             }
         }
     }

@@ -100,7 +100,23 @@ class SplitEditorViewModel @Inject constructor(
             _state.update { it.copy(loading = true) }
             viewModelScope.launch { loadExisting(editBillId) }
         } else if (startExpenseId != null) {
-            _state.update { it.copy(selectedExpenseId = startExpenseId) }
+            _state.update { it.copy(loading = true) }
+            viewModelScope.launch {
+                val existing = splitRepository.billForExpense(startExpenseId)
+                if (existing != null) {
+                    loadExisting(existing.id)
+                } else {
+                    val expense = expenseDao.getById(startExpenseId)
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            selectedExpenseId = startExpenseId,
+                            // The pre-linked payment time is the best bill time until a receipt gives a date.
+                            billTime = expense?.notificationPostTime ?: it.billTime
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -116,7 +132,7 @@ class SplitEditorViewModel @Inject constructor(
                 loading = false,
                 billId = billId,
                 locked = locked,
-                step = if (locked) SplitStep.Summary else SplitStep.Items,
+                step = SplitStep.Summary,
                 merchant = draft.merchant.orEmpty(),
                 billTime = draft.billTime,
                 printedTotal = draft.printedTotal,
@@ -261,7 +277,7 @@ class SplitEditorViewModel @Inject constructor(
         val s = _state.value
         val total = totalOf(s) ?: return
         viewModelScope.launch {
-            val found = splitRepository.paymentCandidates(total, System.currentTimeMillis())
+            val found = splitRepository.paymentCandidates(s.billId, total, s.billTime)
             val selected = s.selectedExpenseId?.let { id ->
                 if (found.any { it.id == id }) null else expenseDao.getById(id)
             }
@@ -280,11 +296,15 @@ class SplitEditorViewModel @Inject constructor(
                 _state.update { it.copy(step = SplitStep.Summary, saving = false) }
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: IllegalStateException) {
+                _state.update { it.copy(saving = false, error = e.message) }
             } catch (e: Exception) {
                 _state.update { it.copy(saving = false, error = "Couldn't save the split. Try again.") }
             }
         }
     }
+
+    fun editItems() = _state.update { it.copy(step = SplitStep.Items, error = null) }
 
     fun changePayment() {
         _state.update { it.copy(step = SplitStep.Link) }
@@ -367,9 +387,7 @@ class SplitEditorViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IllegalStateException) {
-                _state.update {
-                    it.copy(saving = false, error = "This split already has a repayment, so it can't change.")
-                }
+                _state.update { it.copy(saving = false, error = e.message) }
             } catch (e: Exception) {
                 _state.update { it.copy(saving = false, error = "Couldn't save the split. Try again.") }
             }
