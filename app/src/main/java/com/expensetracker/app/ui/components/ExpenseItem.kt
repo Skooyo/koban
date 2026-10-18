@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.data.ParseConfidence
 import com.expensetracker.app.data.TransactionType
+import com.expensetracker.app.data.effectiveAmount
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.theme.categoryColor
 import java.math.BigDecimal
@@ -176,7 +177,7 @@ fun LazyListScope.expensesByDay(
 @Composable
 private fun DayHeader(timeMs: Long, expenses: List<ExpenseEntity>) {
     val spent = expenses.fold(BigDecimal.ZERO) { sum, e ->
-        if (e.transactionType == TransactionType.RECEIVE) sum else sum + e.amount
+        if (e.transactionType == TransactionType.RECEIVE) sum else sum + e.effectiveAmount
     }
     Column(modifier = Modifier.padding(top = 20.dp)) {
         Row(

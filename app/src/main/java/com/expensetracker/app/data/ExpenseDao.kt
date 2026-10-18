@@ -29,7 +29,7 @@ interface ExpenseDao {
     @Query(
         """
         SELECT COALESCE(SUM(
-            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
+            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
         ), 0) FROM expenses
         WHERE status != 'DISMISSED'
         AND notificationPostTime >= :start AND notificationPostTime < :end
@@ -60,7 +60,7 @@ interface ExpenseDao {
         """
         SELECT categoryId,
         COALESCE(SUM(
-            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
+            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
         ), 0) AS total
         FROM expenses
         WHERE status != 'DISMISSED'
@@ -75,7 +75,7 @@ interface ExpenseDao {
     @Query(
         """
         SELECT COALESCE(SUM(
-            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
+            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
         ), 0) FROM expenses
         WHERE status != 'DISMISSED'
         AND notificationPostTime >= :startOfDay AND notificationPostTime < :endOfDay
@@ -118,6 +118,17 @@ interface ExpenseDao {
     )
     suspend fun findByNotificationKey(notificationKey: String): ExpenseEntity?
 
+    /** Active rows of one type since [since] that no split has adjusted yet, newest first. */
+    @Query(
+        """
+        SELECT * FROM expenses
+        WHERE status != 'DISMISSED' AND transactionType = :type
+        AND countedAmount IS NULL AND notificationPostTime >= :since
+        ORDER BY notificationPostTime DESC
+        """
+    )
+    suspend fun getRecentByType(type: TransactionType, since: Long): List<ExpenseEntity>
+
     @Query("SELECT * FROM expenses WHERE id = :id")
     suspend fun getById(id: String): ExpenseEntity?
 
@@ -133,7 +144,7 @@ interface ExpenseDao {
             (CAST(strftime('%Y', notificationPostTime / 1000, 'unixepoch', 'localtime') AS INTEGER) * 100
             + CAST(strftime('%m', notificationPostTime / 1000, 'unixepoch', 'localtime') AS INTEGER)) AS yearMonth,
             COALESCE(SUM(
-                CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
+                CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
             ), 0) AS total
         FROM expenses
         WHERE status != 'DISMISSED'
@@ -146,7 +157,7 @@ interface ExpenseDao {
     @Query(
         """
         SELECT COALESCE(SUM(
-            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
+            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
         ), 0) FROM expenses
         WHERE status != 'DISMISSED'
         AND notificationPostTime >= :start AND notificationPostTime < :end

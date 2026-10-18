@@ -30,6 +30,14 @@ class ParseConfidenceConverter {
     fun toConfidence(value: String): ParseConfidence = ParseConfidence.valueOf(value)
 }
 
+class DebtStatusConverter {
+    @TypeConverter
+    fun fromStatus(status: DebtStatus): String = status.name
+
+    @TypeConverter
+    fun toStatus(value: String): DebtStatus = DebtStatus.valueOf(value)
+}
+
 class TransactionTypeConverter {
     @TypeConverter
     fun fromType(type: TransactionType): String = type.name

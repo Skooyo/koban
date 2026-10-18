@@ -24,5 +24,9 @@ data class ExpenseEntity(
     val notificationKey: String?,
     val categoryId: String? = null,
     val notes: String? = null,
-    val transactionType: TransactionType = TransactionType.WITHDRAW
+    val transactionType: TransactionType = TransactionType.WITHDRAW,
+    /** What this payment cost me after a split. Null means the full [amount]. */
+    val countedAmount: BigDecimal? = null
 )
+
+val ExpenseEntity.effectiveAmount: BigDecimal get() = countedAmount ?: amount

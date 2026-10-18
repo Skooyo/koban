@@ -63,3 +63,18 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_expenses_dedupKey ON expenses(dedupKey)")
     }
 }
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE expenses ADD COLUMN countedAmount TEXT")
+        db.execSQL("CREATE TABLE IF NOT EXISTS split_bills (id TEXT NOT NULL, merchant TEXT, billTime INTEGER NOT NULL, currency TEXT NOT NULL, printedTotal TEXT, serviceCharge TEXT NOT NULL, tax TEXT NOT NULL, discount TEXT NOT NULL, rounding TEXT NOT NULL, linkedExpenseId TEXT, createdAt INTEGER NOT NULL, PRIMARY KEY(id))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS split_items (id TEXT NOT NULL, billId TEXT NOT NULL, name TEXT NOT NULL, quantity INTEGER NOT NULL, price TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY(id))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_split_items_billId ON split_items (billId)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS split_people (id TEXT NOT NULL, name TEXT NOT NULL, lastUsedAt INTEGER NOT NULL, PRIMARY KEY(id))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS split_item_shares (itemId TEXT NOT NULL, personId TEXT NOT NULL, PRIMARY KEY(itemId, personId))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_split_item_shares_personId ON split_item_shares (personId)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS split_debts (id TEXT NOT NULL, billId TEXT NOT NULL, personId TEXT NOT NULL, amount TEXT NOT NULL, status TEXT NOT NULL, repaymentExpenseId TEXT, suggestedRepaymentExpenseId TEXT, paidAt INTEGER, PRIMARY KEY(id))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_split_debts_billId ON split_debts (billId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_split_debts_personId ON split_debts (personId)")
+    }
+}

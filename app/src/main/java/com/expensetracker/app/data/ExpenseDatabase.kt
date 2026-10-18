@@ -8,19 +8,26 @@ import androidx.room.TypeConverters
     entities = [
         ExpenseEntity::class,
         CategoryEntity::class,
-        MerchantCategoryEntity::class
+        MerchantCategoryEntity::class,
+        SplitBillEntity::class,
+        SplitItemEntity::class,
+        SplitPersonEntity::class,
+        SplitItemShareEntity::class,
+        SplitDebtEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(
     BigDecimalConverters::class,
     ExpenseStatusConverter::class,
     ParseConfidenceConverter::class,
-    TransactionTypeConverter::class
+    TransactionTypeConverter::class,
+    DebtStatusConverter::class
 )
 abstract class ExpenseDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun categoryDao(): CategoryDao
     abstract fun merchantCategoryDao(): MerchantCategoryDao
+    abstract fun splitDao(): SplitDao
 }
