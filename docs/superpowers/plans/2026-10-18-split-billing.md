@@ -4,7 +4,7 @@
 
 **Goal:** Photograph a receipt, get its items from Gemini, assign items to people, record only the owner's share as spending, and track who owes the owner until repaid.
 
-**Architecture:** Pure Kotlin money rules (`SplitMath`), receipt JSON parsing (`ReceiptParser`) and repayment matching (`RepaymentMatcher`) carry all the logic and all the unit tests. Room stores bills, items, people, shares and debts (database v6). Every existing spending total switches from `amount` to `COALESCE(countedAmount, amount)`; a linked card payment gets `countedAmount` = owner's share, and a confirmed repayment gets `countedAmount` = 0, so nothing is counted twice.
+**Architecture:** Pure Kotlin money rules (`SplitMath`), receipt JSON parsing (`ReceiptParser`) and repayment matching (`RepaymentMatcher`) carry all the logic and all the unit tests. Room stores bills, items, people, shares and debts (database v6). Totals already count spending only (received money adds 0; see commit "Count spending only in totals"). Every spending total switches from `amount` to `COALESCE(countedAmount, amount)`, so a linked card payment counts as the owner's share. A confirmed repayment gets `countedAmount` = 0, which marks it as used (it already never counts in totals).
 
 **Tech Stack:** Kotlin 2.0, Jetpack Compose + Material 3, Hilt, Room 2.6 (KSP), OkHttp + org.json, Gemini `generateContent` with inline image data.
 
@@ -18,7 +18,7 @@
 - Database goes from version 5 to 6 with a migration. `fallbackToDestructiveMigration` is forbidden: the owner has 379 real expenses on the phone.
 - Reuse `GeminiClient` (same `.env` key, same primary/secondary model fallback). Without a key, or on failure, open the item editor empty.
 - UI follows the existing theme (`ui/theme/Theme.kt`) and components (`MoneyAmount`, `ExpenseListCard`, `PeriodTotalRow`, `categoryFill`). Sentence case copy, no all-caps labels.
-- Do not commit. The owner commits by hand. Leave changes in the working tree.
+- Work on branch `feature/split-billing`. Commit at the end of each task with the owner's git identity and no AI attribution lines. Do not push; the controller pushes.
 - Build/test from PowerShell with `$env:JAVA_HOME = 'C:\Users\daven\AppData\Local\Temp\claude\d--Projects-Expense-Tracker\783d92a6-f61a-4a33-bbf4-ccfcdb48ee2a\scratchpad\jdk\jdk-17.0.20.1+1'` (no JDK is installed on this PC).
 - Unit test command: `.\gradlew.bat testDebugUnitTest --tests "<class>"`. Instrumented tests (`connectedAndroidTest`) are forbidden: AGP uninstalls the app afterwards and would delete the owner's data.
 
@@ -199,7 +199,7 @@ Entity annotations must declare the same indices (`Index("billId")`, `Index("per
 - [ ] **Step 2: Run** `--tests "com.expensetracker.app.data.ExpenseEffectiveAmountTest"` — expected: compilation FAIL.
 - [ ] **Step 3: Add entities, DAO, converter, migration, DI wiring, `effectiveAmount`.**
 - [ ] **Step 4: Replace `amount` with `COALESCE(countedAmount, amount)` inside every `SUM(CASE …)` in `ExpenseDao`** (5 queries: `observeTotalForRange`, `observeTotalsByCategory`, `observeTotalForDay`, `observeMonthlyTotals`, `getTotalForRangeOnce`). Leave `findByAmountInWindow` on `amount` (dedup compares what the bank sent).
-- [ ] **Step 5: `DayHeader` in `ExpenseItem.kt` sums `effectiveAmount`.**
+- [ ] **Step 5: `DayHeader` in `ExpenseItem.kt` sums `effectiveAmount` of WITHDRAW rows (RECEIVE rows add nothing, as today).**
 - [ ] **Step 6: Run** `.\gradlew.bat assembleDebug testDebugUnitTest` — expected: BUILD SUCCESSFUL, all tests PASS. (Room validates the migration only on the device; Task 8 checks it.)
 
 ---

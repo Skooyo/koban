@@ -111,9 +111,10 @@ in the edit dialog of an existing expense (this pre-links that expense).
 
 ### Effect on the tracker
 
-- Today every total subtracts all Receive rows from spending (ExpenseDao
-  queries and the day header sum in ExpenseItem.kt). Split billing changes
-  this, as below.
+- Totals count spending only (owner's decision, 2026-10-18, commit "Count
+  spending only in totals"). Money received is shown as a separate line and
+  never lowers spending. A repayment therefore cannot be counted twice;
+  confirming one only closes debts.
 - A linked expense counts as the owner's spending as defined above, in every
   spending total and in its category. The expense row shows that amount as the
   main amount, with the full amount paid in smaller text.
@@ -123,10 +124,10 @@ in the edit dialog of an existing expense (this pre-links that expense).
   If its amount equals one open debt, or the sum of several whole open debts of
   the same person, mark it on those debts as "Possible repayment". Prefer
   matches where the sender name in the notification resembles the person's
-  name. The owner confirms with one tap. Until confirmed, the transfer counts
-  as normal received money.
-- A confirmed repayment does not count in spending totals, so money is not
-  counted twice.
+  name. The owner confirms with one tap. Until confirmed, the transfer is
+  normal received money.
+- A confirmed repayment is marked as used (shown as "Repayment" in lists) so
+  it cannot be linked to another debt.
 - One repayment can close one or more **whole** debts of the same person
   (owner's decision). No part payments or overpayments in v1.
 - "Mark paid" by hand: pick a Receive transaction to link (same rules), or
