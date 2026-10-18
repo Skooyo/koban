@@ -98,7 +98,7 @@ class SplitRepository @Inject constructor(
         val billId = draft.billId ?: UUID.randomUUID().toString()
         val existing = draft.billId?.let { splitDao.getBill(it) }
         if (existing != null && isLocked(billId)) {
-            throw IllegalStateException("Split already has a repayment and cannot change")
+            throw IllegalStateException("This split already has a repayment, so it can't change.")
         }
         val now = System.currentTimeMillis()
 

@@ -54,6 +54,8 @@ data class SplitEditorState(
     val billId: String? = null,
     /** A bill with a paid debt. Only its payment link and deletion may change. */
     val locked: Boolean = false,
+    /** A saved bill reopened with "Edit items". Without it, a saved bill is only viewed. */
+    val editing: Boolean = false,
     val merchant: String = "",
     val billTime: Long = System.currentTimeMillis(),
     val printedTotal: BigDecimal? = null,
@@ -297,14 +299,14 @@ class SplitEditorViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IllegalStateException) {
-                _state.update { it.copy(saving = false, error = e.message) }
+                _state.update { it.copy(saving = false, error = e.message ?: "Couldn't save the split. Try again.") }
             } catch (e: Exception) {
                 _state.update { it.copy(saving = false, error = "Couldn't save the split. Try again.") }
             }
         }
     }
 
-    fun editItems() = _state.update { it.copy(step = SplitStep.Items, error = null) }
+    fun editItems() = _state.update { it.copy(step = SplitStep.Items, editing = true, error = null) }
 
     fun changePayment() {
         _state.update { it.copy(step = SplitStep.Link) }
@@ -355,7 +357,7 @@ class SplitEditorViewModel @Inject constructor(
             SplitStep.People -> SplitStep.Items
             SplitStep.Assign -> SplitStep.People
             SplitStep.Link -> if (s.locked) SplitStep.Summary else SplitStep.Assign
-            SplitStep.Summary -> if (s.locked) return false else SplitStep.Link
+            SplitStep.Summary -> if (s.locked || (s.billId != null && !s.editing)) return false else SplitStep.Link
         }
         _state.update { it.copy(step = target, error = null) }
         return true
@@ -366,6 +368,11 @@ class SplitEditorViewModel @Inject constructor(
     fun done() {
         val s = _state.value
         if (s.locked || s.saving) return
+        // A viewed bill has nothing to save; re-saving would drop its repayment suggestions.
+        if (s.billId != null && !s.editing) {
+            _state.update { it.copy(finished = true) }
+            return
+        }
         val items = parseItems(s) ?: return
         val charges = chargesOf(s) ?: return
         val draft = SplitDraft(
@@ -387,7 +394,7 @@ class SplitEditorViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IllegalStateException) {
-                _state.update { it.copy(saving = false, error = e.message) }
+                _state.update { it.copy(saving = false, error = e.message ?: "Couldn't save the split. Try again.") }
             } catch (e: Exception) {
                 _state.update { it.copy(saving = false, error = "Couldn't save the split. Try again.") }
             }
