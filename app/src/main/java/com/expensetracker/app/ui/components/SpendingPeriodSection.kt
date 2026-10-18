@@ -21,7 +21,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -67,6 +71,29 @@ fun MoneyAmount(
     )
 }
 
+/** Solid fill for a category; diagonal stripes for uncategorized, so it reads as "not sorted yet". */
+fun Modifier.categoryFill(categoryId: String?, color: Color): Modifier =
+    if (categoryId != null) {
+        background(color)
+    } else {
+        drawBehind {
+            val step = 5.5.dp.toPx()
+            clipRect {
+                var x = -size.height
+                while (x < size.width) {
+                    drawLine(
+                        color = color,
+                        start = Offset(x, size.height),
+                        end = Offset(x + size.height, 0f),
+                        strokeWidth = 2.5.dp.toPx()
+                    )
+                    x += step
+                }
+            }
+            drawRect(color = color.copy(alpha = 0.55f), style = Stroke(width = 1.dp.toPx()))
+        }
+    }
+
 /** Spending split by category, one banknote colour per category. Received money is left out. */
 @Composable
 fun NoteStrip(
@@ -94,7 +121,7 @@ fun NoteStrip(
                 Modifier
                     .weight(item.total.toFloat())
                     .fillMaxHeight()
-                    .background(categoryColor(item.categoryId))
+                    .categoryFill(item.categoryId, categoryColor(item.categoryId))
             )
         }
     }

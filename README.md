@@ -2,7 +2,7 @@
 
 Android app that tracks spending by reading bank and wallet payment notifications on your phone.
 
-[Overview](#overview) • [Features](#features) • [Getting started](#getting-started) • [Build](#build) • [Privacy](#privacy--security) • [Troubleshooting](#troubleshooting)
+[Overview](#overview) • [Demo](#demo) • [Features](#features) • [Getting started](#getting-started) • [Build](#build) • [Privacy](#privacy--security) • [Troubleshooting](#troubleshooting)
 
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-API%2026%2B-3DDC84?style=flat-square&logo=android&logoColor=white)
@@ -28,6 +28,21 @@ Room database (on device)
         ▼
 Home · Expenses · History · Settings
 ```
+
+## Demo
+
+Home, Expenses and History in dark mode (the default) and light mode. All merchants and amounts are sample data.
+
+![Home, Expenses and History screens in dark mode](docs/screenshots/screens-dark.png)
+
+<details>
+<summary>Light mode</summary>
+
+![Home, Expenses and History screens in light mode](docs/screenshots/screens-light.png)
+
+</details>
+
+Each spending category takes the color of a ringgit note (RM10 red, RM1 blue, RM100 purple, RM20 orange, RM50 teal, gold foil). Uncategorized spending shows as stripes.
 
 ## Features
 

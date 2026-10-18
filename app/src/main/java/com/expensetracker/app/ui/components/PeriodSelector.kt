@@ -1,6 +1,5 @@
 package com.expensetracker.app.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +33,7 @@ fun CategoryBreakdownList(
                     modifier = Modifier
                         .size(10.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(categoryColor(item.categoryId))
+                        .categoryFill(item.categoryId, categoryColor(item.categoryId))
                 )
                 Text(
                     text = item.name,

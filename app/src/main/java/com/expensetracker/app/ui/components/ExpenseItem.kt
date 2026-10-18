@@ -1,6 +1,5 @@
 package com.expensetracker.app.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,7 +76,7 @@ fun ExpenseListCard(
                 .width(4.dp)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(2.dp))
-                .background(categoryColor(expense.categoryId))
+                .categoryFill(expense.categoryId, categoryColor(expense.categoryId))
         )
         Column(
             modifier = Modifier

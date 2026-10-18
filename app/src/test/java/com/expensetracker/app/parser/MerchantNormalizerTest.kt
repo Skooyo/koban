@@ -17,7 +17,7 @@ class MerchantNormalizerTest {
     @Test
     fun leavesCleanMerchantAlone() {
         assertEquals("Starbucks", MerchantNormalizer.clean("Starbucks"))
-        assertEquals("VINCENT WESLEY LIEM", MerchantNormalizer.clean("VINCENT WESLEY LIEM"))
+        assertEquals("AISYAH NUR RAHMAN", MerchantNormalizer.clean("AISYAH NUR RAHMAN"))
     }
 
     @Test

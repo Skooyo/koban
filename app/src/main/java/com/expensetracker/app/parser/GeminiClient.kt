@@ -186,7 +186,7 @@ Rules:
   - amount: the transaction amount as a number (no currency symbol). Prefer the payment amount over balances.
   - currency: default "MYR" when RM/MYR or Malaysian context; otherwise use the stated ISO-like code.
   - merchant: ONLY the merchant, shop, recipient, or counterparty name.
-    Examples: "KK - SUPER MART - UMN", "Starbucks", "VINCENT WESLEY LIEM".
+    Examples: "KK - SUPER MART - UMN", "Starbucks", "AISYAH NUR RAHMAN".
     NEVER include card/account tails such as "with your Maybank Debit Card Visa ending with 3729",
     "using your debit card", "ending with 1234", account numbers, refs, or payment method text.
     Strip quotes and trailing punctuation. null if unknown.

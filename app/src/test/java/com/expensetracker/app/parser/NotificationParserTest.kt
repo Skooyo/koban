@@ -105,11 +105,11 @@ class NotificationParserTest {
     @Test
     fun parse_transferSuccessfulStyle() {
         val result = NotificationParser.parse(
-            "RM 1.00 has been successfully transferred to VINCENT WESLEY LIEM"
+            "RM 1.00 has been successfully transferred to AISYAH NUR RAHMAN"
         )
         assertNotNull(result)
         assertEquals(BigDecimal("1.00"), result!!.amount)
-        assertEquals("VINCENT WESLEY LIEM", result.merchant)
+        assertEquals("AISYAH NUR RAHMAN", result.merchant)
         assertEquals(TransactionType.WITHDRAW, result.transactionType)
         assertEquals(ParseConfidence.HIGH, result.confidence)
     }
@@ -117,11 +117,11 @@ class NotificationParserTest {
     @Test
     fun parse_maybankTransferStyle() {
         val result = NotificationParser.parse(
-            "You've transferred RM 2.00 to VINCENT WESLEY LIEM"
+            "You've transferred RM 2.00 to AISYAH NUR RAHMAN"
         )
         assertNotNull(result)
         assertEquals(BigDecimal("2.00"), result!!.amount)
-        assertEquals("VINCENT WESLEY LIEM", result.merchant)
+        assertEquals("AISYAH NUR RAHMAN", result.merchant)
         assertEquals(TransactionType.WITHDRAW, result.transactionType)
         assertEquals(ParseConfidence.HIGH, result.confidence)
     }

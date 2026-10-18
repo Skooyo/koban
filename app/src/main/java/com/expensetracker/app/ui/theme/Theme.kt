@@ -19,41 +19,75 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.expensetracker.app.R
 
-/** Colours taken from the Malaysian ringgit notes. Each spending category gets one note. */
-object Ringgit {
-    val Rm1Blue = Color(0xFF2F62A8)
-    val Rm5Green = Color(0xFF2E8B57)
-    val Rm10Red = Color(0xFFC9423A)
-    val Rm20Orange = Color(0xFFE0872F)
-    val Rm50Teal = Color(0xFF23898F)
-    val Rm100Purple = Color(0xFF7051AE)
-    val GoldFoil = Color(0xFFC49A2C)
-    val Indigo = Color(0xFF5C6BC0)
-    val Slate = Color(0xFF7A8696)
-}
-
-/** Colour for a category id. Custom categories all share the indigo they are saved with. */
-fun categoryColor(categoryId: String?): Color = when (categoryId) {
-    "food" -> Ringgit.Rm10Red
-    "transport" -> Ringgit.Rm1Blue
-    "shopping" -> Ringgit.Rm100Purple
-    "bills" -> Ringgit.Rm20Orange
-    "entertainment" -> Ringgit.GoldFoil
-    "health" -> Ringgit.Rm50Teal
-    null, "other" -> Ringgit.Slate
-    else -> Ringgit.Indigo
-}
-
+/**
+ * Money colours. The six notes come from the Malaysian ringgit (RM10 red, RM1 blue, RM20 orange,
+ * RM100 purple, RM50 teal, gold foil); dark mode uses brighter "polymer" versions so they hold
+ * up on the ink background.
+ */
 @Immutable
-data class MoneyColors(val received: Color, val review: Color)
+data class MoneyColors(
+    val received: Color,
+    val review: Color,
+    val red: Color,
+    val blue: Color,
+    val orange: Color,
+    val purple: Color,
+    val teal: Color,
+    val gold: Color,
+    val custom: Color,
+    val other: Color,
+    val uncategorized: Color
+)
 
-private val LightMoney = MoneyColors(received = Color(0xFF1F7A47), review = Color(0xFFA85A00))
-private val DarkMoney = MoneyColors(received = Color(0xFF7FCF9C), review = Color(0xFFF0B060))
+private val LightMoney = MoneyColors(
+    received = Color(0xFF188A4A),
+    review = Color(0xFFA85A00),
+    red = Color(0xFFE5483B),
+    blue = Color(0xFF1F6FE0),
+    orange = Color(0xFFF08A1C),
+    purple = Color(0xFF7B4FD6),
+    teal = Color(0xFF0E9C95),
+    gold = Color(0xFFD8A31A),
+    custom = Color(0xFF4C5FD5),
+    other = Color(0xFF6B7686),
+    uncategorized = Color(0xFF6B7686)
+)
+
+private val DarkMoney = MoneyColors(
+    received = Color(0xFF5EDB8F),
+    review = Color(0xFFF0B060),
+    red = Color(0xFFFF6B5E),
+    blue = Color(0xFF5B9BFF),
+    orange = Color(0xFFFFA94D),
+    purple = Color(0xFFA98BFF),
+    teal = Color(0xFF3CC6C0),
+    gold = Color(0xFFF2C94C),
+    custom = Color(0xFF8C9EFF),
+    other = Color(0xFF8A96A8),
+    uncategorized = Color(0xFFA3AEBD)
+)
 
 val LocalMoneyColors = staticCompositionLocalOf { LightMoney }
 
+/** Colour for a category id. Custom categories all share one colour, like the indigo they are saved with. */
+@Composable
+fun categoryColor(categoryId: String?): Color {
+    val c = LocalMoneyColors.current
+    return when (categoryId) {
+        "food" -> c.red
+        "transport" -> c.blue
+        "shopping" -> c.purple
+        "bills" -> c.orange
+        "entertainment" -> c.gold
+        "health" -> c.teal
+        "other" -> c.other
+        null -> c.uncategorized
+        else -> c.custom
+    }
+}
+
 private val LightColors = lightColorScheme(
-    primary = Ringgit.Rm1Blue,
+    primary = Color(0xFF1F5FD1),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFDCE6F5),
     onPrimaryContainer = Color(0xFF12305E),
@@ -78,28 +112,32 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF8FB2EA),
-    onPrimary = Color(0xFF0E2A55),
-    primaryContainer = Color(0xFF23406E),
-    onPrimaryContainer = Color(0xFFD8E4F8),
+    primary = Color(0xFF6EA8FF),
+    onPrimary = Color(0xFF0A2350),
+    primaryContainer = Color(0xFF22406F),
+    onPrimaryContainer = Color(0xFFD8E6FF),
     secondary = Color(0xFFB4C0D0),
     onSecondary = Color(0xFF1E2938),
-    secondaryContainer = Color(0xFF2E3A4C),
-    onSecondaryContainer = Color(0xFFDDE5EF),
+    secondaryContainer = Color(0xFF33415A),
+    onSecondaryContainer = Color(0xFFE3EAF5),
     tertiary = Color(0xFFF0B060),
-    background = Color(0xFF1A2230),
-    onBackground = Color(0xFFE8EDF3),
-    surface = Color(0xFF1A2230),
-    onSurface = Color(0xFFE8EDF3),
-    surfaceVariant = Color(0xFF2A3546),
-    onSurfaceVariant = Color(0xFF9DA9B9),
-    surfaceContainerLowest = Color(0xFF151C28),
-    surfaceContainerLow = Color(0xFF202A3A),
-    surfaceContainer = Color(0xFF243042),
-    surfaceContainerHigh = Color(0xFF2A3649),
-    surfaceContainerHighest = Color(0xFF313E52),
+    error = Color(0xFFFF8A80),
+    onError = Color(0xFF5C0E14),
+    errorContainer = Color(0xFF7A1F2B),
+    onErrorContainer = Color(0xFFFFE3E0),
+    background = Color(0xFF161D29),
+    onBackground = Color(0xFFEEF2F7),
+    surface = Color(0xFF161D29),
+    onSurface = Color(0xFFEEF2F7),
+    surfaceVariant = Color(0xFF263042),
+    onSurfaceVariant = Color(0xFFA3AEBD),
+    surfaceContainerLowest = Color(0xFF111722),
+    surfaceContainerLow = Color(0xFF1B2331),
+    surfaceContainer = Color(0xFF1F2836),
+    surfaceContainerHigh = Color(0xFF263042),
+    surfaceContainerHighest = Color(0xFF2D384B),
     outline = Color(0xFF6B7788),
-    outlineVariant = Color(0xFF323E50)
+    outlineVariant = Color(0xFF2C3747)
 )
 
 // One variable font. Text sizes use the small optical size; display sizes use the large one.
