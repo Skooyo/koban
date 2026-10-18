@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-color Koban coin for themed launcher icons. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-14">
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M31,54a23,30.5 0,1 0,46 0a23,30.5 0,1 0,-46 0zM34.5,54a19.5,27 0,1 0,39 0a19.5,27 0,1 0,-39 0z" />
+        <path
+            android:pathData="M38.5,45h31M38.5,63h31"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="3.4" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M50,47.5h8a2.5,2.5 0,0 1,2.5 2.5v8a2.5,2.5 0,0 1,-2.5 2.5h-8a2.5,2.5 0,0 1,-2.5 -2.5v-8a2.5,2.5 0,0 1,2.5 -2.5z" />
+    </group>
+</vector>

@@ -41,7 +41,7 @@ object ListenerDisconnectNotifier {
         )
 
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_koban)
             .setContentTitle(appContext.getString(R.string.disconnect_alert_title))
             .setContentText(appContext.getString(R.string.disconnect_alert_text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -49,12 +49,12 @@ object ListenerDisconnectNotifier {
             .setAutoCancel(false)
             .setContentIntent(openApp)
             .addAction(
-                R.drawable.ic_launcher_foreground,
+                R.drawable.ic_stat_koban,
                 appContext.getString(R.string.disconnect_alert_reconnect),
                 openApp
             )
             .addAction(
-                R.drawable.ic_launcher_foreground,
+                R.drawable.ic_stat_koban,
                 appContext.getString(R.string.disconnect_alert_settings),
                 openSettings
             )

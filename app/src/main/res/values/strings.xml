@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Expense Tracker</string>
+    <string name="app_name">Koban</string>
     <string name="keepalive_channel_name">Expense tracking</string>
     <string name="keepalive_channel_description">Keeps payment notification tracking active in the background</string>
     <string name="keepalive_notification_title">Tracking payment notifications</string>
-    <string name="keepalive_notification_text">Expense Tracker is listening for bank and wallet alerts</string>
+    <string name="keepalive_notification_text">Koban is listening for bank and wallet alerts</string>
     <string name="disconnect_alert_channel">Listener alerts</string>
     <string name="disconnect_alert_channel_description">Alerts when payment notification tracking stops</string>
     <string name="disconnect_alert_title">Payment tracking disconnected</string>

@@ -1,4 +1,4 @@
-# Expense Tracker
+# Koban
 
 Android app that tracks spending by reading bank and wallet payment notifications on your phone.
 
@@ -10,7 +10,7 @@ Android app that tracks spending by reading bank and wallet payment notification
 
 ## Overview
 
-Expense Tracker listens to payment alerts from banking and e-wallet apps, extracts the amount and merchant, and saves them as expenses automatically. You get day / week / month spending summaries with categories — without typing every purchase by hand.
+Koban listens to payment alerts from banking and e-wallet apps, extracts the amount and merchant, and saves them as expenses automatically. You get day / week / month spending summaries with categories — without typing every purchase by hand.
 
 It is built for Malaysian Ringgit notifications (`RM` / `MYR`), with optional [Google AI Studio](https://aistudio.google.com/) Gemini parsing for better merchant extraction and filtering out promotional messages that only mention money amounts.
 
@@ -30,6 +30,10 @@ Home · Expenses · History · Settings
 ```
 
 ## Demo
+
+A 21-second demo with sound: a payment notification becomes an expense, spending by category, a bill split from a receipt photo, and a repayment confirmed. Click the image to play it.
+
+[![Koban demo video](docs/demo/koban-demo.jpg)](docs/demo/koban-demo.mp4)
 
 Home, Expenses and History in dark mode (the default) and light mode. All merchants and amounts are sample data.
 
@@ -70,7 +74,7 @@ Each spending category takes the color of a ringgit note (RM10 red, RM1 blue, RM
 1. Clone the repository and open it in Android Studio.
 2. Sync Gradle, then run on your device (`Run` or `./gradlew.bat installDebug`).
 3. Grant **Notification access**:
-   - Android Settings → Apps → Special app access → **Notification access** → enable **Expense Tracker**
+   - Android Settings → Apps → Special app access → **Notification access** → enable **Koban**
 4. Open the app **Settings** tab:
    - Leave the allowlist empty to track all apps, or add your bank/wallet package names
    - On Xiaomi/HyperOS, follow the in-app battery/autostart checklist so the listener is not killed

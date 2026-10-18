@@ -62,11 +62,11 @@ object OemBatteryHelper {
     }
 
     fun xiaomiChecklist(): List<String> = listOf(
-        "Security app → Autostart → turn ON for Expense Tracker",
-        "Settings → Apps → Expense Tracker → App permissions → Background autostart → Allow",
-        "Settings → Apps → Expense Tracker → Battery saver → No restrictions",
-        "Settings → Apps → Expense Tracker → turn OFF “Restrict background activity” if shown",
-        "Recent apps → long-press Expense Tracker → tap the lock icon (do not “Clear all”)",
+        "Security app → Autostart → turn ON for Koban",
+        "Settings → Apps → Koban → App permissions → Background autostart → Allow",
+        "Settings → Apps → Koban → Battery saver → No restrictions",
+        "Settings → Apps → Koban → turn OFF “Restrict background activity” if shown",
+        "Recent apps → long-press Koban → tap the lock icon (do not “Clear all”)",
         "Keep the persistent “Tracking payment notifications” notification visible",
         "If notification access keeps turning off, disable MIUI optimizations in Developer options"
     )
