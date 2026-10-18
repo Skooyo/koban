@@ -28,6 +28,7 @@ import com.expensetracker.app.ui.viewmodel.FilteredExpensesViewModel
 @Composable
 fun FilteredExpensesScreen(
     onBack: () -> Unit,
+    onSplit: (expenseId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: FilteredExpensesViewModel = hiltViewModel()
 ) {
@@ -82,6 +83,10 @@ fun FilteredExpensesScreen(
             expense = expense,
             categories = categories,
             onDismiss = viewModel::clearEditing,
+            onSplit = {
+                viewModel.clearEditing()
+                onSplit(expense.id)
+            },
             onSave = viewModel::saveEdit
         )
     }

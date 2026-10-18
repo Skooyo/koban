@@ -30,6 +30,7 @@ import com.expensetracker.app.ui.screens.HistoryWeeksScreen
 import com.expensetracker.app.ui.screens.HomeScreen
 import com.expensetracker.app.ui.screens.NotificationDebugScreen
 import com.expensetracker.app.ui.screens.SettingsScreen
+import com.expensetracker.app.ui.screens.SplitEditorScreen
 
 private data class BottomNavItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -86,7 +87,9 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
                     onNavigateToFiltered = { route -> navController.navigate(route) }
                 )
             }
-            composable(Routes.EXPENSES) { ExpensesScreen() }
+            composable(Routes.EXPENSES) {
+                ExpensesScreen(onSplit = { id -> navController.navigate(Routes.splitNew(id)) })
+            }
             composable(Routes.HISTORY) {
                 HistoryMonthsScreen(
                     onMonthClick = { yearMonth ->
@@ -113,7 +116,28 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
                     navArgument("title") { type = NavType.StringType }
                 )
             ) {
-                FilteredExpensesScreen(onBack = { navController.popBackStack() })
+                FilteredExpensesScreen(
+                    onBack = { navController.popBackStack() },
+                    onSplit = { id -> navController.navigate(Routes.splitNew(id)) }
+                )
+            }
+            composable(
+                route = Routes.SPLIT_NEW,
+                arguments = listOf(
+                    navArgument("expenseId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) {
+                SplitEditorScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = Routes.SPLIT_EDIT,
+                arguments = listOf(navArgument("billId") { type = NavType.StringType })
+            ) {
+                SplitEditorScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.SETTINGS) {
                 SettingsScreen(

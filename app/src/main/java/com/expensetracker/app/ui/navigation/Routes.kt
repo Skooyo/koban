@@ -11,6 +11,14 @@ object Routes {
     const val EXPENSES_FILTER = "expenses/filter/{start}/{end}/{title}"
     const val HISTORY_MONTH = "history/{yearMonth}"
 
+    const val SPLIT_NEW = "split/new?expenseId={expenseId}"
+    const val SPLIT_EDIT = "split/{billId}"
+
+    fun splitNew(expenseId: String?): String =
+        if (expenseId == null) "split/new" else "split/new?expenseId=${Uri.encode(expenseId)}"
+
+    fun splitEdit(billId: String): String = "split/${Uri.encode(billId)}"
+
     fun expensesFilter(start: Long, end: Long, title: String): String {
         return "expenses/filter/$start/$end/${Uri.encode(title)}"
     }

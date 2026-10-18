@@ -1,10 +1,13 @@
 package com.expensetracker.app.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,6 +21,7 @@ import com.expensetracker.app.ui.viewmodel.ExpensesViewModel
 
 @Composable
 fun ExpensesScreen(
+    onSplit: (expenseId: String?) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ExpensesViewModel = hiltViewModel()
 ) {
@@ -40,6 +44,12 @@ fun ExpensesScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 12.dp)
+            ) {
+                OutlinedButton(onClick = { onSplit(null) }) { Text("Split a bill") }
+            }
         }
         if (uiState.expenses.isEmpty()) {
             item {
@@ -65,6 +75,10 @@ fun ExpensesScreen(
             expense = expense,
             categories = categories,
             onDismiss = viewModel::clearEditing,
+            onSplit = {
+                viewModel.clearEditing()
+                onSplit(expense.id)
+            },
             onSave = viewModel::saveEdit
         )
     }

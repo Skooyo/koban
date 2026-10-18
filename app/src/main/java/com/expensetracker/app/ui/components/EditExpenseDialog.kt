@@ -32,6 +32,7 @@ fun EditExpenseDialog(
     expense: ExpenseEntity,
     categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
+    onSplit: (() -> Unit)? = null,
     onSave: (
         amount: BigDecimal,
         merchant: String?,
@@ -153,6 +154,11 @@ fun EditExpenseDialog(
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (onSplit != null && selectedType == TransactionType.WITHDRAW) {
+                    TextButton(onClick = onSplit, modifier = Modifier.fillMaxWidth()) {
+                        Text("Split this bill")
+                    }
+                }
                 error?.let {
                     Text(text = it, color = MaterialTheme.colorScheme.error)
                 }
