@@ -20,6 +20,7 @@ import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.ReceiptReader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -66,6 +67,7 @@ data class SplitEditorState(
     val selectedExpenseId: String? = null,
     val message: String? = null,
     val error: String? = null,
+    val saving: Boolean = false,
     val finished: Boolean = false
 )
 
@@ -270,9 +272,17 @@ class SplitEditorViewModel @Inject constructor(
     /** Locked bills only: saves the new link at once and shows the summary again. */
     fun saveLockedPayment() {
         val billId = _state.value.billId ?: return
+        if (_state.value.saving) return
+        _state.update { it.copy(saving = true, error = null) }
         viewModelScope.launch {
-            splitRepository.linkPayment(billId, _state.value.selectedExpenseId)
-            _state.update { it.copy(step = SplitStep.Summary) }
+            try {
+                splitRepository.linkPayment(billId, _state.value.selectedExpenseId)
+                _state.update { it.copy(step = SplitStep.Summary, saving = false) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(saving = false, error = "Couldn't save the split. Try again.") }
+            }
         }
     }
 
@@ -283,9 +293,17 @@ class SplitEditorViewModel @Inject constructor(
 
     fun deleteSplit() {
         val billId = _state.value.billId ?: return
+        if (_state.value.saving) return
+        _state.update { it.copy(saving = true, error = null) }
         viewModelScope.launch {
-            splitRepository.deleteSplit(billId)
-            _state.update { it.copy(finished = true) }
+            try {
+                splitRepository.deleteSplit(billId)
+                _state.update { it.copy(finished = true) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(saving = false, error = "Couldn't delete the split. Try again.") }
+            }
         }
     }
 
@@ -327,7 +345,7 @@ class SplitEditorViewModel @Inject constructor(
 
     fun done() {
         val s = _state.value
-        if (s.locked) return
+        if (s.locked || s.saving) return
         val items = parseItems(s) ?: return
         val charges = chargesOf(s) ?: return
         val draft = SplitDraft(
@@ -341,12 +359,19 @@ class SplitEditorViewModel @Inject constructor(
             people = s.people,
             linkedExpenseId = s.selectedExpenseId
         )
+        _state.update { it.copy(saving = true, error = null) }
         viewModelScope.launch {
             try {
                 splitRepository.saveSplit(draft)
                 _state.update { it.copy(finished = true) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: IllegalStateException) {
-                _state.update { it.copy(error = "This split already has a repayment, so it can't change.") }
+                _state.update {
+                    it.copy(saving = false, error = "This split already has a repayment, so it can't change.")
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(saving = false, error = "Couldn't save the split. Try again.") }
             }
         }
     }

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -89,7 +90,7 @@ fun SplitEditorScreen(
                 Surface(tonalElevation = 3.dp) {
                     Button(
                         onClick = action.onClick,
-                        enabled = action.enabled,
+                        enabled = action.enabled && !state.saving,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp, vertical = 12.dp)
@@ -164,7 +165,7 @@ private fun PhotoStep(modifier: Modifier, vm: SplitEditorViewModel) {
         val uri = pending
         if (saved && uri != null) vm.readReceipt(uri) else vm.photoCancelled()
     }
-    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) vm.readReceipt(uri)
     }
     Column(
@@ -185,7 +186,7 @@ private fun PhotoStep(modifier: Modifier, vm: SplitEditorViewModel) {
             },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Take photo") }
-        OutlinedButton(onClick = { gallery.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.fillMaxWidth()) {
             Text("Choose from gallery")
         }
         TextButton(onClick = vm::typeItemsInstead, modifier = Modifier.fillMaxWidth()) {

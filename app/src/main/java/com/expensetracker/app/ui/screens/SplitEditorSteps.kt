@@ -214,6 +214,7 @@ internal fun LinkStep(modifier: Modifier, state: SplitEditorState, vm: SplitEdit
                 onSelect = { vm.selectExpense(null) }
             ) { Text("Not paid by card", style = MaterialTheme.typography.bodyLarge) }
         }
+        state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         if (selected != null && total != null && selected.amount.compareTo(total) != 0) {
             item {
                 Text(
@@ -318,11 +319,12 @@ internal fun SummaryStep(
         }
         if (state.locked) {
             item {
-                OutlinedButton(onClick = vm::changePayment, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = vm::changePayment, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
                     Text("Change payment")
                 }
                 TextButton(
                     onClick = { confirmDelete = true },
+                    enabled = !state.saving,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Delete split", color = MaterialTheme.colorScheme.error) }
             }
