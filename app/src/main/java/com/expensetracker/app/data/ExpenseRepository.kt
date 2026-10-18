@@ -74,8 +74,9 @@ class ExpenseRepository @Inject constructor(
         return combine(
             expenseDao.observeTotalForRange(start, end),
             observeCategoryBreakdown(start, end),
-            expenseDao.observeInRange(start, end)
-        ) { total, breakdown, expenses ->
+            expenseDao.observeInRange(start, end),
+            expenseDao.observeReceivedForRange(start, end)
+        ) { total, breakdown, expenses, received ->
             PeriodSummary(
                 title = PeriodCalculator.title(period),
                 subtitle = PeriodCalculator.label(period, anchor),
@@ -83,7 +84,8 @@ class ExpenseRepository @Inject constructor(
                 breakdown = breakdown,
                 recentExpenses = expenses.take(RECENT_IN_PERIOD),
                 periodStart = start,
-                periodEnd = end
+                periodEnd = end,
+                received = received ?: BigDecimal.ZERO
             )
         }
     }

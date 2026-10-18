@@ -29,13 +29,23 @@ interface ExpenseDao {
     @Query(
         """
         SELECT COALESCE(SUM(
-            CASE WHEN transactionType = 'RECEIVE' THEN -amount ELSE amount END
+            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
         ), 0) FROM expenses
         WHERE status != 'DISMISSED'
         AND notificationPostTime >= :start AND notificationPostTime < :end
         """
     )
     fun observeTotalForRange(start: Long, end: Long): Flow<java.math.BigDecimal?>
+
+    /** Money received in the range. Shown beside spending, never subtracted from it. */
+    @Query(
+        """
+        SELECT COALESCE(SUM(amount), 0) FROM expenses
+        WHERE status != 'DISMISSED' AND transactionType = 'RECEIVE'
+        AND notificationPostTime >= :start AND notificationPostTime < :end
+        """
+    )
+    fun observeReceivedForRange(start: Long, end: Long): Flow<BigDecimal?>
 
     @Query(
         """
@@ -50,7 +60,7 @@ interface ExpenseDao {
         """
         SELECT categoryId,
         COALESCE(SUM(
-            CASE WHEN transactionType = 'RECEIVE' THEN -amount ELSE amount END
+            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
         ), 0) AS total
         FROM expenses
         WHERE status != 'DISMISSED'
@@ -65,7 +75,7 @@ interface ExpenseDao {
     @Query(
         """
         SELECT COALESCE(SUM(
-            CASE WHEN transactionType = 'RECEIVE' THEN -amount ELSE amount END
+            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
         ), 0) FROM expenses
         WHERE status != 'DISMISSED'
         AND notificationPostTime >= :startOfDay AND notificationPostTime < :endOfDay
@@ -123,7 +133,7 @@ interface ExpenseDao {
             (CAST(strftime('%Y', notificationPostTime / 1000, 'unixepoch', 'localtime') AS INTEGER) * 100
             + CAST(strftime('%m', notificationPostTime / 1000, 'unixepoch', 'localtime') AS INTEGER)) AS yearMonth,
             COALESCE(SUM(
-                CASE WHEN transactionType = 'RECEIVE' THEN -amount ELSE amount END
+                CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
             ), 0) AS total
         FROM expenses
         WHERE status != 'DISMISSED'
@@ -136,7 +146,7 @@ interface ExpenseDao {
     @Query(
         """
         SELECT COALESCE(SUM(
-            CASE WHEN transactionType = 'RECEIVE' THEN -amount ELSE amount END
+            CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE amount END
         ), 0) FROM expenses
         WHERE status != 'DISMISSED'
         AND notificationPostTime >= :start AND notificationPostTime < :end

@@ -157,11 +157,14 @@ fun PeriodHero(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        MoneyAmount(
-            amount = summary.total,
-            style = MaterialTheme.typography.displayLarge,
-            symbolScale = 0.4f
-        )
+        Column {
+            MoneyAmount(
+                amount = summary.total,
+                style = MaterialTheme.typography.displayLarge,
+                symbolScale = 0.4f
+            )
+            ReceivedNote(received = summary.received, modifier = Modifier.padding(top = 4.dp))
+        }
         NoteStrip(breakdown = summary.breakdown)
         if (summary.breakdown.isEmpty()) {
             Text(
@@ -239,6 +242,18 @@ fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifi
     }
 }
 
+/** Money received in a period. Totals count spending only, so this is shown beside them. */
+@Composable
+fun ReceivedNote(received: BigDecimal, modifier: Modifier = Modifier) {
+    if (received <= BigDecimal.ZERO) return
+    Text(
+        text = "+${AmountFormatter.currencySymbol("MYR")} ${AmountFormatter.formatGrouped(received)} received",
+        style = MaterialTheme.typography.bodyMedium,
+        color = LocalMoneyColors.current.received,
+        modifier = modifier
+    )
+}
+
 @Composable
 fun NetSpendingTotal(
     total: BigDecimal,
@@ -247,7 +262,7 @@ fun NetSpendingTotal(
 ) {
     Column(modifier = modifier) {
         Text(
-            text = if (total < BigDecimal.ZERO) "Net received" else "Net spending",
+            text = "Spent",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

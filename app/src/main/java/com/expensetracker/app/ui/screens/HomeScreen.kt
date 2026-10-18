@@ -25,6 +25,7 @@ import com.expensetracker.app.ui.components.ListenerStatusBanner
 import com.expensetracker.app.ui.components.NoteStrip
 import com.expensetracker.app.ui.components.PeriodHero
 import com.expensetracker.app.ui.components.PeriodTotalRow
+import com.expensetracker.app.ui.components.ReceivedNote
 import com.expensetracker.app.ui.navigation.Routes
 import com.expensetracker.app.ui.viewmodel.HomeViewModel
 
@@ -79,6 +80,7 @@ fun HomeScreen(
                     onClick = { open(summary) }
                 ) {
                     NoteStrip(breakdown = summary.breakdown, height = 6.dp)
+                    ReceivedNote(received = summary.received)
                 }
                 HorizontalDivider(color = divider)
             }

@@ -175,8 +175,8 @@ fun LazyListScope.expensesByDay(
 
 @Composable
 private fun DayHeader(timeMs: Long, expenses: List<ExpenseEntity>) {
-    val net = expenses.fold(BigDecimal.ZERO) { sum, e ->
-        if (e.transactionType == TransactionType.RECEIVE) sum - e.amount else sum + e.amount
+    val spent = expenses.fold(BigDecimal.ZERO) { sum, e ->
+        if (e.transactionType == TransactionType.RECEIVE) sum else sum + e.amount
     }
     Column(modifier = Modifier.padding(top = 20.dp)) {
         Row(
@@ -191,7 +191,7 @@ private fun DayHeader(timeMs: Long, expenses: List<ExpenseEntity>) {
                 modifier = Modifier.weight(1f)
             )
             MoneyAmount(
-                amount = net,
+                amount = spent,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

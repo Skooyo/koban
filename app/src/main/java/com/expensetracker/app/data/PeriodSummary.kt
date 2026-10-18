@@ -7,5 +7,6 @@ data class PeriodSummary(
     val breakdown: List<CategoryBreakdown>,
     val recentExpenses: List<ExpenseEntity>,
     val periodStart: Long = 0L,
-    val periodEnd: Long = 0L
+    val periodEnd: Long = 0L,
+    val received: java.math.BigDecimal = java.math.BigDecimal.ZERO
 )
