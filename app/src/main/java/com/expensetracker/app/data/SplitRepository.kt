@@ -228,7 +228,9 @@ class SplitRepository @Inject constructor(
                 return@withTransaction
             }
             val expense = expenseDao.getById(repaymentExpenseId)
-                ?: throw IllegalArgumentException("Repayment expense not found")
+            if (expense == null || !isUsableRepayment(expense)) {
+                throw IllegalArgumentException("Repayment expense is not available")
+            }
             val personOpen = splitDao.getOpenDebts().filter { it.personId == debt.personId }
             val total = personOpen.fold(BigDecimal.ZERO) { sum, d -> sum + d.amount }
             val closing = when {
@@ -243,10 +245,22 @@ class SplitRepository @Inject constructor(
     suspend fun confirmSuggestion(debtId: String) {
         db.withTransaction {
             val expenseId = splitDao.getDebt(debtId)?.suggestedRepaymentExpenseId ?: return@withTransaction
-            val expense = expenseDao.getById(expenseId) ?: return@withTransaction
-            close(suggestedWith(expenseId), expense)
+            val debts = suggestedWith(expenseId)
+            val expense = expenseDao.getById(expenseId)
+            val owed = debts.fold(BigDecimal.ZERO) { sum, d -> sum + d.amount }
+            if (expense == null || !isUsableRepayment(expense) || expense.amount.compareTo(owed) != 0) {
+                // Stale suggestion: the receive changed or was used. Clear it, do not close.
+                debts.forEach { splitDao.updateDebt(it.copy(suggestedRepaymentExpenseId = null)) }
+                return@withTransaction
+            }
+            close(debts, expense)
         }
     }
+
+    private fun isUsableRepayment(expense: ExpenseEntity): Boolean =
+        expense.transactionType == TransactionType.RECEIVE &&
+            expense.status != ExpenseStatus.DISMISSED &&
+            expense.countedAmount == null
 
     suspend fun dismissSuggestion(debtId: String) {
         db.withTransaction {
@@ -263,6 +277,13 @@ class SplitRepository @Inject constructor(
     /** Marks [debts] PAID. A null [expense] means cash. */
     private suspend fun close(debts: List<SplitDebtEntity>, expense: ExpenseEntity?) {
         val now = System.currentTimeMillis()
+        // Other open debts must not keep a suggestion that this close made stale.
+        val staleIds = debts.mapNotNull { it.suggestedRepaymentExpenseId }.toSet() +
+            listOfNotNull(expense?.id)
+        val closingIds = debts.map { it.id }.toSet()
+        splitDao.getOpenDebts()
+            .filter { it.id !in closingIds && it.suggestedRepaymentExpenseId in staleIds }
+            .forEach { splitDao.updateDebt(it.copy(suggestedRepaymentExpenseId = null)) }
         debts.forEach {
             splitDao.updateDebt(
                 it.copy(

@@ -23,6 +23,7 @@ class ExpenseRepository @Inject constructor(
     private val splitRepository: SplitRepository
 ) {
     companion object {
+        private const val TAG = "ExpenseRepository"
         private const val RECENT_IN_PERIOD = 5
 
         /** How far either side of a notification the same amount counts as the same payment. */
@@ -172,7 +173,11 @@ class ExpenseRepository @Inject constructor(
             )
             val inserted = expenseDao.insert(entity) != -1L
             if (inserted && entity.transactionType == TransactionType.RECEIVE) {
-                splitRepository.suggestRepayment(entity)
+                try {
+                    splitRepository.suggestRepayment(entity)
+                } catch (e: Exception) {
+                    android.util.Log.w(TAG, "Repayment suggestion failed", e)
+                }
             }
             inserted
         }
@@ -200,7 +205,11 @@ class ExpenseRepository @Inject constructor(
                 status = ExpenseStatus.EDITED
             )
         )
-        splitRepository.onExpenseEdited(id)
+        try {
+            splitRepository.onExpenseEdited(id)
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "Split recompute failed", e)
+        }
     }
 
     suspend fun dismissExpense(id: String) {
