@@ -27,6 +27,9 @@ interface SplitDao {
     @Query("SELECT * FROM split_bills WHERE id = :billId")
     suspend fun getBill(billId: String): SplitBillEntity?
 
+    @Query("SELECT * FROM split_bills WHERE linkedExpenseId = :expenseId LIMIT 1")
+    suspend fun getBillByLinkedExpense(expenseId: String): SplitBillEntity?
+
     @Query("SELECT * FROM split_items WHERE billId = :billId ORDER BY position")
     suspend fun getItems(billId: String): List<SplitItemEntity>
 

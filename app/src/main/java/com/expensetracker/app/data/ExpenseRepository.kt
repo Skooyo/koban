@@ -19,7 +19,8 @@ import javax.inject.Singleton
 class ExpenseRepository @Inject constructor(
     private val expenseDao: ExpenseDao,
     private val categoryRepository: CategoryRepository,
-    private val merchantCategoryRepository: MerchantCategoryRepository
+    private val merchantCategoryRepository: MerchantCategoryRepository,
+    private val splitRepository: SplitRepository
 ) {
     companion object {
         private const val RECENT_IN_PERIOD = 5
@@ -169,7 +170,11 @@ class ExpenseRepository @Inject constructor(
                 notes = null,
                 transactionType = parsed.transactionType
             )
-            expenseDao.insert(entity) != -1L
+            val inserted = expenseDao.insert(entity) != -1L
+            if (inserted && entity.transactionType == TransactionType.RECEIVE) {
+                splitRepository.suggestRepayment(entity)
+            }
+            inserted
         }
     }
 
@@ -195,6 +200,7 @@ class ExpenseRepository @Inject constructor(
                 status = ExpenseStatus.EDITED
             )
         )
+        splitRepository.onExpenseEdited(id)
     }
 
     suspend fun dismissExpense(id: String) {
