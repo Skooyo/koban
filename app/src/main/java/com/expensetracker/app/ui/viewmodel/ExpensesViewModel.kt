@@ -7,12 +7,14 @@ import com.expensetracker.app.data.CategoryRepository
 import com.expensetracker.app.data.DefaultCategories
 import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.data.ExpenseRepository
+import com.expensetracker.app.data.SplitRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
@@ -26,7 +28,8 @@ data class ExpensesUiState(
 @HiltViewModel
 class ExpensesViewModel @Inject constructor(
     private val expenseRepository: ExpenseRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    splitRepository: SplitRepository
 ) : ViewModel() {
 
     val categories: StateFlow<List<CategoryEntity>> = categoryRepository.observeAll()
@@ -41,6 +44,10 @@ class ExpensesViewModel @Inject constructor(
             categoryNames = categories.associate { it.id to it.name }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpensesUiState())
+
+    val openDebtCount: StateFlow<Int> = splitRepository.observeOpenDebts()
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     private val _editingExpense = MutableStateFlow<ExpenseEntity?>(null)
     val editingExpense: StateFlow<ExpenseEntity?> = _editingExpense.asStateFlow()

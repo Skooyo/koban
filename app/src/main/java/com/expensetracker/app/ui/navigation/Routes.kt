@@ -11,6 +11,7 @@ object Routes {
     const val EXPENSES_FILTER = "expenses/filter/{start}/{end}/{title}"
     const val HISTORY_MONTH = "history/{yearMonth}"
 
+    const val DEBTS = "debts"
     const val SPLIT_NEW = "split/new?expenseId={expenseId}"
     const val SPLIT_EDIT = "split/edit/{billId}"
 

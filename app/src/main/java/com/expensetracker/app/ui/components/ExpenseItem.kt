@@ -32,6 +32,7 @@ import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.data.ParseConfidence
 import com.expensetracker.app.data.TransactionType
 import com.expensetracker.app.data.effectiveAmount
+import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.theme.categoryColor
 import java.math.BigDecimal
@@ -58,10 +59,14 @@ fun ExpenseListCard(
     }
     val merchant = expense.merchant?.takeIf { it.isNotBlank() } ?: "Unknown merchant"
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val signedAmount = if (expense.transactionType == TransactionType.RECEIVE) {
-        expense.amount.negate()
-    } else {
-        expense.amount
+    val counted = expense.countedAmount
+    val isRepayment = expense.transactionType == TransactionType.RECEIVE && counted?.signum() == 0
+    val partlyCounted = expense.transactionType == TransactionType.WITHDRAW &&
+        counted != null && counted.compareTo(expense.amount) != 0
+    val signedAmount = when {
+        isRepayment -> expense.amount
+        expense.transactionType == TransactionType.RECEIVE -> expense.amount.negate()
+        else -> expense.effectiveAmount
     }
 
     Row(
@@ -98,6 +103,15 @@ fun ExpenseListCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (isRepayment) {
+                Text(text = "Repayment", style = MaterialTheme.typography.bodySmall, color = muted)
+            } else if (partlyCounted) {
+                Text(
+                    text = "paid ${AmountFormatter.currencySymbol(expense.currency)} ${AmountFormatter.formatGrouped(expense.amount)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = muted
+                )
+            }
             expense.notes?.takeIf { it.isNotBlank() }?.let { notes ->
                 Text(
                     text = notes,
@@ -118,7 +132,8 @@ fun ExpenseListCard(
         MoneyAmount(
             amount = signedAmount,
             currency = expense.currency,
-            style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium
+            style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+            color = if (isRepayment) muted else MaterialTheme.colorScheme.onSurface
         )
         if (showActions) {
             IconButton(onClick = onDelete) {

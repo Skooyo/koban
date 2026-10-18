@@ -23,6 +23,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.expensetracker.app.ui.navigation.Routes
+import com.expensetracker.app.ui.screens.DebtsScreen
 import com.expensetracker.app.ui.screens.ExpensesScreen
 import com.expensetracker.app.ui.screens.FilteredExpensesScreen
 import com.expensetracker.app.ui.screens.HistoryMonthsScreen
@@ -88,7 +89,16 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
                 )
             }
             composable(Routes.EXPENSES) {
-                ExpensesScreen(onSplit = { id -> navController.navigate(Routes.splitNew(id)) })
+                ExpensesScreen(
+                    onSplit = { id -> navController.navigate(Routes.splitNew(id)) },
+                    onDebts = { navController.navigate(Routes.DEBTS) }
+                )
+            }
+            composable(Routes.DEBTS) {
+                DebtsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenSplit = { id -> navController.navigate(Routes.splitEdit(id)) }
+                )
             }
             composable(Routes.HISTORY) {
                 HistoryMonthsScreen(
