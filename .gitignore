@@ -27,3 +27,7 @@
 # Log/OS
 *.log
 Thumbs.db
+
+# Local agent worktrees and scratch
+.claude/worktrees/
+.superpowers/
