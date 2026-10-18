@@ -9,12 +9,17 @@ import com.expensetracker.app.data.DefaultCategories
 import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.data.ExpenseRepository
 import com.expensetracker.app.data.TransactionType
+import com.expensetracker.app.data.effectiveAmount
+import com.expensetracker.app.ui.components.DonutSlice
+import com.expensetracker.app.ui.components.donutSlices
+import com.expensetracker.app.ui.components.matchesCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
@@ -24,7 +29,9 @@ data class FilteredExpensesUiState(
     val title: String = "",
     val expenses: List<ExpenseEntity> = emptyList(),
     val categoryNames: Map<String, String> = emptyMap(),
-    val total: BigDecimal = BigDecimal.ZERO
+    val total: BigDecimal = BigDecimal.ZERO,
+    val slices: List<DonutSlice> = emptyList(),
+    val categoryFilter: String? = null
 )
 
 @HiltViewModel
@@ -41,18 +48,34 @@ class FilteredExpensesViewModel @Inject constructor(
     val categories: StateFlow<List<CategoryEntity>> = categoryRepository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val categoryFilter = MutableStateFlow<String?>(null)
+
     val uiState: StateFlow<FilteredExpensesUiState> = combine(
         expenseRepository.observeInRange(startMs, endMs),
         expenseRepository.observeTotalForRange(startMs, endMs),
-        categoryRepository.observeAll()
-    ) { expenses, total, cats ->
+        expenseRepository.observeCategoryBreakdown(startMs, endMs),
+        categoryRepository.observeAll(),
+        categoryFilter
+    ) { expenses, total, breakdown, cats, filter ->
+        val shown = expenses.filter { it.matchesCategory(filter) }
         FilteredExpensesUiState(
             title = title,
-            expenses = expenses,
+            expenses = shown,
             categoryNames = cats.associate { it.id to it.name },
-            total = total ?: BigDecimal.ZERO
+            total = if (filter == null) {
+                total ?: BigDecimal.ZERO
+            } else {
+                shown.filter { it.transactionType != TransactionType.RECEIVE }
+                    .fold(BigDecimal.ZERO) { sum, e -> sum + e.effectiveAmount }
+            },
+            slices = donutSlices(breakdown),
+            categoryFilter = filter
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FilteredExpensesUiState(title = title))
+
+    fun setCategoryFilter(filter: String?) {
+        categoryFilter.value = filter
+    }
 
     private val _editingExpense = MutableStateFlow<ExpenseEntity?>(null)
     val editingExpense: StateFlow<ExpenseEntity?> = _editingExpense.asStateFlow()
@@ -73,10 +96,9 @@ class FilteredExpensesViewModel @Inject constructor(
         notes: String?,
         transactionType: TransactionType
     ) {
-        val id = _editingExpense.value?.id ?: return
+        val id = _editingExpense.getAndUpdate { null }?.id ?: return
         viewModelScope.launch {
             expenseRepository.updateExpense(id, amount, merchant, postTime, categoryId, notes, transactionType)
-            _editingExpense.value = null
         }
     }
 

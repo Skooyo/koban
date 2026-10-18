@@ -24,6 +24,7 @@ class ExpenseRepository @Inject constructor(
 ) {
     companion object {
         private const val TAG = "ExpenseRepository"
+        const val MANUAL_SOURCE = "manual"
         private const val RECENT_IN_PERIOD = 5
 
         /** How far either side of a notification the same amount counts as the same payment. */
@@ -197,6 +198,12 @@ class ExpenseRepository @Inject constructor(
     ) {
         val existing = expenseDao.getById(id) ?: return
         merchantCategoryRepository.saveMapping(merchant, categoryId)
+        // A new category applies to every payment from this merchant in the same direction, past ones included.
+        if (categoryId != null && categoryId != existing.categoryId) {
+            merchantCategoryRepository.normalizeKey(merchant)?.let {
+                expenseDao.setCategoryForMerchant(it, transactionType, categoryId)
+            }
+        }
         expenseDao.update(
             existing.copy(
                 amount = AmountFormatter.toMoney(amount),
@@ -212,6 +219,49 @@ class ExpenseRepository @Inject constructor(
             splitRepository.onExpenseEdited(id)
         } catch (e: Exception) {
             android.util.Log.w(TAG, "Split recompute failed", e)
+        }
+    }
+
+    /** A payment the owner types in, for one that came without a readable notification. */
+    suspend fun addManualExpense(
+        amount: BigDecimal,
+        merchant: String?,
+        notificationPostTime: Long,
+        categoryId: String?,
+        notes: String?,
+        transactionType: TransactionType
+    ) {
+        merchantCategoryRepository.saveMapping(merchant, categoryId)
+        if (categoryId != null) {
+            merchantCategoryRepository.normalizeKey(merchant)?.let {
+                expenseDao.setCategoryForMerchant(it, transactionType, categoryId)
+            }
+        }
+        val id = UUID.randomUUID().toString()
+        val entity = ExpenseEntity(
+            id = id,
+            amount = AmountFormatter.toMoney(amount),
+            currency = "MYR",
+            merchant = merchant?.trim()?.ifBlank { null },
+            rawNotificationText = "",
+            sourcePackage = MANUAL_SOURCE,
+            notificationPostTime = notificationPostTime,
+            createdAt = System.currentTimeMillis(),
+            dedupKey = "manual:$id",
+            status = ExpenseStatus.EDITED,
+            confidence = ParseConfidence.HIGH,
+            notificationKey = null,
+            categoryId = categoryId,
+            notes = notes?.trim()?.ifBlank { null },
+            transactionType = transactionType
+        )
+        expenseDao.insert(entity)
+        if (transactionType == TransactionType.RECEIVE) {
+            try {
+                splitRepository.suggestRepayment(entity)
+            } catch (e: Exception) {
+                android.util.Log.w(TAG, "Repayment suggestion failed", e)
+            }
         }
     }
 

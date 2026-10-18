@@ -4,6 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -25,6 +30,11 @@ import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.data.TransactionType
 import com.expensetracker.app.parser.AmountFormatter
 import java.math.BigDecimal
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +42,7 @@ fun EditExpenseDialog(
     expense: ExpenseEntity,
     categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
+    title: String = "Edit expense",
     onSplit: (() -> Unit)? = null,
     onSave: (
         amount: BigDecimal,
@@ -43,8 +54,10 @@ fun EditExpenseDialog(
     ) -> Unit
 ) {
     var amountText by remember(expense.id) {
-        mutableStateOf(AmountFormatter.formatDisplay(expense.amount))
+        mutableStateOf(if (expense.amount.signum() == 0) "" else AmountFormatter.formatDisplay(expense.amount))
     }
+    var postTime by remember(expense.id) { mutableStateOf(expense.notificationPostTime) }
+    var pickingDate by remember { mutableStateOf(false) }
     var merchantText by remember(expense.id) { mutableStateOf(expense.merchant ?: "") }
     var notesText by remember(expense.id) { mutableStateOf(expense.notes ?: "") }
     var selectedCategoryId by remember(expense.id) { mutableStateOf(expense.categoryId) }
@@ -58,7 +71,7 @@ fun EditExpenseDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit expense") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -72,7 +85,7 @@ fun EditExpenseDialog(
                     value = merchantText,
                     onValueChange = { merchantText = it },
                     label = { Text("Merchant") },
-                    supportingText = { Text("Category is remembered for this merchant") },
+                    supportingText = { Text("A new category also applies to past payments from this merchant") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -146,6 +159,9 @@ fun EditExpenseDialog(
                         }
                     }
                 }
+                OutlinedButton(onClick = { pickingDate = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Date: " + SimpleDateFormat("EEE, d MMM yyyy", Locale.getDefault()).format(Date(postTime)))
+                }
                 OutlinedTextField(
                     value = notesText,
                     onValueChange = { notesText = it },
@@ -168,14 +184,14 @@ fun EditExpenseDialog(
             TextButton(
                 onClick = {
                     val amount = AmountFormatter.parseInput(amountText)
-                    if (amount == null) {
-                        error = "Invalid amount"
+                    if (amount == null || amount.signum() <= 0) {
+                        error = "Enter an amount above 0"
                         return@TextButton
                     }
                     onSave(
                         amount,
                         merchantText.ifBlank { null },
-                        expense.notificationPostTime,
+                        postTime,
                         selectedCategoryId,
                         notesText,
                         selectedType
@@ -191,4 +207,46 @@ fun EditExpenseDialog(
             }
         }
     )
+
+    if (pickingDate) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = localDateAsUtcMillis(postTime),
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) =
+                    utcTimeMillis <= localDateAsUtcMillis(System.currentTimeMillis())
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { pickingDate = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { postTime = withDate(postTime, it) }
+                    pickingDate = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pickingDate = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
+}
+
+/** The DatePicker works in UTC midnights; this is the local date of [time] as one. */
+private fun localDateAsUtcMillis(time: Long): Long {
+    val local = Calendar.getInstance().apply { timeInMillis = time }
+    return Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+        clear()
+        set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH))
+    }.timeInMillis
+}
+
+/** [time] moved to the picked date, keeping its local time of day. */
+private fun withDate(time: Long, utcDateMillis: Long): Long {
+    val picked = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = utcDateMillis }
+    return Calendar.getInstance().apply {
+        timeInMillis = time
+        set(picked.get(Calendar.YEAR), picked.get(Calendar.MONTH), picked.get(Calendar.DAY_OF_MONTH))
+    }.timeInMillis
 }

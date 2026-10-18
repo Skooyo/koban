@@ -83,6 +83,15 @@ interface ExpenseDao {
     )
     fun observeTotalForDay(startOfDay: Long, endOfDay: Long): Flow<java.math.BigDecimal?>
 
+    /** [merchantKey] is the trimmed, lower-case merchant name (MerchantCategoryRepository.normalizeKey). */
+    // ponytail: SQLite lower() folds ASCII letters only, so a merchant with non-ASCII capitals can be missed.
+    // Upgrade: store the normalized key in its own column.
+    @Query(
+        "UPDATE expenses SET categoryId = :categoryId " +
+            "WHERE lower(trim(merchant)) = :merchantKey AND transactionType = :type"
+    )
+    suspend fun setCategoryForMerchant(merchantKey: String, type: TransactionType, categoryId: String)
+
     @Query("SELECT * FROM expenses WHERE dedupKey = :dedupKey AND notificationPostTime >= :since LIMIT 1")
     suspend fun findByDedupKeySince(dedupKey: String, since: Long): ExpenseEntity?
 

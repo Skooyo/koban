@@ -19,7 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expensetracker.app.ui.components.CategoryDonut
+import com.expensetracker.app.ui.components.CategoryFilterRow
 import com.expensetracker.app.ui.components.EditExpenseDialog
+import com.expensetracker.app.ui.components.UNCATEGORIZED_FILTER
 import com.expensetracker.app.ui.components.NetSpendingTotal
 import com.expensetracker.app.ui.components.expensesByDay
 import com.expensetracker.app.ui.viewmodel.FilteredExpensesViewModel
@@ -57,11 +60,22 @@ fun FilteredExpensesScreen(
         ) {
             item {
                 NetSpendingTotal(total = uiState.total)
+                CategoryDonut(
+                    slices = uiState.slices,
+                    onSelect = { viewModel.setCategoryFilter(it.categoryId ?: UNCATEGORIZED_FILTER) },
+                    modifier = Modifier.padding(top = 20.dp)
+                )
+                CategoryFilterRow(
+                    categories = categories,
+                    selected = uiState.categoryFilter,
+                    onSelect = viewModel::setCategoryFilter,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
             }
             if (uiState.expenses.isEmpty()) {
                 item {
                     Text(
-                        text = "No transactions in this period.",
+                        text = if (uiState.categoryFilter == null) "No transactions in this period." else "No transactions in this category.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 24.dp)

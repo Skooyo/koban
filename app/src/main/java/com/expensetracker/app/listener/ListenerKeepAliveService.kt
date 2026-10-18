@@ -133,7 +133,13 @@ class ListenerKeepAliveService : Service() {
         fun start(context: Context) {
             if (!NotificationAccessHelper.isNotificationAccessGranted(context)) return
             val intent = Intent(context, ListenerKeepAliveService::class.java)
-            context.startForegroundService(intent)
+            try {
+                context.startForegroundService(intent)
+            } catch (e: IllegalStateException) {
+                // Android 12+ refuses this when the system starts the app in the background
+                // (ForegroundServiceStartNotAllowedException). The next start from the foreground retries it.
+                android.util.Log.w("ListenerKeepAlive", "Foreground service start refused", e)
+            }
         }
 
         fun stop(context: Context) {
