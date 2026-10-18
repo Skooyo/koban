@@ -54,6 +54,18 @@ class SplitMathTest {
     }
 
     @Test
+    fun shares_meNeverNegative() = assertEquals(
+        mapOf("me" to BigDecimal("0.00"), "a" to BigDecimal("0.02"), "b" to BigDecimal("0.02"), "c" to BigDecimal("0.01")),
+        SplitMath.shares(listOf(item("0.05", "a", "b", "c")), SplitCharges()),
+    )
+
+    @Test
+    fun shares_sumEqualsComputedTotal() = assertEquals(
+        BigDecimal("29.15"),
+        SplitMath.shares(example, exampleCharges).values.fold(BigDecimal.ZERO, BigDecimal::add),
+    )
+
+    @Test
     fun shares_rejectsUnassignedItem() {
         assertThrows(IllegalArgumentException::class.java) {
             SplitMath.shares(listOf(item("5.00", "me"), item("4.00")), SplitCharges())

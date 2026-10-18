@@ -54,7 +54,19 @@ object SplitMath {
             result[person] = money(value)
             othersTotal += result.getValue(person)
         }
-        result[ME_ID] = computedTotal(items, charges) - othersTotal
+        val total = computedTotal(items, charges)
+        // Half-up rounding of others can overshoot the total. Take cents back, from the
+        // person whose rounding gained most (ties: id sorting last), so ME_ID never goes negative.
+        val cent = BigDecimal("0.01")
+        while (total - othersTotal < BigDecimal.ZERO) {
+            val loser = result.keys
+                .filter { result.getValue(it).signum() > 0 }
+                .maxWithOrNull(compareBy<String>({ result.getValue(it) - exact.getValue(it) }, { it }))
+                ?: break
+            result[loser] = result.getValue(loser) - cent
+            othersTotal -= cent
+        }
+        result[ME_ID] = total - othersTotal
         return result
     }
 
