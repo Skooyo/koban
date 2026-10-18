@@ -31,7 +31,7 @@ class SettingsRepository @Inject constructor(
         prefs[darkModeKey] ?: true
     }
 
-    /** When true and an OpenRouter API key is built in, use LLM parsing with regex fallback. */
+    /** When true and a Gemini API key is built in, use LLM parsing with regex fallback. */
     val llmParsingEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[llmParsingKey] ?: true
     }

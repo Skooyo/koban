@@ -5,7 +5,7 @@ import com.expensetracker.app.data.TransactionType
 import org.json.JSONObject
 
 /**
- * Parses structured JSON content returned by the OpenRouter chat model
+ * Parses structured JSON content returned by the Gemini / LLM chat model
  * into [ParsedExpense], or signals skip / failure.
  */
 object LlmResponseParser {
@@ -17,6 +17,25 @@ object LlmResponseParser {
         return try {
             val json = extractJsonObject(trimmed) ?: return LlmParseResult.Failed
             parseJsonObject(json)
+        } catch (_: Exception) {
+            LlmParseResult.Failed
+        }
+    }
+
+    /** Google AI Studio / Gemini `generateContent` HTTP response body. */
+    fun parseGenerateContentBody(responseBody: String): LlmParseResult {
+        return try {
+            val root = JSONObject(responseBody)
+            val content = root
+                .optJSONArray("candidates")
+                ?.optJSONObject(0)
+                ?.optJSONObject("content")
+                ?.optJSONArray("parts")
+                ?.optJSONObject(0)
+                ?.optString("text")
+                ?.takeIf { it.isNotBlank() }
+                ?: return LlmParseResult.Failed
+            parseModelContent(content)
         } catch (_: Exception) {
             LlmParseResult.Failed
         }

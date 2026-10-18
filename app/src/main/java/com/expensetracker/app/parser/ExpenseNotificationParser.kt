@@ -9,25 +9,28 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Parses payment notifications via OpenRouter when configured, otherwise
+ * Parses payment notifications via Google AI Studio (Gemini) when configured, otherwise
  * falls back to [NotificationParser] regex extraction.
  */
 @Singleton
 class ExpenseNotificationParser @Inject constructor(
-    private val openRouterClient: OpenRouterClient,
+    private val geminiClient: GeminiClient,
     private val settingsRepository: SettingsRepository
 ) {
     val isLlmConfigured: Boolean
-        get() = openRouterClient.isConfigured
+        get() = geminiClient.isConfigured
+
+    val modelsLabel: String
+        get() = geminiClient.modelsLabel
 
     suspend fun parse(notificationBody: String): ExpenseParseResult {
         val body = notificationBody.trim()
         if (body.isBlank()) return ExpenseParseResult.NoAmount
 
         val llmEnabled = settingsRepository.llmParsingEnabled.first()
-        if (llmEnabled && openRouterClient.isConfigured) {
+        if (llmEnabled && geminiClient.isConfigured) {
             val llmResult = withContext(Dispatchers.IO) {
-                openRouterClient.parsePaymentNotification(body)
+                geminiClient.parsePaymentNotification(body)
             }
             when (llmResult) {
                 is LlmParseResult.Success -> {

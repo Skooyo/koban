@@ -1,7 +1,7 @@
 package com.expensetracker.app.parser
 
 /**
- * Result of an OpenRouter LLM parse attempt.
+ * Result of a Gemini / Google AI Studio LLM parse attempt.
  * [Failed] triggers regex fallback; [NotTransaction] skips saving without fallback.
  */
 sealed class LlmParseResult {

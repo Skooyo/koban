@@ -12,7 +12,7 @@ Android app that tracks spending by reading bank and wallet payment notification
 
 Expense Tracker listens to payment alerts from banking and e-wallet apps, extracts the amount and merchant, and saves them as expenses automatically. You get day / week / month spending summaries with categories — without typing every purchase by hand.
 
-It is built for Malaysian Ringgit notifications (`RM` / `MYR`), with optional [OpenRouter](https://openrouter.ai) LLM parsing for better merchant extraction and filtering out promotional messages that only mention money amounts.
+It is built for Malaysian Ringgit notifications (`RM` / `MYR`), with optional [Google AI Studio](https://aistudio.google.com/) Gemini parsing for better merchant extraction and filtering out promotional messages that only mention money amounts.
 
 ```text
 Bank / wallet notification
@@ -20,9 +20,9 @@ Bank / wallet notification
         ▼
 NotificationListenerService
         │
-        ├── LLM parse (OpenRouter)  ──► real transaction?
-        │         │                         │
-        │         └─ fallback ──► regex      └─ skip promo / OTP / etc.
+        ├── LLM parse (Gemini Flash Lite)  ──► real transaction?
+        │         │  (3.1 ↔ 3.5 on rate limit)   │
+        │         └─ fallback ──► regex          └─ skip promo / OTP / etc.
         ▼
 Room database (on device)
         ▼
@@ -32,7 +32,8 @@ Home · Expenses · History · Settings
 ## Features
 
 - **Automatic capture** — reads payment notifications via Android’s `NotificationListenerService`
-- **Smart parsing** — optional OpenRouter LLM extracts amount, merchant, and transaction direction; rejects promos that aren’t real payments
+- **Smart parsing** — optional Gemini (3.1 / 3.5 Flash Lite) extracts amount, merchant, and transaction direction; rejects promos that aren’t real payments
+- **Rate-limit failover** — if one Gemini model is rate-limited, the other is tried automatically
 - **Regex fallback** — works offline or without an API key using RM/MYR pattern matching
 - **Duplicate protection** — skips the same payment when it arrives from multiple apps or twice within a short window
 - **Spending views** — today / this week / this month totals with category breakdown
@@ -62,9 +63,11 @@ Home · Expenses · History · Settings
 > [!TIP]
 > After a real transfer or Scan & Pay, check **Settings → Notification log**. You should see the notification marked **Saved**, or **Not transaction** if the LLM classified it as a promo.
 
-### Optional: OpenRouter LLM parsing
+### Optional: Google AI Studio (Gemini) parsing
 
 LLM parsing improves merchant names and filters promotional RM amounts. Without a key, the app falls back to regex.
+
+Defaults cycle between [`gemini-3.1-flash-lite`](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite) and [`gemini-3.5-flash-lite`](https://deepmind.google/models/gemini/flash-lite/) when one hits a rate limit.
 
 1. Copy the example env file:
 
@@ -75,8 +78,9 @@ LLM parsing improves merchant names and filters promotional RM amounts. Without 
 2. Edit `.env`:
 
    ```env
-   OPENROUTER_API_KEY=sk-or-v1-...
-   OPENROUTER_MODEL=openrouter/free
+   GEMINI_API_KEY=your-google-ai-studio-key
+   GEMINI_MODEL_PRIMARY=gemini-3.1-flash-lite
+   GEMINI_MODEL_SECONDARY=gemini-3.5-flash-lite
    ```
 
 3. Rebuild the app so Gradle injects the key into `BuildConfig`.
@@ -84,7 +88,7 @@ LLM parsing improves merchant names and filters promotional RM amounts. Without 
 > [!IMPORTANT]
 > Never commit `.env` or built APKs. The API key is compiled into the debug APK via `BuildConfig` and can be extracted from a distributed binary. Fine for personal builds; use a backend proxy before any public release.
 
-Get a key at [openrouter.ai/keys](https://openrouter.ai/keys).
+Get a key at [Google AI Studio](https://aistudio.google.com/apikey).
 
 ## Build
 
@@ -120,7 +124,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | DI | Hilt |
 | Storage | Room (expenses, categories), DataStore (settings) |
 | Listener | `NotificationListenerService` + foreground keep-alive |
-| Parsing | OpenRouter (OkHttp) → regex fallback |
+| Parsing | Google AI Studio Gemini (OkHttp) → regex fallback |
 | Min SDK | 26 · Target / Compile SDK 35 |
 
 Key packages under `app/src/main/java/com/expensetracker/app/`:
@@ -133,7 +137,7 @@ Key packages under `app/src/main/java/com/expensetracker/app/`:
 ## Privacy & security
 
 - Expense data stays **on device** in a local Room database.
-- Notification text is processed on device; with LLM enabled, notification body text is sent to OpenRouter for parsing.
+- Notification text is processed on device; with LLM enabled, notification body text is sent to Google AI Studio (Gemini) for parsing.
 - `.env` is gitignored. Do not publish APKs that contain a personal API key.
 
 ## Troubleshooting
@@ -143,7 +147,7 @@ Key packages under `app/src/main/java/com/expensetracker/app/`:
 | Nothing is tracked | Confirm notification access is enabled; check **Notification log** |
 | Listener dies when app is closed | Disable battery restrictions; enable autostart (Xiaomi); keep the persistent tracking notification |
 | Duplicate expenses | Update to the latest build; dismiss old duplicates manually — new ones should be blocked within ±5 minutes for the same amount |
-| Promos saved as expenses | Enable LLM parsing with a valid OpenRouter key and rebuild |
+| Promos saved as expenses | Enable LLM parsing with a valid Gemini API key and rebuild |
 | Xiaomi reconnect fails | Prefer soft reconnect / checklist in Settings; avoid repeatedly toggling notification access |
 
 > [!NOTE]
@@ -154,7 +158,7 @@ Key packages under `app/src/main/java/com/expensetracker/app/`:
 **Does the app need to stay open?**  
 It should keep listening in the background via the notification listener and keep-alive service, but OEM battery policies can still stop it. Use the Settings checklist on Xiaomi devices.
 
-**Will it work without OpenRouter?**  
+**Will it work without Gemini / Google AI Studio?**  
 Yes. Regex parsing still extracts RM/MYR amounts. Merchant names and promo filtering will be less accurate.
 
 **Can two real purchases of the same amount be merged?**  

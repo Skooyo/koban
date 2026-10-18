@@ -1,29 +1,30 @@
 package com.expensetracker.app.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.expensetracker.app.data.SpendingPeriod
+import com.expensetracker.app.data.DefaultCategories
+import com.expensetracker.app.data.PeriodSummary
+import com.expensetracker.app.ui.components.ExpenseItem
 import com.expensetracker.app.ui.components.ListenerStatusBanner
-import com.expensetracker.app.ui.components.SpendingPeriodSection
+import com.expensetracker.app.ui.components.NoteStrip
+import com.expensetracker.app.ui.components.PeriodHero
+import com.expensetracker.app.ui.components.PeriodTotalRow
 import com.expensetracker.app.ui.navigation.Routes
 import com.expensetracker.app.ui.viewmodel.HomeViewModel
 
@@ -46,75 +47,60 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    fun open(summary: PeriodSummary) = onNavigateToFiltered(
+        Routes.expensesFilter(summary.periodStart, summary.periodEnd, summary.title)
+    )
+
+    val divider = MaterialTheme.colorScheme.outlineVariant
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)
     ) {
         item {
             ListenerStatusBanner(
                 isAccessGranted = uiState.isAccessGranted,
-                onEnableClick = viewModel::openNotificationSettings
+                onEnableClick = viewModel::openNotificationSettings,
+                modifier = Modifier.padding(bottom = 16.dp)
             )
         }
 
         item {
-            SpendingPeriodSection(
-                summary = uiState.today,
-                categoryNames = uiState.categoryNames,
-                highlight = true,
-                onViewAll = {
-                    onNavigateToFiltered(
-                        Routes.expensesFilter(
-                            uiState.today.periodStart,
-                            uiState.today.periodEnd,
-                            "Today"
-                        )
-                    )
+            PeriodHero(summary = uiState.today, onOpen = { open(uiState.today) })
+            HorizontalDivider(color = divider, modifier = Modifier.padding(top = 20.dp))
+        }
+
+        listOf(uiState.week, uiState.month).forEach { summary ->
+            item {
+                PeriodTotalRow(
+                    title = summary.title,
+                    subtitle = summary.subtitle,
+                    total = summary.total,
+                    onClick = { open(summary) }
+                ) {
+                    NoteStrip(breakdown = summary.breakdown, height = 6.dp)
                 }
-            )
+                HorizontalDivider(color = divider)
+            }
         }
 
-        item {
-            Text(
-                text = "Scroll for weekly & monthly",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        item {
-            SpendingPeriodSection(
-                summary = uiState.week,
-                categoryNames = uiState.categoryNames,
-                onViewAll = {
-                    onNavigateToFiltered(
-                        Routes.expensesFilter(
-                            uiState.week.periodStart,
-                            uiState.week.periodEnd,
-                            "This week"
-                        )
-                    )
-                }
-            )
-        }
-
-        item {
-            SpendingPeriodSection(
-                summary = uiState.month,
-                categoryNames = uiState.categoryNames,
-                onViewAll = {
-                    onNavigateToFiltered(
-                        Routes.expensesFilter(
-                            uiState.month.periodStart,
-                            uiState.month.periodEnd,
-                            "This month"
-                        )
-                    )
-                }
-            )
+        if (uiState.week.recentExpenses.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Latest this week",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 28.dp, bottom = 4.dp)
+                )
+            }
+            items(uiState.week.recentExpenses, key = { it.id }) { expense ->
+                ExpenseItem(
+                    expense = expense,
+                    categoryName = expense.categoryId?.let { uiState.categoryNames[it] }
+                        ?: DefaultCategories.UNCATEGORIZED_NAME,
+                    compact = true,
+                    timePattern = "EEE HH:mm"
+                )
+            }
         }
     }
 }

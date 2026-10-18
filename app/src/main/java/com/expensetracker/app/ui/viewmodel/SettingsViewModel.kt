@@ -3,7 +3,6 @@ package com.expensetracker.app.ui.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.expensetracker.app.BuildConfig
 import com.expensetracker.app.data.CategoryEntity
 import com.expensetracker.app.data.CategoryRepository
 import com.expensetracker.app.data.SettingsRepository
@@ -38,8 +37,8 @@ data class SettingsUiState(
     val regexTestResult: String? = null,
     val reconnectMessage: String? = null,
     val llmParsingEnabled: Boolean = true,
-    val openRouterKeyConfigured: Boolean = false,
-    val openRouterModel: String = ""
+    val geminiKeyConfigured: Boolean = false,
+    val geminiModelsLabel: String = ""
 )
 
 @HiltViewModel
@@ -97,12 +96,12 @@ class SettingsViewModel @Inject constructor(
             regexTestResult = form.result,
             reconnectMessage = form.reconnectMessage,
             llmParsingEnabled = llmEnabled,
-            openRouterKeyConfigured = expenseNotificationParser.isLlmConfigured,
-            openRouterModel = BuildConfig.OPENROUTER_MODEL
+            geminiKeyConfigured = expenseNotificationParser.isLlmConfigured,
+            geminiModelsLabel = expenseNotificationParser.modelsLabel
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState(
-        openRouterKeyConfigured = expenseNotificationParser.isLlmConfigured,
-        openRouterModel = BuildConfig.OPENROUTER_MODEL
+        geminiKeyConfigured = expenseNotificationParser.isLlmConfigured,
+        geminiModelsLabel = expenseNotificationParser.modelsLabel
     ))
 
     fun refresh() {

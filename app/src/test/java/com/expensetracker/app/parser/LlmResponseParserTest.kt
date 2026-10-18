@@ -182,4 +182,35 @@ class LlmResponseParserTest {
             LlmResponseParser.parseChatCompletionsBody("""{"choices":[]}""")
         )
     }
+
+    @Test
+    fun parseGenerateContentBody_extractsCandidateText() {
+        val body = """
+            {
+              "candidates": [
+                {
+                  "content": {
+                    "parts": [
+                      {
+                        "text": "{\"isTransaction\":true,\"amount\":12.5,\"currency\":\"MYR\",\"merchant\":\"KK - SUPER MART - UMN\",\"transactionType\":\"WITHDRAW\",\"confidence\":\"HIGH\"}"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val expense = (LlmResponseParser.parseGenerateContentBody(body) as LlmParseResult.Success).expense
+        assertEquals(BigDecimal("12.50"), expense.amount)
+        assertEquals("KK - SUPER MART - UMN", expense.merchant)
+    }
+
+    @Test
+    fun parseGenerateContentBody_emptyCandidates_returnsFailed() {
+        assertEquals(
+            LlmParseResult.Failed,
+            LlmResponseParser.parseGenerateContentBody("""{"candidates":[]}""")
+        )
+    }
 }

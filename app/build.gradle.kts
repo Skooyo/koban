@@ -28,9 +28,13 @@ fun escapeBuildConfig(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 
 val rootEnv = loadDotEnv(rootProject.file(".env"))
-val openRouterApiKey = rootEnv["OPENROUTER_API_KEY"].orEmpty()
-val openRouterModel = rootEnv["OPENROUTER_MODEL"]?.takeIf { it.isNotBlank() }
-    ?: "openrouter/free"
+val geminiApiKey = rootEnv["GEMINI_API_KEY"]
+    ?.takeIf { it.isNotBlank() }
+    ?: rootEnv["GOOGLE_AI_API_KEY"].orEmpty()
+val geminiModelPrimary = rootEnv["GEMINI_MODEL_PRIMARY"]?.takeIf { it.isNotBlank() }
+    ?: "gemini-3.1-flash-lite"
+val geminiModelSecondary = rootEnv["GEMINI_MODEL_SECONDARY"]?.takeIf { it.isNotBlank() }
+    ?: "gemini-3.5-flash-lite"
 
 android {
     namespace = "com.expensetracker.app"
@@ -47,13 +51,18 @@ android {
 
         buildConfigField(
             "String",
-            "OPENROUTER_API_KEY",
-            "\"${escapeBuildConfig(openRouterApiKey)}\""
+            "GEMINI_API_KEY",
+            "\"${escapeBuildConfig(geminiApiKey)}\""
         )
         buildConfigField(
             "String",
-            "OPENROUTER_MODEL",
-            "\"${escapeBuildConfig(openRouterModel)}\""
+            "GEMINI_MODEL_PRIMARY",
+            "\"${escapeBuildConfig(geminiModelPrimary)}\""
+        )
+        buildConfigField(
+            "String",
+            "GEMINI_MODEL_SECONDARY",
+            "\"${escapeBuildConfig(geminiModelSecondary)}\""
         )
     }
 

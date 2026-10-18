@@ -1,104 +1,214 @@
 package com.expensetracker.app.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.expensetracker.app.parser.AmountFormatter
-import com.expensetracker.app.data.DefaultCategories
+import com.expensetracker.app.data.CategoryBreakdown
 import com.expensetracker.app.data.PeriodSummary
+import com.expensetracker.app.parser.AmountFormatter
+import com.expensetracker.app.ui.theme.LocalMoneyColors
+import com.expensetracker.app.ui.theme.categoryColor
 import java.math.BigDecimal
+import java.math.RoundingMode
 
+/**
+ * Money with a small currency symbol. A negative [amount] means money received:
+ * it shows as "+RM" in the received colour.
+ */
 @Composable
-fun SpendingPeriodSection(
-    summary: PeriodSummary,
-    categoryNames: Map<String, String>,
-    onViewAll: () -> Unit,
+fun MoneyAmount(
+    amount: BigDecimal,
+    style: TextStyle,
     modifier: Modifier = Modifier,
-    highlight: Boolean = false
+    currency: String = "MYR",
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    symbolScale: Float = 0.75f
 ) {
-    val containerColor = if (highlight) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
-    }
+    val received = amount < BigDecimal.ZERO
+    val symbolColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Text(
+        text = buildAnnotatedString {
+            if (received) append("+")
+            withStyle(SpanStyle(fontSize = style.fontSize * symbolScale, color = symbolColor)) {
+                append(AmountFormatter.currencySymbol(currency))
+                append(" ")
+            }
+            append(AmountFormatter.formatGrouped(amount.abs()))
+        },
+        style = style.copy(fontFeatureSettings = "tnum"),
+        color = if (received) LocalMoneyColors.current.received else color,
+        maxLines = 1,
+        modifier = modifier
+    )
+}
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (highlight) 4.dp else 1.dp)
+/** Spending split by category, one banknote colour per category. Received money is left out. */
+@Composable
+fun NoteStrip(
+    breakdown: List<CategoryBreakdown>,
+    modifier: Modifier = Modifier,
+    height: Dp = 14.dp
+) {
+    val spent = breakdown.filter { it.total > BigDecimal.ZERO }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(RoundedCornerShape(3.dp)),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = summary.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = summary.subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        if (spent.isEmpty()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.outlineVariant)
+            )
+        }
+        spent.forEach { item ->
+            Box(
+                Modifier
+                    .weight(item.total.toFloat())
+                    .fillMaxHeight()
+                    .background(categoryColor(item.categoryId))
+            )
+        }
+    }
+}
 
-            NetSpendingTotal(total = summary.total, large = highlight)
+/** The large total at the top of Home. Tap opens the transactions for the period. */
+@Composable
+fun PeriodHero(
+    summary: PeriodSummary,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClickLabel = "Open transactions", onClick = onOpen)
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = summary.title, style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = summary.subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 10.dp)
+            )
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        MoneyAmount(
+            amount = summary.total,
+            style = MaterialTheme.typography.displayLarge,
+            symbolScale = 0.4f
+        )
+        NoteStrip(breakdown = summary.breakdown)
+        if (summary.breakdown.isEmpty()) {
+            Text(
+                text = "No payments recorded yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            CategoryBreakdownList(breakdown = summary.breakdown)
+        }
+    }
+}
 
-            if (summary.breakdown.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                CategoryBreakdownList(breakdown = summary.breakdown)
-            }
-
-            if (summary.recentExpenses.isNotEmpty()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Text(
-                    text = "Recent",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                summary.recentExpenses.forEach { expense ->
-                    val categoryName = expense.categoryId?.let { categoryNames[it] }
-                        ?: DefaultCategories.UNCATEGORIZED_NAME
-                    ExpenseItem(
-                        expense = expense,
-                        categoryName = categoryName,
-                        compact = true
+/** One tappable period with its total, e.g. a week or a month. [below] draws under the total. */
+@Composable
+fun PeriodTotalRow(
+    title: String,
+    subtitle: String?,
+    total: BigDecimal,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    below: @Composable () -> Unit = {}
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.titleMedium)
+                subtitle?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                TextButton(
-                    onClick = onViewAll,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("View all expenses")
-                }
-            } else if (summary.total == BigDecimal.ZERO) {
-                Text(
-                    text = "No transactions yet",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                TextButton(
-                    onClick = onViewAll,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("View all expenses")
-                }
             }
+            MoneyAmount(amount = total, style = MaterialTheme.typography.titleLarge)
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp)
+            )
         }
+        below()
+    }
+}
+
+/** Thin bar that compares [total] with the largest total in a list. */
+@Composable
+fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifier) {
+    val fraction = if (max == null || max <= BigDecimal.ZERO || total <= BigDecimal.ZERO) {
+        0f
+    } else {
+        total.divide(max, 4, RoundingMode.HALF_UP).toFloat().coerceIn(0f, 1f)
+    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(fraction)
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.primary)
+        )
     }
 }
 
@@ -108,22 +218,16 @@ fun NetSpendingTotal(
     modifier: Modifier = Modifier,
     large: Boolean = false
 ) {
-    val isCredit = total < BigDecimal.ZERO
-    val displayAmount = if (isCredit) total.abs() else total
-    val prefix = if (isCredit) "− MYR " else "MYR "
-    val color = if (isCredit) androidx.compose.ui.graphics.Color(0xFF66BB6A) else MaterialTheme.colorScheme.primary
-
     Column(modifier = modifier) {
         Text(
-            text = if (isCredit) "Net (after received)" else "Net spending",
+            text = if (total < BigDecimal.ZERO) "Net received" else "Net spending",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-            text = "$prefix${AmountFormatter.formatDisplay(displayAmount)}",
-            style = if (large) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = color
+        MoneyAmount(
+            amount = total,
+            style = if (large) MaterialTheme.typography.displayMedium else MaterialTheme.typography.displaySmall,
+            symbolScale = 0.45f
         )
     }
 }

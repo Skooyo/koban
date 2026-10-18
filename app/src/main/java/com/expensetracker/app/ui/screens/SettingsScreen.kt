@@ -296,15 +296,16 @@ fun SettingsScreen(
 
         item {
             Text(
-                text = "AI parsing (OpenRouter)",
+                text = "AI parsing (Google AI Studio)",
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = if (uiState.openRouterKeyConfigured) {
-                    "API key configured · model ${uiState.openRouterModel.ifBlank { "default" }}. " +
-                        "Falls back to regex if the request fails or you are offline."
+                text = if (uiState.geminiKeyConfigured) {
+                    "API key configured · models ${uiState.geminiModelsLabel.ifBlank { "Gemini Flash Lite" }}. " +
+                        "If one model is rate-limited, the other is tried automatically. " +
+                        "Falls back to regex if both fail or you are offline."
                 } else {
-                    "No API key — using regex only. Copy .env.example to .env, set OPENROUTER_API_KEY, and rebuild."
+                    "No API key — using regex only. Copy .env.example to .env, set GEMINI_API_KEY, and rebuild."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -322,9 +323,9 @@ fun SettingsScreen(
                     modifier = Modifier.weight(1f)
                 )
                 Switch(
-                    checked = uiState.llmParsingEnabled && uiState.openRouterKeyConfigured,
+                    checked = uiState.llmParsingEnabled && uiState.geminiKeyConfigured,
                     onCheckedChange = viewModel::setLlmParsingEnabled,
-                    enabled = uiState.openRouterKeyConfigured
+                    enabled = uiState.geminiKeyConfigured
                 )
             }
         }

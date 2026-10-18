@@ -8,7 +8,7 @@ import com.expensetracker.app.data.MIGRATION_1_2
 import com.expensetracker.app.data.MIGRATION_2_3
 import com.expensetracker.app.data.MIGRATION_3_4
 import com.expensetracker.app.data.MIGRATION_4_5
-import com.expensetracker.app.parser.OpenRouterClient
+import com.expensetracker.app.parser.GeminiClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -44,5 +44,5 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient = OpenRouterClient.createDefaultHttpClient()
+    fun provideOkHttpClient(): OkHttpClient = GeminiClient.createDefaultHttpClient()
 }
