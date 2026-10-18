@@ -37,18 +37,40 @@ class GeminiClient @Inject constructor(
     private val preferredIndex = AtomicInteger(0)
     private val cooldownUntilMs = LongArray(2)
 
-    /**
-     * Calls Gemini generateContent. Runs on the caller's thread —
-     * invoke from a background dispatcher / coroutine.
-     */
-    fun parsePaymentNotification(notificationText: String): LlmParseResult {
-        if (!isConfigured) return LlmParseResult.Failed
+    /** Notification classification. Runs on the caller's thread. */
+    fun parsePaymentNotification(notificationText: String): LlmParseResult =
+        generate(
+            SYSTEM_PROMPT,
+            JSONArray().put(JSONObject().put("text", notificationText))
+        ) { body ->
+            LlmResponseParser.parseGenerateContentBody(body).takeIf { it != LlmParseResult.Failed }
+        } ?: LlmParseResult.Failed
 
+    /**
+     * Calls Gemini generateContent, trying the preferred model first and the other on failure
+     * or rate limit. A body that [parse] rejects (returns null) counts as a failed attempt.
+     * Runs on the caller's thread — invoke from a background dispatcher / coroutine.
+     */
+    fun <T : Any> generate(
+        systemPrompt: String,
+        userParts: JSONArray,
+        callTimeoutSeconds: Long = DEFAULT_CALL_TIMEOUT_SECONDS,
+        parse: (String) -> T?
+    ): T? {
+        if (!isConfigured) return null
+
+        val client = if (callTimeoutSeconds == DEFAULT_CALL_TIMEOUT_SECONDS) {
+            httpClient
+        } else {
+            httpClient.newBuilder()
+                .callTimeout(callTimeoutSeconds, TimeUnit.SECONDS)
+                .readTimeout(callTimeoutSeconds, TimeUnit.SECONDS)
+                .build()
+        }
         val models = listOf(primaryModel, secondaryModel)
         val start = preferredIndex.get().coerceIn(0, 1)
         val order = listOf(start, 1 - start)
 
-        var lastFailure: LlmParseResult = LlmParseResult.Failed
         for (index in order) {
             val model = models[index]
             val now = System.currentTimeMillis()
@@ -57,7 +79,7 @@ class GeminiClient @Inject constructor(
                 continue
             }
 
-            when (val attempt = callModel(model, notificationText)) {
+            when (val attempt = callModel(client, model, systemPrompt, userParts, parse)) {
                 is ModelAttempt.Success -> {
                     preferredIndex.set(index)
                     clearCooldown(index)
@@ -68,18 +90,20 @@ class GeminiClient @Inject constructor(
                     cooldownUntilMs[index] = now + RATE_LIMIT_COOLDOWN_MS
                     preferredIndex.set(1 - index)
                     Log.w(TAG, "Rate limited on $model — will try alternate model")
-                    lastFailure = LlmParseResult.Failed
                 }
-                ModelAttempt.Failed -> {
-                    Log.w(TAG, "Call failed on $model")
-                    lastFailure = LlmParseResult.Failed
-                }
+                ModelAttempt.Failed -> Log.w(TAG, "Call failed on $model")
             }
         }
-        return lastFailure
+        return null
     }
 
-    private fun callModel(model: String, notificationText: String): ModelAttempt {
+    private fun <T : Any> callModel(
+        client: OkHttpClient,
+        model: String,
+        systemPrompt: String,
+        userParts: JSONArray,
+        parse: (String) -> T?
+    ): ModelAttempt<T> {
         return try {
             val encodedKey = URLEncoder.encode(BuildConfig.GEMINI_API_KEY, Charsets.UTF_8.name())
             val url =
@@ -87,10 +111,10 @@ class GeminiClient @Inject constructor(
             val request = Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json")
-                .post(buildRequestJson(notificationText).toRequestBody(JSON_MEDIA_TYPE))
+                .post(buildRequestJson(systemPrompt, userParts).toRequestBody(JSON_MEDIA_TYPE))
                 .build()
 
-            httpClient.newCall(request).execute().use { response ->
+            client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 when {
                     response.code == 429 -> ModelAttempt.RateLimited
@@ -104,11 +128,7 @@ class GeminiClient @Inject constructor(
                             ModelAttempt.Failed
                         }
                     }
-                    else -> {
-                        val parsed = LlmResponseParser.parseGenerateContentBody(body)
-                        if (parsed == LlmParseResult.Failed) ModelAttempt.Failed
-                        else ModelAttempt.Success(parsed)
-                    }
+                    else -> parse(body)?.let { ModelAttempt.Success(it) } ?: ModelAttempt.Failed
                 }
             }
         } catch (e: Exception) {
@@ -116,25 +136,21 @@ class GeminiClient @Inject constructor(
             ModelAttempt.Failed
         }
     }
-
     private fun clearCooldown(index: Int) {
         cooldownUntilMs[index] = 0L
     }
 
-    private fun buildRequestJson(notificationText: String): String {
+    private fun buildRequestJson(systemPrompt: String, userParts: JSONArray): String {
         val systemInstruction = JSONObject()
             .put(
                 "parts",
-                JSONArray().put(JSONObject().put("text", SYSTEM_PROMPT))
+                JSONArray().put(JSONObject().put("text", systemPrompt))
             )
 
         val contents = JSONArray().put(
             JSONObject()
                 .put("role", "user")
-                .put(
-                    "parts",
-                    JSONArray().put(JSONObject().put("text", notificationText))
-                )
+                .put("parts", userParts)
         )
 
         val generationConfig = JSONObject()
@@ -148,10 +164,10 @@ class GeminiClient @Inject constructor(
             .toString()
     }
 
-    private sealed class ModelAttempt {
-        data class Success(val result: LlmParseResult) : ModelAttempt()
-        data object RateLimited : ModelAttempt()
-        data object Failed : ModelAttempt()
+    private sealed class ModelAttempt<out T> {
+        data class Success<T>(val result: T) : ModelAttempt<T>()
+        data object RateLimited : ModelAttempt<Nothing>()
+        data object Failed : ModelAttempt<Nothing>()
     }
 
     companion object {
@@ -160,6 +176,7 @@ class GeminiClient @Inject constructor(
             "https://generativelanguage.googleapis.com/v1beta/models"
         private const val DEFAULT_PRIMARY = "gemini-3.1-flash-lite"
         private const val DEFAULT_SECONDARY = "gemini-3.5-flash-lite"
+        private const val DEFAULT_CALL_TIMEOUT_SECONDS = 20L
         private const val RATE_LIMIT_COOLDOWN_MS = 60_000L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
