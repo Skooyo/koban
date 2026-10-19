@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Koban logo: an oval gold koban coin with hammered ridges and a red seal. -->
+<!-- Koban logo: a plain gold koban coin, tilted. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -10,27 +10,7 @@
         android:pivotY="54"
         android:rotation="-14">
         <path
-            android:fillColor="#B07D0C"
-            android:pathData="M31,54a23,30.5 0,1 0,46 0a23,30.5 0,1 0,-46 0z" />
-        <path
             android:fillColor="#F2C94C"
-            android:pathData="M34,54a20,27.5 0,1 0,40 0a20,27.5 0,1 0,-40 0z" />
-        <path
-            android:pathData="M38.5,45h31M38.5,63h31M42,36h24M42,72h24"
-            android:strokeColor="#D39E17"
-            android:strokeLineCap="round"
-            android:strokeWidth="2.4" />
-        <path
-            android:fillColor="#E5483B"
-            android:pathData="M50.5,48h7a2.5,2.5 0,0 1,2.5 2.5v7a2.5,2.5 0,0 1,-2.5 2.5h-7a2.5,2.5 0,0 1,-2.5 -2.5v-7a2.5,2.5 0,0 1,2.5 -2.5z" />
-        <path
-            android:pathData="M51.5,50.5h5a1,1 0,0 1,1 1v5a1,1 0,0 1,-1 1h-5a1,1 0,0 1,-1 -1v-5a1,1 0,0 1,1 -1z"
-            android:strokeColor="#FFD9D4"
-            android:strokeWidth="1.2" />
-        <path
-            android:pathData="M42.5,33Q46.5,29 52,28.2"
-            android:strokeColor="#FFF3C4"
-            android:strokeLineCap="round"
-            android:strokeWidth="2.4" />
+            android:pathData="M32,54a22,30 0,1 0,44 0a22,30 0,1 0,-44 0z" />
     </group>
 </vector>
