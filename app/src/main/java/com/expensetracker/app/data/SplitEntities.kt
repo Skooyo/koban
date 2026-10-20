@@ -1,5 +1,6 @@
 package com.expensetracker.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -36,7 +37,10 @@ data class SplitItemEntity(
 data class SplitPersonEntity(
     @PrimaryKey val id: String,
     val name: String,
-    val lastUsedAt: Long
+    val lastUsedAt: Long,
+    val qrPath: String? = null,
+    @ColumnInfo(defaultValue = "0") val archived: Boolean = false,
+    val suggestedSettleExpenseId: String? = null
 )
 
 @Entity(

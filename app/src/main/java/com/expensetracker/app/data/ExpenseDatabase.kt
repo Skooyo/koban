@@ -13,9 +13,10 @@ import androidx.room.TypeConverters
         SplitItemEntity::class,
         SplitPersonEntity::class,
         SplitItemShareEntity::class,
-        SplitDebtEntity::class
+        SplitDebtEntity::class,
+        OwedItemEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(

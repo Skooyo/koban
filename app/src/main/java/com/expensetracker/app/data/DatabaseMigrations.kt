@@ -78,3 +78,13 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         db.execSQL("CREATE INDEX IF NOT EXISTS index_split_debts_personId ON split_debts (personId)")
     }
 }
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE split_people ADD COLUMN qrPath TEXT")
+        db.execSQL("ALTER TABLE split_people ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE split_people ADD COLUMN suggestedSettleExpenseId TEXT")
+        db.execSQL("CREATE TABLE IF NOT EXISTS owed_items (id TEXT NOT NULL, personId TEXT NOT NULL, description TEXT NOT NULL, amount TEXT NOT NULL, itemDate INTEGER NOT NULL, createdAt INTEGER NOT NULL, status TEXT NOT NULL, paidAt INTEGER, PRIMARY KEY(id))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_owed_items_personId ON owed_items (personId)")
+    }
+}

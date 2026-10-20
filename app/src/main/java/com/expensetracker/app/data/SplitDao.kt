@@ -68,11 +68,64 @@ interface SplitDao {
     @Query("SELECT * FROM split_debts WHERE status = 'OPEN'")
     suspend fun getOpenDebts(): List<SplitDebtEntity>
 
-    @Query("SELECT * FROM split_people ORDER BY lastUsedAt DESC")
+    @Query("SELECT * FROM split_people WHERE archived = 0 ORDER BY lastUsedAt DESC")
     fun observePeople(): Flow<List<SplitPersonEntity>>
 
-    @Query("SELECT * FROM split_people ORDER BY lastUsedAt DESC")
+    @Query("SELECT * FROM split_people WHERE archived = 0 ORDER BY lastUsedAt DESC")
     suspend fun getPeople(): List<SplitPersonEntity>
+
+    @Query("SELECT * FROM split_people")
+    suspend fun getAllPeopleIncludingArchived(): List<SplitPersonEntity>
+
+    @Query("SELECT * FROM split_people WHERE archived = 0 ORDER BY name COLLATE NOCASE")
+    fun observeAllPeople(): Flow<List<SplitPersonEntity>>
+
+    @Query("SELECT * FROM split_people WHERE id = :id")
+    suspend fun getPerson(id: String): SplitPersonEntity?
+
+    @Query("SELECT * FROM split_people WHERE id = :id")
+    fun observePerson(id: String): Flow<SplitPersonEntity?>
+
+    @Query(
+        """
+        SELECT d.id AS debtId, d.billId AS billId, d.personId AS personId,
+               p.name AS personName, b.merchant AS merchant, b.billTime AS billTime,
+               d.amount AS amount
+        FROM split_debts d
+        JOIN split_people p ON p.id = d.personId
+        JOIN split_bills b ON b.id = d.billId
+        WHERE d.status = 'OPEN' AND d.personId = :personId
+        ORDER BY b.billTime ASC
+        """
+    )
+    fun observeOpenDebtsFor(personId: String): Flow<List<OpenDebtRow>>
+
+    @Query("SELECT * FROM split_debts WHERE status = 'OPEN' AND personId = :personId")
+    suspend fun getOpenDebtsFor(personId: String): List<SplitDebtEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOwedItem(item: OwedItemEntity)
+
+    @Update
+    suspend fun updateOwedItem(item: OwedItemEntity)
+
+    @Query("DELETE FROM owed_items WHERE id = :id")
+    suspend fun deleteOwedItem(id: String)
+
+    @Query("SELECT * FROM owed_items WHERE id = :id")
+    suspend fun getOwedItem(id: String): OwedItemEntity?
+
+    @Query("SELECT * FROM owed_items WHERE personId = :personId AND status = 'OPEN' ORDER BY itemDate")
+    fun observeOwedItems(personId: String): Flow<List<OwedItemEntity>>
+
+    @Query("SELECT * FROM owed_items WHERE personId = :personId AND status = 'OPEN'")
+    suspend fun getOpenOwedItems(personId: String): List<OwedItemEntity>
+
+    @Query("SELECT * FROM owed_items WHERE status = 'OPEN'")
+    fun observeAllOpenOwedItems(): Flow<List<OwedItemEntity>>
+
+    @Query("DELETE FROM owed_items WHERE personId = :personId AND status = 'PAID'")
+    suspend fun deletePaidOwedItems(personId: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBill(bill: SplitBillEntity)
