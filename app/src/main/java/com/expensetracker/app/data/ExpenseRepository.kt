@@ -39,6 +39,9 @@ class ExpenseRepository @Inject constructor(
     fun observeTotalForRange(start: Long, end: Long): Flow<BigDecimal?> =
         expenseDao.observeTotalForRange(start, end)
 
+    fun observeReceivedForRange(start: Long, end: Long): Flow<BigDecimal?> =
+        expenseDao.observeReceivedForRange(start, end)
+
     fun observeInRange(start: Long, end: Long): Flow<List<ExpenseEntity>> =
         expenseDao.observeInRange(start, end)
 
@@ -50,7 +53,8 @@ class ExpenseRepository @Inject constructor(
                     year = year,
                     month = month,
                     label = PeriodCalculator.monthLabel(year, month),
-                    total = row.total
+                    total = row.total,
+                    received = row.received
                 )
             }
         }

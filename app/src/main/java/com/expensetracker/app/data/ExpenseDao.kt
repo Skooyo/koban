@@ -158,7 +158,8 @@ interface ExpenseDao {
             + CAST(strftime('%m', notificationPostTime / 1000, 'unixepoch', 'localtime') AS INTEGER)) AS yearMonth,
             COALESCE(SUM(
                 CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
-            ), 0) AS total
+            ), 0) AS total,
+            COALESCE(SUM(CASE WHEN transactionType = 'RECEIVE' THEN amount ELSE 0 END), 0) AS received
         FROM expenses
         WHERE status != 'DISMISSED'
         GROUP BY yearMonth

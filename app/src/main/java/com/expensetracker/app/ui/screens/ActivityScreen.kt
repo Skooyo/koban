@@ -63,6 +63,7 @@ import com.expensetracker.app.ui.components.CategoryFilterRow
 import com.expensetracker.app.ui.components.MoneyAmount
 import com.expensetracker.app.ui.components.NetSpendingTotal
 import com.expensetracker.app.ui.components.PeriodTotalRow
+import com.expensetracker.app.ui.components.ReceivedNote
 import com.expensetracker.app.ui.components.RelativeBar
 import com.expensetracker.app.ui.components.UNCATEGORIZED_FILTER
 import com.expensetracker.app.ui.components.expensesByDay
@@ -122,6 +123,7 @@ fun ActivityScreen(
                         modifier = Modifier.padding(top = 8.dp)
                     )
                     NetSpendingTotal(total = uiState.monthTotal, large = true, modifier = Modifier.padding(top = 8.dp))
+                    ReceivedNote(received = uiState.monthReceived)
                     WeekStrip(
                         weeks = uiState.weeks,
                         selected = uiState.selectedWeek,
@@ -240,21 +242,23 @@ private fun ViewSwitch(showAll: Boolean, onShowAll: (Boolean) -> Unit, modifier:
 /** Sticky month header of the All view: month name and that month's spent total. */
 @Composable
 private fun MonthHeader(group: ActivityMonthGroup) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .padding(top = 20.dp, bottom = 4.dp)
-            .semantics(mergeDescendants = true) { heading() },
-        verticalAlignment = Alignment.Bottom
+            .semantics(mergeDescendants = true) { heading() }
     ) {
-        Text(
-            text = MonthNav.label(group.month),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f)
-        )
-        MoneyAmount(amount = group.total, style = MaterialTheme.typography.titleMedium)
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = MonthNav.label(group.month),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            MoneyAmount(amount = group.total, style = MaterialTheme.typography.titleMedium)
+        }
+        ReceivedNote(received = group.received)
     }
 }
 

@@ -37,6 +37,7 @@ data class ActivityUiState(
     val month: YearMonth = YearMonth.now(),
     val canGoNext: Boolean = false,
     val monthTotal: BigDecimal = BigDecimal.ZERO,
+    val monthReceived: BigDecimal = BigDecimal.ZERO,
     val weeks: List<WeekSummary> = emptyList(),
     val selectedWeek: Long? = null,
     val expenses: List<ExpenseEntity> = emptyList(),
@@ -47,12 +48,13 @@ data class ActivityUiState(
 )
 
 /** One month of the All view: its spent total (as the Month view's total) and its payments after the category filter. */
-data class ActivityMonthGroup(val month: YearMonth, val total: BigDecimal, val expenses: List<ExpenseEntity>)
+data class ActivityMonthGroup(val month: YearMonth, val total: BigDecimal, val received: BigDecimal, val expenses: List<ExpenseEntity>)
 
 /** Payments, totals, weeks and donut slices of one month (or week), before the category filter. */
 private data class MonthData(
     val month: YearMonth,
     val monthTotal: BigDecimal,
+    val monthReceived: BigDecimal,
     val weeks: List<WeekSummary>,
     val selectedWeek: Long?,
     val expenses: List<ExpenseEntity>,
@@ -85,13 +87,14 @@ class ActivityViewModel @Inject constructor(
             val spanEnd = weekRanges.lastOrNull()?.second ?: monthEnd
             combine(
                 expenseRepository.observeTotalForRange(monthStart, monthEnd),
+                expenseRepository.observeReceivedForRange(monthStart, monthEnd),
                 expenseRepository.observeInRange(spanStart, spanEnd).mapLatest { span ->
                     expenseRepository.weekSummariesForMonth(year, month) to
                         span.filter { it.notificationPostTime in listStart until listEnd }
                 },
                 expenseRepository.observeCategoryBreakdown(listStart, listEnd)
-            ) { total, (weeks, expenses), breakdown ->
-                MonthData(shownMonth, total ?: BigDecimal.ZERO, weeks, week?.first, expenses, donutSlices(breakdown))
+            ) { total, received, (weeks, expenses), breakdown ->
+                MonthData(shownMonth, total ?: BigDecimal.ZERO, received ?: BigDecimal.ZERO, weeks, week?.first, expenses, donutSlices(breakdown))
             }
         }
 
@@ -104,6 +107,7 @@ class ActivityViewModel @Inject constructor(
             month = data.month,
             canGoNext = MonthNav.next(data.month, YearMonth.now()) != null,
             monthTotal = data.monthTotal,
+            monthReceived = data.monthReceived,
             weeks = data.weeks,
             selectedWeek = data.selectedWeek,
             expenses = data.expenses.filter { it.matchesCategory(filter) },
@@ -132,11 +136,14 @@ class ActivityViewModel @Inject constructor(
                     expenseRepository.observeMonthlySummaries(),
                     activitySelection.state.map { it.categoryFilter }.distinctUntilChanged()
                 ) { expenses, months, filter ->
-                    val totals = months.associate { YearMonth.of(it.year, it.month + 1) to it.total }
+                    val byMonth = months.associateBy { YearMonth.of(it.year, it.month + 1) }
                     val zone = ZoneId.systemDefault()
                     expenses.filter { it.matchesCategory(filter) }
                         .groupBy { YearMonth.from(Instant.ofEpochMilli(it.notificationPostTime).atZone(zone)) }
-                        .map { (month, list) -> ActivityMonthGroup(month, totals[month] ?: BigDecimal.ZERO, list) }
+                        .map { (month, list) ->
+                            val summary = byMonth[month]
+                            ActivityMonthGroup(month, summary?.total ?: BigDecimal.ZERO, summary?.received ?: BigDecimal.ZERO, list)
+                        }
                 }
             }
         }
