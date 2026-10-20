@@ -3,6 +3,7 @@ package com.expensetracker.app.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -67,8 +68,10 @@ fun SettingsScreen(
 
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0),
                 title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

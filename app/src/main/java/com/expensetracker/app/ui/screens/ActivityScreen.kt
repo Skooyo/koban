@@ -116,7 +116,8 @@ fun ActivityScreen(
                 CategoryDonut(
                     slices = uiState.slices,
                     onSelect = { viewModel.setCategoryFilter(it.categoryId ?: UNCATEGORIZED_FILTER) },
-                    modifier = Modifier.padding(top = 20.dp)
+                    modifier = Modifier.padding(top = 12.dp),
+                    compact = true
                 )
                 CategoryFilterRow(
                     categories = categories,
