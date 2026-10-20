@@ -11,10 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,8 +27,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.data.CategoryBreakdown
-import com.expensetracker.app.data.CategoryEntity
-import com.expensetracker.app.data.DefaultCategories
 import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.theme.categoryColor
@@ -199,28 +194,6 @@ fun CategoryDonut(
         Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             ring(Modifier.align(Alignment.CenterHorizontally))
             legendColumn(Modifier)
-        }
-    }
-}
-
-/** One row of chips: All, each category, Uncategorized. */
-@Composable
-fun CategoryFilterRow(
-    categories: List<CategoryEntity>,
-    selected: String?,
-    onSelect: (String?) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val options = listOf<Pair<String?, String>>(null to "All") +
-        categories.map { it.id to it.name } +
-        (UNCATEGORIZED_FILTER to DefaultCategories.UNCATEGORIZED_NAME)
-    LazyRow(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(options, key = { it.first ?: "all" }) { (id, name) ->
-            FilterChip(
-                selected = selected == id,
-                onClick = { onSelect(id) },
-                label = { Text(name) }
-            )
         }
     }
 }

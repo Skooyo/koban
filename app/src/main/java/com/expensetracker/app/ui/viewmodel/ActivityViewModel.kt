@@ -3,6 +3,7 @@ package com.expensetracker.app.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.data.ActivitySelection
+import com.expensetracker.app.data.CategoryBreakdown
 import com.expensetracker.app.data.CategoryEntity
 import com.expensetracker.app.data.CategoryRepository
 import com.expensetracker.app.data.DefaultCategories
@@ -42,6 +43,7 @@ data class ActivityUiState(
     val selectedWeek: Long? = null,
     val expenses: List<ExpenseEntity> = emptyList(),
     val slices: List<DonutSlice> = emptyList(),
+    val breakdown: List<CategoryBreakdown> = emptyList(),
     val categoryNames: Map<String, String> = emptyMap(),
     val categoryFilter: String? = null,
     val showAll: Boolean = false
@@ -58,8 +60,12 @@ private data class MonthData(
     val weeks: List<WeekSummary>,
     val selectedWeek: Long?,
     val expenses: List<ExpenseEntity>,
-    val slices: List<DonutSlice>
+    val slices: List<DonutSlice>,
+    val breakdown: List<CategoryBreakdown>
 )
+
+/** Spent in total and per category over the range the filter sheet shows. */
+data class FilterTotals(val total: BigDecimal = BigDecimal.ZERO, val breakdown: List<CategoryBreakdown> = emptyList())
 
 @HiltViewModel
 class ActivityViewModel @Inject constructor(
@@ -95,7 +101,7 @@ class ActivityViewModel @Inject constructor(
                 },
                 expenseRepository.observeCategoryBreakdown(listStart, listEnd)
             ) { total, received, (weeks, expenses), breakdown ->
-                MonthData(shownMonth, total ?: BigDecimal.ZERO, received ?: BigDecimal.ZERO, weeks, week?.first, expenses, donutSlices(breakdown))
+                MonthData(shownMonth, total ?: BigDecimal.ZERO, received ?: BigDecimal.ZERO, weeks, week?.first, expenses, donutSlices(breakdown), breakdown)
             }
         }
 
@@ -113,6 +119,7 @@ class ActivityViewModel @Inject constructor(
             selectedWeek = data.selectedWeek,
             expenses = data.expenses.filter { it.matchesCategory(filter) },
             slices = data.slices,
+            breakdown = data.breakdown,
             categoryNames = cats.associate { it.id to it.name },
             categoryFilter = filter,
             showAll = showAll
@@ -149,6 +156,23 @@ class ActivityViewModel @Inject constructor(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** Totals for the filter sheet: the donut's range (month or selected week) in the Month view, all time in the All view. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val filterTotals: StateFlow<FilterTotals> = activitySelection.state
+        .map { it.showAll }
+        .distinctUntilChanged()
+        .flatMapLatest { showAll ->
+            if (showAll) {
+                combine(
+                    expenseRepository.observeTotalForRange(0, Long.MAX_VALUE),
+                    expenseRepository.observeCategoryBreakdown(0, Long.MAX_VALUE)
+                ) { total, breakdown -> FilterTotals(total ?: BigDecimal.ZERO, breakdown) }
+            } else {
+                uiState.map { FilterTotals(it.monthTotal, it.breakdown) }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FilterTotals())
 
     /** Months with payments, newest first, plus the current month even when it is empty. */
     val sheetMonths: StateFlow<List<MonthSummary>> = expenseRepository.observeMonthlySummaries()
