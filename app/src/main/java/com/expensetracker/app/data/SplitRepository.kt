@@ -76,7 +76,7 @@ class SplitRepository @Inject constructor(
         val bill = splitDao.getBill(billId) ?: return null
         val items = splitDao.getItems(billId)
         val sharesByItem = splitDao.getShares(billId).groupBy({ it.itemId }, { it.personId })
-        val peopleById = splitDao.getPeople().associateBy { it.id }
+        val peopleById = splitDao.getAllPeopleIncludingArchived().associateBy { it.id }
         val usedIds = (sharesByItem.values.flatten() + splitDao.getDebts(billId).map { it.personId })
             .toSet() - ME_ID
         return SplitDraft(
@@ -102,19 +102,21 @@ class SplitRepository @Inject constructor(
         }
         val now = System.currentTimeMillis()
 
-        // Map each draft person id to a stored person, matching by case-insensitive name.
-        val stored = splitDao.getPeople().toMutableList()
+        // Map each draft person id to a stored person by normalized name. A match revives an archived person.
+        val stored = splitDao.getAllPeopleIncludingArchived().sortedBy { it.archived }.toMutableList()
         val idMap = mutableMapOf(ME_ID to ME_ID)
         for (person in draft.people) {
             val name = person.name.trim()
-            val match = stored.firstOrNull { it.name.equals(name, ignoreCase = true) }
+            val key = PeopleMath.normalizedName(name)
+            val match = stored.firstOrNull { PeopleMath.normalizedName(it.name) == key }
             val resolved = (match ?: SplitPersonEntity(UUID.randomUUID().toString(), name, now))
-                .copy(lastUsedAt = now)
+                .copy(lastUsedAt = now, archived = false)
             splitDao.upsertPerson(resolved)
             if (match == null) stored.add(resolved)
             idMap[person.id] = resolved.id
         }
 
+        val oldDebtPeople = splitDao.getDebts(billId).map { it.personId }
         splitDao.deleteSharesByBill(billId)
         splitDao.deleteItemsByBill(billId)
         splitDao.deleteDebtsByBill(billId)
@@ -161,6 +163,7 @@ class SplitRepository @Inject constructor(
         splitDao.insertItems(itemEntities)
         splitDao.insertShares(shareEntities)
         splitDao.insertDebts(debts)
+        (oldDebtPeople + debts.map { it.personId }).toSet().forEach { clearSettleSuggestion(it) }
 
         applyLink(billId, draft.linkedExpenseId)
         billId
@@ -268,7 +271,7 @@ class SplitRepository @Inject constructor(
         }
     }
 
-    private fun isUsableRepayment(expense: ExpenseEntity): Boolean =
+    internal fun isUsableRepayment(expense: ExpenseEntity): Boolean =
         expense.transactionType == TransactionType.RECEIVE &&
             expense.status != ExpenseStatus.DISMISSED &&
             expense.countedAmount == null
@@ -285,9 +288,29 @@ class SplitRepository @Inject constructor(
     private suspend fun suggestedWith(expenseId: String): List<SplitDebtEntity> =
         splitDao.getOpenDebts().filter { it.suggestedRepaymentExpenseId == expenseId }
 
+    /** Closes every open debt of [personId]. A non-null [expense] is marked used even when no debt is open. */
+    internal suspend fun closeAllFor(personId: String, expense: ExpenseEntity?) {
+        db.withTransaction {
+            close(splitDao.getOpenDebtsFor(personId), expense)
+            clearSettleSuggestion(personId)
+        }
+    }
+
+    internal suspend fun clearSettleSuggestion(personId: String) {
+        val person = splitDao.getPerson(personId) ?: return
+        if (person.suggestedSettleExpenseId == null) return
+        splitDao.upsertPerson(person.copy(suggestedSettleExpenseId = null))
+    }
+
     /** Marks [debts] PAID. A null [expense] means cash. */
     private suspend fun close(debts: List<SplitDebtEntity>, expense: ExpenseEntity?) {
         val now = System.currentTimeMillis()
+        // A settle suggestion goes stale when its person's debts change or its expense gets used.
+        val personIds = debts.map { it.personId }.toSet()
+        splitDao.getAllPeopleIncludingArchived()
+            .filter { it.suggestedSettleExpenseId != null }
+            .filter { it.id in personIds || (expense != null && it.suggestedSettleExpenseId == expense.id) }
+            .forEach { splitDao.upsertPerson(it.copy(suggestedSettleExpenseId = null)) }
         // Other open debts must not keep a suggestion that this close made stale.
         val staleIds = debts.mapNotNull { it.suggestedRepaymentExpenseId }.toSet() +
             listOfNotNull(expense?.id)
@@ -312,9 +335,10 @@ class SplitRepository @Inject constructor(
     suspend fun suggestRepayment(receive: ExpenseEntity) {
         if (receive.transactionType != TransactionType.RECEIVE) return
         db.withTransaction {
-            val open = splitDao.getOpenDebts().filter { it.suggestedRepaymentExpenseId == null }
-            if (open.isEmpty()) return@withTransaction
-            val names = splitDao.getPeople().associate { it.id to it.name }
+            val allOpen = splitDao.getOpenDebts()
+            val open = allOpen.filter { it.suggestedRepaymentExpenseId == null }
+            val people = splitDao.getAllPeopleIncludingArchived()
+            val names = people.associate { it.id to it.name }
             val billTimes = open.map { it.billId }.distinct()
                 .associateWith { splitDao.getBill(it)?.billTime ?: Long.MAX_VALUE }
             val refs = open.sortedBy { billTimes.getValue(it.billId) }.map {
@@ -323,6 +347,27 @@ class SplitRepository @Inject constructor(
             val matched = RepaymentMatcher.match(receive.amount, receive.merchant, refs).toSet()
             open.filter { it.id in matched }.forEach {
                 splitDao.updateDebt(it.copy(suggestedRepaymentExpenseId = receive.id))
+            }
+            if (matched.isNotEmpty()) return@withTransaction
+
+            // No subset of debts fits: offer a settle up to the one person whose whole net equals the amount.
+            val debtsByPerson = allOpen.groupBy { it.personId }
+            val candidates = people
+                .filter { !it.archived && it.suggestedSettleExpenseId == null && it.id in debtsByPerson }
+                .map { person ->
+                    PeopleMath.SettleCandidate(
+                        person.id,
+                        person.name,
+                        PeopleMath.net(
+                            debtsByPerson.getValue(person.id).map { it.amount },
+                            splitDao.getOpenOwedItems(person.id).map { it.amount }
+                        )
+                    )
+                }
+            val personId = PeopleMath.settleMatch(receive.amount, receive.merchant, candidates)
+                ?: return@withTransaction
+            people.first { it.id == personId }.let {
+                splitDao.upsertPerson(it.copy(suggestedSettleExpenseId = receive.id))
             }
         }
     }
