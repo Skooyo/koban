@@ -42,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -256,13 +258,14 @@ private fun PersonRow(summary: PersonSummary, avatarColor: Color, onClick: () ->
             Box(
                 modifier = Modifier
                     .size(40.dp)
+                    .clearAndSetSemantics {}
                     .background(avatarColor, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = name.trim().take(1).uppercase(),
                     style = MaterialTheme.typography.titleSmall,
-                    color = Color.White
+                    color = if (avatarColor.luminance() > 0.18f) Ink else Color.White
                 )
             }
             Spacer(Modifier.width(14.dp))
