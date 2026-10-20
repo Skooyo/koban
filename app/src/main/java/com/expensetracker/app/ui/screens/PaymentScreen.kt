@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -28,6 +30,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -126,6 +129,7 @@ fun PaymentScreen(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PaymentContent(
     form: PaymentForm,
@@ -142,6 +146,14 @@ private fun PaymentContent(
     var pickingDate by remember { mutableStateOf(false) }
     val padVisible = !shopFocused && !noteFocused
     val valid = AmountInput.toAmount(form.amountText) != null
+    val saving by viewModel.saving.collectAsStateWithLifecycle()
+    // Back or Done hides the keyboard but leaves focus in Shop/Note; drop it so the number pad returns.
+    val imeVisible = WindowInsets.isImeVisible
+    var wasImeVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(imeVisible) {
+        if (wasImeVisible && !imeVisible) focusManager.clearFocus()
+        wasImeVisible = imeVisible
+    }
 
     Column(
         modifier = Modifier
@@ -151,7 +163,7 @@ private fun PaymentContent(
             .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
             .padding(horizontal = 16.dp)
     ) {
-        TopRow(type = form.type, onClose = onClose, onType = viewModel::setType)
+        TopRow(type = form.type, onClose = { if (!saving) onClose() }, onType = viewModel::setType)
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -206,7 +218,7 @@ private fun PaymentContent(
                 onFocus = { noteFocused = it },
                 singleLine = false
             )
-            if (isEditing && form.categoryId != null && form.categoryId != loadedCategoryId) {
+            if (form.categoryId != null && form.categoryId != loadedCategoryId && form.merchant.isNotBlank()) {
                 Text(
                     text = "A new category also applies to past payments from this shop",
                     style = MaterialTheme.typography.bodySmall,
@@ -305,6 +317,7 @@ private fun TopRow(type: TransactionType, onClose: () -> Unit, onType: (Transact
 
 @Composable
 private fun RowScope.TypeSegment(label: String, selected: Boolean, selectedColor: Color, onClick: () -> Unit) {
+    val lightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
     Box(
         modifier = Modifier
             .weight(1f)
@@ -320,6 +333,8 @@ private fun RowScope.TypeSegment(label: String, selected: Boolean, selectedColor
             fontWeight = FontWeight.SemiBold,
             color = when {
                 !selected -> MaterialTheme.colorScheme.onSurfaceVariant
+                // Ink on the light-theme green is only ~3.6:1.
+                lightTheme && selectedColor == LocalMoneyColors.current.received -> Color.White
                 selectedColor.luminance() > 0.18f -> Ink
                 else -> Color.White
             }
@@ -459,6 +474,7 @@ private fun TextCard(
     modifier: Modifier = Modifier
 ) {
     val focus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     val textStyle = MaterialTheme.typography.bodyLarge.copy(
         color = MaterialTheme.colorScheme.onSurface,
         fontWeight = FontWeight.SemiBold
@@ -482,6 +498,7 @@ private fun TextCard(
                 capitalization = KeyboardCapitalization.Sentences,
                 imeAction = if (singleLine) ImeAction.Done else ImeAction.Default
             ),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focus)

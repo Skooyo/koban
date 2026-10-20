@@ -61,7 +61,8 @@ class PaymentViewModel @Inject constructor(
     val events: Flow<PaymentEvent> = _events.receiveAsFlow()
 
     /** Set on the first save, so a double tap cannot add the payment twice. */
-    private var saving = false
+    private val _saving = MutableStateFlow(false)
+    val saving: StateFlow<Boolean> = _saving.asStateFlow()
 
     init {
         if (expenseId == null) {
@@ -106,8 +107,8 @@ class PaymentViewModel @Inject constructor(
     private fun persist(after: PaymentEvent) {
         val f = _form.value ?: return
         val amount = AmountInput.toAmount(f.amountText) ?: return
-        if (saving) return
-        saving = true
+        if (_saving.value) return
+        _saving.value = true
         val merchant = f.merchant.ifBlank { null }
         val notes = f.notes.ifBlank { null }
         viewModelScope.launch {

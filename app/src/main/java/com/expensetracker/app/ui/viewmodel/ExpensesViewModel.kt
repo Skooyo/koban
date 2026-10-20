@@ -7,21 +7,16 @@ import com.expensetracker.app.data.CategoryRepository
 import com.expensetracker.app.data.DefaultCategories
 import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.data.ExpenseRepository
-import com.expensetracker.app.data.ExpenseStatus
-import com.expensetracker.app.data.ParseConfidence
 import com.expensetracker.app.data.PeopleRepository
 import com.expensetracker.app.ui.components.matchesCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.math.BigDecimal
 import javax.inject.Inject
 
 data class ExpensesUiState(

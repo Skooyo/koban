@@ -94,8 +94,8 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
                 ExpensesScreen(
                     onSplit = { id -> navController.navigate(Routes.splitNew(id)) },
                     onPeople = { navController.navigate(Routes.PEOPLE) },
-                    onAddPayment = { navController.navigate(Routes.PAYMENT_NEW) },
-                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) }
+                    onAddPayment = { navController.navigate(Routes.PAYMENT_NEW) { launchSingleTop = true } },
+                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) { launchSingleTop = true } }
                 )
             }
             composable(Routes.PEOPLE) {
@@ -143,7 +143,7 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
             ) {
                 FilteredExpensesScreen(
                     onBack = { navController.popBackStack() },
-                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) }
+                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) { launchSingleTop = true } }
                 )
             }
             composable(
