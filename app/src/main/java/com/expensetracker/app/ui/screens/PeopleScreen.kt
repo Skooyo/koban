@@ -60,7 +60,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Ink = Color(0xFF1B2430)
+internal val Ink = Color(0xFF1B2430)
 
 private fun billDate(timeMs: Long): String =
     SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(timeMs))

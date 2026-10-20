@@ -209,27 +209,41 @@ fun EditExpenseDialog(
     )
 
     if (pickingDate) {
-        val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = localDateAsUtcMillis(postTime),
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long) =
-                    utcTimeMillis <= localDateAsUtcMillis(System.currentTimeMillis())
+        PastDatePickerDialog(
+            time = postTime,
+            onDismiss = { pickingDate = false },
+            onPicked = {
+                postTime = it
+                pickingDate = false
             }
         )
-        DatePickerDialog(
-            onDismissRequest = { pickingDate = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    pickerState.selectedDateMillis?.let { postTime = withDate(postTime, it) }
-                    pickingDate = false
-                }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { pickingDate = false }) { Text("Cancel") }
-            }
-        ) {
-            DatePicker(state = pickerState)
+    }
+}
+
+/** Date picker up to today. [onPicked] gets [time] moved to the picked date, keeping its time of day. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PastDatePickerDialog(time: Long, onDismiss: () -> Unit, onPicked: (Long) -> Unit) {
+    val pickerState = rememberDatePickerState(
+        initialSelectedDateMillis = localDateAsUtcMillis(time),
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long) =
+                utcTimeMillis <= localDateAsUtcMillis(System.currentTimeMillis())
         }
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                val picked = pickerState.selectedDateMillis
+                if (picked != null) onPicked(withDate(time, picked)) else onDismiss()
+            }) { Text("OK") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    ) {
+        DatePicker(state = pickerState)
     }
 }
 
