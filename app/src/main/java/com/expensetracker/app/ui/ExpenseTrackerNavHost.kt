@@ -15,6 +15,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
@@ -84,7 +86,11 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier, appViewModel: AppViewMo
                         NavigationBarItem(
                             icon = {
                                 if (item.route == Routes.PEOPLE && openPeopleCount > 0) {
-                                    BadgedBox(badge = { Badge { Text("$openPeopleCount") } }) {
+                                    BadgedBox(badge = {
+                                        Badge(Modifier.semantics { contentDescription = "$openPeopleCount open" }) {
+                                            Text("$openPeopleCount")
+                                        }
+                                    }) {
                                         Icon(item.icon, contentDescription = item.label)
                                     }
                                 } else {
