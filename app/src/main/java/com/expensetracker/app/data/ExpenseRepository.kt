@@ -265,6 +265,8 @@ class ExpenseRepository @Inject constructor(
         }
     }
 
+    suspend fun getById(id: String): ExpenseEntity? = expenseDao.getById(id)
+
     suspend fun dismissExpense(id: String) {
         val existing = expenseDao.getById(id) ?: return
         expenseDao.update(existing.copy(status = ExpenseStatus.DISMISSED))

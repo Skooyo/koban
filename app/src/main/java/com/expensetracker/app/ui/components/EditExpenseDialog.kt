@@ -4,11 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SelectableDates
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -31,10 +27,8 @@ import com.expensetracker.app.data.TransactionType
 import com.expensetracker.app.parser.AmountFormatter
 import java.math.BigDecimal
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,49 +212,4 @@ fun EditExpenseDialog(
             }
         )
     }
-}
-
-/** Date picker up to today. [onPicked] gets [time] moved to the picked date, keeping its time of day. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PastDatePickerDialog(time: Long, onDismiss: () -> Unit, onPicked: (Long) -> Unit) {
-    val pickerState = rememberDatePickerState(
-        initialSelectedDateMillis = localDateAsUtcMillis(time),
-        selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long) =
-                utcTimeMillis <= localDateAsUtcMillis(System.currentTimeMillis())
-        }
-    )
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = {
-                val picked = pickerState.selectedDateMillis
-                if (picked != null) onPicked(withDate(time, picked)) else onDismiss()
-            }) { Text("OK") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    ) {
-        DatePicker(state = pickerState)
-    }
-}
-
-/** The DatePicker works in UTC midnights; this is the local date of [time] as one. */
-private fun localDateAsUtcMillis(time: Long): Long {
-    val local = Calendar.getInstance().apply { timeInMillis = time }
-    return Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-        clear()
-        set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH))
-    }.timeInMillis
-}
-
-/** [time] moved to the picked date, keeping its local time of day. */
-private fun withDate(time: Long, utcDateMillis: Long): Long {
-    val picked = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = utcDateMillis }
-    return Calendar.getInstance().apply {
-        timeInMillis = time
-        set(picked.get(Calendar.YEAR), picked.get(Calendar.MONTH), picked.get(Calendar.DAY_OF_MONTH))
-    }.timeInMillis
 }

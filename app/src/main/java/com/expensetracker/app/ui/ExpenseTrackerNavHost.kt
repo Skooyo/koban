@@ -29,6 +29,7 @@ import com.expensetracker.app.ui.screens.HistoryMonthsScreen
 import com.expensetracker.app.ui.screens.HistoryWeeksScreen
 import com.expensetracker.app.ui.screens.HomeScreen
 import com.expensetracker.app.ui.screens.NotificationDebugScreen
+import com.expensetracker.app.ui.screens.PaymentScreen
 import com.expensetracker.app.ui.screens.PeopleScreen
 import com.expensetracker.app.ui.screens.PersonScreen
 import com.expensetracker.app.ui.screens.SettingsScreen
@@ -160,6 +161,27 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
                 arguments = listOf(navArgument("billId") { type = NavType.StringType })
             ) {
                 SplitEditorScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Routes.PAYMENT_NEW) {
+                PaymentScreen(
+                    onClose = { navController.popBackStack() },
+                    onSplit = { id ->
+                        navController.popBackStack()
+                        navController.navigate(Routes.splitNew(id))
+                    }
+                )
+            }
+            composable(
+                route = Routes.PAYMENT_EDIT,
+                arguments = listOf(navArgument("expenseId") { type = NavType.StringType })
+            ) {
+                PaymentScreen(
+                    onClose = { navController.popBackStack() },
+                    onSplit = { id ->
+                        navController.popBackStack()
+                        navController.navigate(Routes.splitNew(id))
+                    }
+                )
             }
             composable(Routes.SETTINGS) {
                 SettingsScreen(

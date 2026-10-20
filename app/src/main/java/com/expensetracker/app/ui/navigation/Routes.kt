@@ -15,6 +15,10 @@ object Routes {
     const val PERSON = "people/{personId}"
     const val SPLIT_NEW = "split/new?expenseId={expenseId}"
     const val SPLIT_EDIT = "split/edit/{billId}"
+    const val PAYMENT_NEW = "payment/new"
+    const val PAYMENT_EDIT = "payment/edit/{expenseId}"
+
+    fun paymentEdit(id: String) = "payment/edit/${Uri.encode(id)}"
 
     fun splitNew(expenseId: String?): String =
         if (expenseId == null) "split/new" else "split/new?expenseId=${Uri.encode(expenseId)}"
