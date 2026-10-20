@@ -206,7 +206,7 @@ private fun PaymentContent(
                 onFocus = { noteFocused = it },
                 singleLine = false
             )
-            if (isEditing && form.categoryId != loadedCategoryId) {
+            if (isEditing && form.categoryId != null && form.categoryId != loadedCategoryId) {
                 Text(
                     text = "A new category also applies to past payments from this shop",
                     style = MaterialTheme.typography.bodySmall,
@@ -308,7 +308,7 @@ private fun RowScope.TypeSegment(label: String, selected: Boolean, selectedColor
     Box(
         modifier = Modifier
             .weight(1f)
-            .heightIn(min = 44.dp)
+            .heightIn(min = 48.dp)
             .clip(CircleShape)
             .background(if (selected) selectedColor else Color.Transparent)
             .selectable(selected = selected, role = Role.Tab, onClick = onClick),

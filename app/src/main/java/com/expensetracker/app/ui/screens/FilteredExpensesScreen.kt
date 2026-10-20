@@ -21,7 +21,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.ui.components.CategoryDonut
 import com.expensetracker.app.ui.components.CategoryFilterRow
-import com.expensetracker.app.ui.components.EditExpenseDialog
 import com.expensetracker.app.ui.components.UNCATEGORIZED_FILTER
 import com.expensetracker.app.ui.components.NetSpendingTotal
 import com.expensetracker.app.ui.components.expensesByDay
@@ -31,13 +30,12 @@ import com.expensetracker.app.ui.viewmodel.FilteredExpensesViewModel
 @Composable
 fun FilteredExpensesScreen(
     onBack: () -> Unit,
-    onSplit: (expenseId: String) -> Unit,
+    onEditPayment: (expenseId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: FilteredExpensesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
-    val editing by viewModel.editingExpense.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier,
@@ -85,23 +83,10 @@ fun FilteredExpensesScreen(
                 expensesByDay(
                     expenses = uiState.expenses,
                     categoryName = { viewModel.categoryNameFor(it, uiState.categoryNames) },
-                    onEdit = viewModel::startEditing,
+                    onEdit = { onEditPayment(it.id) },
                     onDelete = viewModel::delete
                 )
             }
         }
-    }
-
-    editing?.let { expense ->
-        EditExpenseDialog(
-            expense = expense,
-            categories = categories,
-            onDismiss = viewModel::clearEditing,
-            onSplit = {
-                viewModel.clearEditing()
-                onSplit(expense.id)
-            },
-            onSave = viewModel::saveEdit
-        )
     }
 }

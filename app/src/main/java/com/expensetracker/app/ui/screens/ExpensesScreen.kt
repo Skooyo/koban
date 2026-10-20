@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.expensetracker.app.ui.components.EditExpenseDialog
 import com.expensetracker.app.ui.components.expensesByDay
 import com.expensetracker.app.ui.viewmodel.ExpensesViewModel
 
@@ -30,13 +29,14 @@ import com.expensetracker.app.ui.viewmodel.ExpensesViewModel
 fun ExpensesScreen(
     onSplit: (expenseId: String?) -> Unit,
     onPeople: () -> Unit,
+    onAddPayment: () -> Unit,
+    onEditPayment: (expenseId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ExpensesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val openPeople by viewModel.openPeopleCount.collectAsStateWithLifecycle()
-    val editing by viewModel.editingExpense.collectAsStateWithLifecycle()
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -87,35 +87,18 @@ fun ExpensesScreen(
                 expensesByDay(
                     expenses = uiState.expenses,
                     categoryName = { viewModel.categoryNameFor(it, uiState.categoryNames) },
-                    onEdit = viewModel::startEditing,
+                    onEdit = { onEditPayment(it.id) },
                     onDelete = viewModel::dismiss
                 )
             }
         }
         FloatingActionButton(
-            onClick = viewModel::startAdding,
+            onClick = onAddPayment,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
         ) {
             Icon(Icons.Default.Add, contentDescription = "Add a payment")
         }
-    }
-
-    editing?.let { expense ->
-        val adding = viewModel.isAdding(expense)
-        EditExpenseDialog(
-            expense = expense,
-            categories = categories,
-            onDismiss = viewModel::clearEditing,
-            title = if (adding) "Add payment" else "Edit expense",
-            onSplit = if (adding) null else {
-                {
-                    viewModel.clearEditing()
-                    onSplit(expense.id)
-                }
-            },
-            onSave = viewModel::saveEdit
-        )
     }
 }

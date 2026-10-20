@@ -77,31 +77,6 @@ class FilteredExpensesViewModel @Inject constructor(
         categoryFilter.value = filter
     }
 
-    private val _editingExpense = MutableStateFlow<ExpenseEntity?>(null)
-    val editingExpense: StateFlow<ExpenseEntity?> = _editingExpense.asStateFlow()
-
-    fun startEditing(expense: ExpenseEntity) {
-        _editingExpense.value = expense
-    }
-
-    fun clearEditing() {
-        _editingExpense.value = null
-    }
-
-    fun saveEdit(
-        amount: BigDecimal,
-        merchant: String?,
-        postTime: Long,
-        categoryId: String?,
-        notes: String?,
-        transactionType: TransactionType
-    ) {
-        val id = _editingExpense.getAndUpdate { null }?.id ?: return
-        viewModelScope.launch {
-            expenseRepository.updateExpense(id, amount, merchant, postTime, categoryId, notes, transactionType)
-        }
-    }
-
     fun delete(expense: ExpenseEntity) {
         viewModelScope.launch {
             expenseRepository.dismissExpense(expense.id)

@@ -30,9 +30,6 @@ data class ExpensesUiState(
     val categoryFilter: String? = null
 )
 
-/** Id of the blank expense that the Add payment dialog edits. */
-private const val NEW_EXPENSE_ID = ""
-
 @HiltViewModel
 class ExpensesViewModel @Inject constructor(
     private val expenseRepository: ExpenseRepository,
@@ -64,59 +61,6 @@ class ExpensesViewModel @Inject constructor(
     val openPeopleCount: StateFlow<Int> = peopleRepository.observePeople()
         .map { list -> list.count { it.hasOpen } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    private val _editingExpense = MutableStateFlow<ExpenseEntity?>(null)
-    val editingExpense: StateFlow<ExpenseEntity?> = _editingExpense.asStateFlow()
-
-    fun startEditing(expense: ExpenseEntity) {
-        _editingExpense.value = expense
-    }
-
-    fun clearEditing() {
-        _editingExpense.value = null
-    }
-
-    /** Opens the edit dialog on a blank payment dated now. */
-    fun startAdding() {
-        val now = System.currentTimeMillis()
-        _editingExpense.value = ExpenseEntity(
-            id = NEW_EXPENSE_ID,
-            amount = BigDecimal.ZERO,
-            currency = "MYR",
-            merchant = null,
-            rawNotificationText = "",
-            sourcePackage = ExpenseRepository.MANUAL_SOURCE,
-            notificationPostTime = now,
-            createdAt = now,
-            dedupKey = "",
-            status = ExpenseStatus.EDITED,
-            confidence = ParseConfidence.HIGH,
-            notificationKey = null
-        )
-    }
-
-    fun isAdding(expense: ExpenseEntity) = expense.id == NEW_EXPENSE_ID
-
-    fun saveEdit(
-        amount: BigDecimal,
-        merchant: String?,
-        postTime: Long,
-        categoryId: String?,
-        notes: String?,
-        transactionType: com.expensetracker.app.data.TransactionType
-    ) {
-        // Close the dialog first, so a double tap on Save cannot add the payment twice.
-        val id = _editingExpense.getAndUpdate { null }?.id ?: return
-        viewModelScope.launch {
-            if (id == NEW_EXPENSE_ID) {
-                expenseRepository.addManualExpense(amount, merchant, postTime, categoryId, notes, transactionType)
-            } else {
-                expenseRepository.updateExpense(
-                    id, amount, merchant, postTime, categoryId, notes, transactionType
-                )
-            }
-        }
-    }
 
     fun dismiss(expense: ExpenseEntity) {
         viewModelScope.launch {

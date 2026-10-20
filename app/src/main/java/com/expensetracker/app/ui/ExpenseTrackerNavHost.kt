@@ -93,7 +93,9 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
             composable(Routes.EXPENSES) {
                 ExpensesScreen(
                     onSplit = { id -> navController.navigate(Routes.splitNew(id)) },
-                    onPeople = { navController.navigate(Routes.PEOPLE) }
+                    onPeople = { navController.navigate(Routes.PEOPLE) },
+                    onAddPayment = { navController.navigate(Routes.PAYMENT_NEW) },
+                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) }
                 )
             }
             composable(Routes.PEOPLE) {
@@ -141,7 +143,7 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
             ) {
                 FilteredExpensesScreen(
                     onBack = { navController.popBackStack() },
-                    onSplit = { id -> navController.navigate(Routes.splitNew(id)) }
+                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) }
                 )
             }
             composable(
@@ -162,24 +164,28 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
             ) {
                 SplitEditorScreen(onBack = { navController.popBackStack() })
             }
-            composable(Routes.PAYMENT_NEW) {
+            composable(Routes.PAYMENT_NEW) { entry ->
                 PaymentScreen(
-                    onClose = { navController.popBackStack() },
+                    onClose = { if (navController.currentBackStackEntry == entry) navController.popBackStack() },
                     onSplit = { id ->
-                        navController.popBackStack()
-                        navController.navigate(Routes.splitNew(id))
+                        if (navController.currentBackStackEntry == entry) {
+                            navController.popBackStack()
+                            navController.navigate(Routes.splitNew(id))
+                        }
                     }
                 )
             }
             composable(
                 route = Routes.PAYMENT_EDIT,
                 arguments = listOf(navArgument("expenseId") { type = NavType.StringType })
-            ) {
+            ) { entry ->
                 PaymentScreen(
-                    onClose = { navController.popBackStack() },
+                    onClose = { if (navController.currentBackStackEntry == entry) navController.popBackStack() },
                     onSplit = { id ->
-                        navController.popBackStack()
-                        navController.navigate(Routes.splitNew(id))
+                        if (navController.currentBackStackEntry == entry) {
+                            navController.popBackStack()
+                            navController.navigate(Routes.splitNew(id))
+                        }
                     }
                 )
             }
