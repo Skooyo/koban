@@ -10,9 +10,6 @@ import java.math.BigDecimal
 
 @Dao
 interface ExpenseDao {
-    @Query("SELECT * FROM expenses WHERE status != 'DISMISSED' ORDER BY notificationPostTime DESC")
-    fun observeAllActive(): Flow<List<ExpenseEntity>>
-
     @Query("SELECT * FROM expenses WHERE status != 'DISMISSED' AND notificationPostTime >= :since ORDER BY notificationPostTime DESC")
     fun observeSince(since: Long): Flow<List<ExpenseEntity>>
 

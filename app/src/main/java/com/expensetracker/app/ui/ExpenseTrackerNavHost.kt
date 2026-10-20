@@ -5,6 +5,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -13,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
@@ -33,6 +36,7 @@ import com.expensetracker.app.ui.screens.PeopleScreen
 import com.expensetracker.app.ui.screens.PersonScreen
 import com.expensetracker.app.ui.screens.SettingsScreen
 import com.expensetracker.app.ui.screens.SplitEditorScreen
+import com.expensetracker.app.ui.viewmodel.AppViewModel
 
 private data class BottomNavItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -64,8 +68,9 @@ private fun NavController.closePayment(entry: NavBackStackEntry, message: String
 }
 
 @Composable
-fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
+fun ExpenseTrackerNavHost(modifier: Modifier = Modifier, appViewModel: AppViewModel = hiltViewModel()) {
     val navController = rememberNavController()
+    val openPeopleCount by appViewModel.openPeopleCount.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in topLevelRoutes
@@ -77,7 +82,15 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
                 NavigationBar {
                     bottomNavItems.forEach { item ->
                         NavigationBarItem(
-                            icon = { Icon(item.icon, contentDescription = item.label) },
+                            icon = {
+                                if (item.route == Routes.PEOPLE && openPeopleCount > 0) {
+                                    BadgedBox(badge = { Badge { Text("$openPeopleCount") } }) {
+                                        Icon(item.icon, contentDescription = item.label)
+                                    }
+                                } else {
+                                    Icon(item.icon, contentDescription = item.label)
+                                }
+                            },
                             label = { Text(item.label) },
                             selected = navBackStackEntry?.destination?.hierarchy?.any {
                                 it.route == item.route

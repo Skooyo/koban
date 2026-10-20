@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -42,6 +43,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,11 +52,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.data.MonthNav
 import com.expensetracker.app.data.MonthSummary
 import com.expensetracker.app.data.WeekSummary
+import com.expensetracker.app.ui.components.CategoryDonut
 import com.expensetracker.app.ui.components.CategoryFilterRow
 import com.expensetracker.app.ui.components.MoneyAmount
 import com.expensetracker.app.ui.components.NetSpendingTotal
 import com.expensetracker.app.ui.components.PeriodTotalRow
 import com.expensetracker.app.ui.components.RelativeBar
+import com.expensetracker.app.ui.components.UNCATEGORIZED_FILTER
 import com.expensetracker.app.ui.components.expensesByDay
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.viewmodel.ActivityViewModel
@@ -108,6 +113,11 @@ fun ActivityScreen(
                     onToggle = viewModel::toggleWeek,
                     modifier = Modifier.padding(top = 16.dp)
                 )
+                CategoryDonut(
+                    slices = uiState.slices,
+                    onSelect = { viewModel.setCategoryFilter(it.categoryId ?: UNCATEGORIZED_FILTER) },
+                    modifier = Modifier.padding(top = 20.dp)
+                )
                 CategoryFilterRow(
                     categories = categories,
                     selected = uiState.categoryFilter,
@@ -118,7 +128,11 @@ fun ActivityScreen(
             if (uiState.expenses.isEmpty()) {
                 item {
                     Text(
-                        text = "No payments in $monthLabel.",
+                        text = when {
+                            uiState.categoryFilter != null -> "No payments in this category."
+                            uiState.selectedWeek != null -> "No payments in this week."
+                            else -> "No payments in $monthLabel."
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 24.dp)
@@ -138,7 +152,12 @@ fun ActivityScreen(
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
         )
-        SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter))
+        SnackbarHost(
+            snackbar,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp)
+        )
     }
 
     if (sheetOpen) {
@@ -181,6 +200,7 @@ private fun MonthBar(
             modifier = Modifier
                 .weight(1f)
                 .heightIn(min = 48.dp)
+                .semantics { onClick(label = "Pick a month", action = null) }
         ) {
             Text(label, style = MaterialTheme.typography.titleMedium)
             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
@@ -199,7 +219,12 @@ private fun WeekStrip(
     modifier: Modifier = Modifier
 ) {
     val dayFormat = remember { SimpleDateFormat("d MMM", Locale.getDefault()) }
-    LazyRow(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(selected, weeks) {
+        val index = weeks.indexOfFirst { it.startMs == selected }
+        if (index >= 0) listState.animateScrollToItem(index)
+    }
+    LazyRow(modifier = modifier, state = listState, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(weeks, key = { it.startMs }) { week ->
             val isSelected = week.startMs == selected
             Surface(

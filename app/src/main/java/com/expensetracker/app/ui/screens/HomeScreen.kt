@@ -149,6 +149,11 @@ fun HomeScreen(
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
         )
-        SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter))
+        SnackbarHost(
+            snackbar,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp)
+        )
     }
 }

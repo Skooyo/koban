@@ -102,8 +102,6 @@ object PeriodCalculator {
         return year to month
     }
 
-    fun encodeYearMonth(year: Int, month: Int): Int = year * 100 + (month + 1)
-
     private fun startOfDay(cal: Calendar): Calendar {
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)

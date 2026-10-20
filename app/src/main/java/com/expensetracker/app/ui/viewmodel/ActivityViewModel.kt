@@ -12,14 +12,16 @@ import com.expensetracker.app.data.MonthNav
 import com.expensetracker.app.data.MonthSummary
 import com.expensetracker.app.data.PeriodCalculator
 import com.expensetracker.app.data.WeekSummary
+import com.expensetracker.app.ui.components.DonutSlice
+import com.expensetracker.app.ui.components.donutSlices
 import com.expensetracker.app.ui.components.matchesCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -35,17 +37,19 @@ data class ActivityUiState(
     val weeks: List<WeekSummary> = emptyList(),
     val selectedWeek: Long? = null,
     val expenses: List<ExpenseEntity> = emptyList(),
+    val slices: List<DonutSlice> = emptyList(),
     val categoryNames: Map<String, String> = emptyMap(),
     val categoryFilter: String? = null
 )
 
-/** Payments, totals and weeks of one month, before the category filter. */
+/** Payments, totals, weeks and donut slices of one month (or week), before the category filter. */
 private data class MonthData(
-    val selection: ActivitySelection.Selection,
+    val month: YearMonth,
     val monthTotal: BigDecimal,
     val weeks: List<WeekSummary>,
     val selectedWeek: Long?,
-    val expenses: List<ExpenseEntity>
+    val expenses: List<ExpenseEntity>,
+    val slices: List<DonutSlice>
 )
 
 @HiltViewModel
@@ -58,42 +62,45 @@ class ActivityViewModel @Inject constructor(
     val categories: StateFlow<List<CategoryEntity>> = categoryRepository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val categoryFilter = MutableStateFlow<String?>(null)
-
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val monthData: Flow<MonthData> = activitySelection.state.flatMapLatest { sel ->
-        val year = sel.month.year
-        val month = sel.month.monthValue - 1
-        val (monthStart, monthEnd) = PeriodCalculator.rangeForMonth(year, month)
-        val weekRanges = PeriodCalculator.weeksInMonth(year, month)
-        val week = sel.weekStart?.let { start -> weekRanges.firstOrNull { it.first == start } }
-        val (listStart, listEnd) = week ?: (monthStart to monthEnd)
-        // Full Mon–Sun weeks reach into the neighbor months, so watch the whole span.
-        val spanStart = weekRanges.firstOrNull()?.first ?: monthStart
-        val spanEnd = weekRanges.lastOrNull()?.second ?: monthEnd
-        combine(
-            expenseRepository.observeTotalForRange(monthStart, monthEnd),
-            expenseRepository.observeInRange(spanStart, spanEnd).mapLatest { span ->
-                expenseRepository.weekSummariesForMonth(year, month) to
-                    span.filter { it.notificationPostTime in listStart until listEnd }
+    private val monthData: Flow<MonthData> = activitySelection.state
+        .map { it.month to it.weekStart }
+        .distinctUntilChanged()
+        .flatMapLatest { (shownMonth, weekStart) ->
+            val year = shownMonth.year
+            val month = shownMonth.monthValue - 1
+            val (monthStart, monthEnd) = PeriodCalculator.rangeForMonth(year, month)
+            val weekRanges = PeriodCalculator.weeksInMonth(year, month)
+            val week = weekStart?.let { start -> weekRanges.firstOrNull { it.first == start } }
+            val (listStart, listEnd) = week ?: (monthStart to monthEnd)
+            // Full Mon–Sun weeks reach into the neighbor months, so watch the whole span.
+            val spanStart = weekRanges.firstOrNull()?.first ?: monthStart
+            val spanEnd = weekRanges.lastOrNull()?.second ?: monthEnd
+            combine(
+                expenseRepository.observeTotalForRange(monthStart, monthEnd),
+                expenseRepository.observeInRange(spanStart, spanEnd).mapLatest { span ->
+                    expenseRepository.weekSummariesForMonth(year, month) to
+                        span.filter { it.notificationPostTime in listStart until listEnd }
+                },
+                expenseRepository.observeCategoryBreakdown(listStart, listEnd)
+            ) { total, (weeks, expenses), breakdown ->
+                MonthData(shownMonth, total ?: BigDecimal.ZERO, weeks, week?.first, expenses, donutSlices(breakdown))
             }
-        ) { total, (weeks, expenses) ->
-            MonthData(sel, total ?: BigDecimal.ZERO, weeks, week?.first, expenses)
         }
-    }
 
     val uiState: StateFlow<ActivityUiState> = combine(
         monthData,
         categoryRepository.observeAll(),
-        categoryFilter
+        activitySelection.state.map { it.categoryFilter }.distinctUntilChanged()
     ) { data, cats, filter ->
         ActivityUiState(
-            month = data.selection.month,
-            canGoNext = MonthNav.next(data.selection.month, YearMonth.now()) != null,
+            month = data.month,
+            canGoNext = MonthNav.next(data.month, YearMonth.now()) != null,
             monthTotal = data.monthTotal,
             weeks = data.weeks,
             selectedWeek = data.selectedWeek,
             expenses = data.expenses.filter { it.matchesCategory(filter) },
+            slices = data.slices,
             categoryNames = cats.associate { it.id to it.name },
             categoryFilter = filter
         )
@@ -116,25 +123,28 @@ class ActivityViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Stepping inside the tab keeps the category filter; only Home's deep link clears it.
     fun previousMonth() {
-        activitySelection.show(MonthNav.previous(activitySelection.state.value.month))
+        val sel = activitySelection.state.value
+        activitySelection.show(MonthNav.previous(sel.month), categoryFilter = sel.categoryFilter)
     }
 
     fun nextMonth() {
-        MonthNav.next(activitySelection.state.value.month, YearMonth.now())?.let { activitySelection.show(it) }
+        val sel = activitySelection.state.value
+        MonthNav.next(sel.month, YearMonth.now())?.let { activitySelection.show(it, categoryFilter = sel.categoryFilter) }
     }
 
     fun pickMonth(month: YearMonth) {
-        activitySelection.show(month)
+        activitySelection.show(month, categoryFilter = activitySelection.state.value.categoryFilter)
     }
 
     fun toggleWeek(weekStart: Long) {
         val sel = activitySelection.state.value
-        activitySelection.show(sel.month, if (sel.weekStart == weekStart) null else weekStart)
+        activitySelection.show(sel.month, if (sel.weekStart == weekStart) null else weekStart, sel.categoryFilter)
     }
 
     fun setCategoryFilter(filter: String?) {
-        categoryFilter.value = filter
+        activitySelection.setCategoryFilter(filter)
     }
 
     fun categoryNameFor(expense: ExpenseEntity, names: Map<String, String>): String {

@@ -34,8 +34,6 @@ class ExpenseRepository @Inject constructor(
     /** Serialises dedup check + insert so racing notifications cannot both pass the check. */
     private val saveMutex = Mutex()
 
-    fun observeAllActive(): Flow<List<ExpenseEntity>> = expenseDao.observeAllActive()
-
     fun observeTotalForRange(start: Long, end: Long): Flow<BigDecimal?> =
         expenseDao.observeTotalForRange(start, end)
 
@@ -67,9 +65,6 @@ class ExpenseRepository @Inject constructor(
             )
         }
     }
-
-    suspend fun getMonthTotalOnce(start: Long, end: Long): BigDecimal =
-        getTotalForRangeOnce(start, end)
 
     fun observeCurrentPeriodSummary(period: SpendingPeriod): Flow<PeriodSummary> {
         val (start, end) = PeriodCalculator.range(period)
