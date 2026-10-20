@@ -9,7 +9,7 @@ import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.data.ExpenseRepository
 import com.expensetracker.app.data.ExpenseStatus
 import com.expensetracker.app.data.ParseConfidence
-import com.expensetracker.app.data.SplitRepository
+import com.expensetracker.app.data.PeopleRepository
 import com.expensetracker.app.ui.components.matchesCategory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +37,7 @@ private const val NEW_EXPENSE_ID = ""
 class ExpensesViewModel @Inject constructor(
     private val expenseRepository: ExpenseRepository,
     private val categoryRepository: CategoryRepository,
-    splitRepository: SplitRepository
+    peopleRepository: PeopleRepository
 ) : ViewModel() {
 
     val categories: StateFlow<List<CategoryEntity>> = categoryRepository.observeAll()
@@ -61,8 +61,8 @@ class ExpensesViewModel @Inject constructor(
         categoryFilter.value = filter
     }
 
-    val openDebtCount: StateFlow<Int> = splitRepository.observeOpenDebts()
-        .map { it.size }
+    val openPeopleCount: StateFlow<Int> = peopleRepository.observePeople()
+        .map { list -> list.count { it.hasOpen } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     private val _editingExpense = MutableStateFlow<ExpenseEntity?>(null)

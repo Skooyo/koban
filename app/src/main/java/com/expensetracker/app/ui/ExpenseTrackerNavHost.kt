@@ -23,13 +23,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.expensetracker.app.ui.navigation.Routes
-import com.expensetracker.app.ui.screens.DebtsScreen
 import com.expensetracker.app.ui.screens.ExpensesScreen
 import com.expensetracker.app.ui.screens.FilteredExpensesScreen
 import com.expensetracker.app.ui.screens.HistoryMonthsScreen
 import com.expensetracker.app.ui.screens.HistoryWeeksScreen
 import com.expensetracker.app.ui.screens.HomeScreen
 import com.expensetracker.app.ui.screens.NotificationDebugScreen
+import com.expensetracker.app.ui.screens.PeopleScreen
+import com.expensetracker.app.ui.screens.PersonScreen
 import com.expensetracker.app.ui.screens.SettingsScreen
 import com.expensetracker.app.ui.screens.SplitEditorScreen
 
@@ -91,11 +92,22 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
             composable(Routes.EXPENSES) {
                 ExpensesScreen(
                     onSplit = { id -> navController.navigate(Routes.splitNew(id)) },
-                    onDebts = { navController.navigate(Routes.DEBTS) }
+                    onPeople = { navController.navigate(Routes.PEOPLE) }
                 )
             }
-            composable(Routes.DEBTS) {
-                DebtsScreen(
+            composable(Routes.PEOPLE) {
+                PeopleScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPerson = { id -> navController.navigate(Routes.person(id)) },
+                    onOpenSplit = { id -> navController.navigate(Routes.splitEdit(id)) }
+                )
+            }
+            composable(
+                route = Routes.PERSON,
+                arguments = listOf(navArgument("personId") { type = NavType.StringType })
+            ) { entry ->
+                PersonScreen(
+                    personId = entry.arguments?.getString("personId").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onOpenSplit = { id -> navController.navigate(Routes.splitEdit(id)) }
                 )

@@ -29,13 +29,13 @@ import com.expensetracker.app.ui.viewmodel.ExpensesViewModel
 @Composable
 fun ExpensesScreen(
     onSplit: (expenseId: String?) -> Unit,
-    onDebts: () -> Unit,
+    onPeople: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ExpensesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
-    val openDebts by viewModel.openDebtCount.collectAsStateWithLifecycle()
+    val openPeople by viewModel.openPeopleCount.collectAsStateWithLifecycle()
     val editing by viewModel.editingExpense.collectAsStateWithLifecycle()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -59,8 +59,8 @@ fun ExpensesScreen(
                     modifier = Modifier.padding(top = 12.dp)
                 ) {
                     OutlinedButton(onClick = { onSplit(null) }) { Text("Split a bill") }
-                    OutlinedButton(onClick = onDebts) {
-                        Text(if (openDebts > 0) "Who owes me ($openDebts)" else "Who owes me")
+                    OutlinedButton(onClick = onPeople) {
+                        Text(if (openPeople > 0) "People ($openPeople)" else "People")
                     }
                 }
                 CategoryFilterRow(
