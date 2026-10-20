@@ -76,11 +76,11 @@ class QrStore @Inject constructor(
             val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Koban")
             dir.mkdirs()
             val file = File(dir, displayName)
-            file.outputStream().use { writeJpeg(bitmap, it) }
             @Suppress("DEPRECATION")
             val dataColumn = MediaStore.MediaColumns.DATA
-            // Saving again overwrites the file, so drop its old MediaStore row first.
+            // Before Q, deleting a row also deletes its file: drop the old row before the new write.
             resolver.delete(collection, "$dataColumn = ?", arrayOf(file.absolutePath))
+            file.outputStream().use { writeJpeg(bitmap, it) }
             values.put(dataColumn, file.absolutePath)
             return resolver.insert(collection, values) ?: throw IOException("Couldn't save to gallery.")
         } finally {

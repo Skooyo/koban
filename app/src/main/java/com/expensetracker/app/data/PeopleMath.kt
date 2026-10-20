@@ -61,5 +61,5 @@ object PeopleMath {
             .singleOrNull()?.personId
     }
 
-    private fun money(amount: BigDecimal) = "RM ${AmountFormatter.formatDisplay(amount)}"
+    private fun money(amount: BigDecimal) = "RM ${AmountFormatter.formatGrouped(amount)}"
 }

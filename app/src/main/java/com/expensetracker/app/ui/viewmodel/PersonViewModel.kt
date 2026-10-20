@@ -107,7 +107,10 @@ class PersonViewModel @Inject constructor(
     /** A null [expenseId] means paid in cash. */
     fun markDebtPaid(expenseId: String?) {
         val debtId = _paying.value?.debt?.debt?.id ?: return
-        if (busy) return
+        if (busy) {
+            showMessage("Try again in a moment.")
+            return
+        }
         _paying.value = null
         run { splitRepository.markPaid(debtId, expenseId) }
     }
@@ -116,9 +119,12 @@ class PersonViewModel @Inject constructor(
 
     fun dismissDebtSuggestion(debtId: String) = run { splitRepository.dismissSuggestion(debtId) }
 
-    /** Runs one action at a time, so a double tap does nothing. Failures show their message. */
+    /** Runs one action at a time. A tap during another action shows a hint. Validation failures show their message. */
     private fun run(action: suspend () -> Unit) {
-        if (busy) return
+        if (busy) {
+            showMessage("Try again in a moment.")
+            return
+        }
         busy = true
         viewModelScope.launch {
             try {
@@ -126,7 +132,8 @@ class PersonViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _messages.send(e.message ?: "Something went wrong. Try again.")
+                val validation = e is IllegalArgumentException || e is IllegalStateException
+                _messages.send((if (validation) e.message else null) ?: "Something went wrong. Try again.")
             } finally {
                 busy = false
             }

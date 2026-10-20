@@ -34,6 +34,7 @@ data class MoneyColors(
     val purple: Color,
     val teal: Color,
     val gold: Color,
+    val goldText: Color,
     val custom: Color,
     val other: Color,
     val uncategorized: Color
@@ -48,6 +49,7 @@ private val LightMoney = MoneyColors(
     purple = Color(0xFF7B4FD6),
     teal = Color(0xFF0E9C95),
     gold = Color(0xFFD8A31A),
+    goldText = Color(0xFF8A6A00),
     custom = Color(0xFF4C5FD5),
     other = Color(0xFF6B7686),
     uncategorized = Color(0xFF6B7686)
@@ -62,6 +64,7 @@ private val DarkMoney = MoneyColors(
     purple = Color(0xFFA98BFF),
     teal = Color(0xFF3CC6C0),
     gold = Color(0xFFF2C94C),
+    goldText = Color(0xFFF2C94C),
     custom = Color(0xFF8C9EFF),
     other = Color(0xFF8A96A8),
     uncategorized = Color(0xFFA3AEBD)

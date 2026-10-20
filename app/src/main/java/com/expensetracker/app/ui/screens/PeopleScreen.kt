@@ -56,14 +56,8 @@ import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.viewmodel.PeopleViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 internal val Ink = Color(0xFF1B2430)
-
-private fun billDate(timeMs: Long): String =
-    SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(timeMs))
 
 private fun groupTitle(group: PeopleMath.Group) = when (group) {
     PeopleMath.Group.YOU_OWE -> "You owe"
@@ -86,6 +80,7 @@ fun PeopleScreen(
     var adding by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var addError by remember { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
     val money = LocalMoneyColors.current
     val avatarColors = listOf(money.red, money.blue, money.orange, money.purple, money.teal)
 
@@ -189,7 +184,7 @@ fun PeopleScreen(
                             modifier = Modifier.weight(1f)
                         )
                         Text(
-                            text = billDate(bill.billTime),
+                            text = personDate(bill.billTime),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -218,7 +213,8 @@ fun PeopleScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(enabled = !saving, onClick = {
+                    saving = true
                     scope.launch {
                         try {
                             val id = viewModel.add(newName)
@@ -228,6 +224,8 @@ fun PeopleScreen(
                             throw e
                         } catch (e: IllegalArgumentException) {
                             addError = e.message
+                        } finally {
+                            saving = false
                         }
                     }
                 }) { Text("Add") }
@@ -242,7 +240,7 @@ private fun PersonRow(summary: PersonSummary, avatarColor: Color, onClick: () ->
     val money = LocalMoneyColors.current
     val name = summary.person.name
     val statusColor = when (summary.balance) {
-        is Balance.YouPay -> money.gold
+        is Balance.YouPay -> money.goldText
         is Balance.PaysYou -> money.received
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }

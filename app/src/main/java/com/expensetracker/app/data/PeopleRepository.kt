@@ -120,7 +120,7 @@ class PeopleRepository @Inject constructor(
     suspend fun saveQrToGallery(personId: String): Uri {
         val person = splitDao.getPerson(personId)
         val path = person?.qrPath ?: throw IllegalStateException("No QR saved yet")
-        val displayName = "koban-${person.name.replace(Regex("[^\\p{L}]"), "-")}-qr.jpg"
+        val displayName = "koban-${person.name.replace(Regex("[^\\p{L}\\p{N}]"), "-")}-qr.jpg"
         return withContext(Dispatchers.IO) { qrStore.saveToGallery(path, displayName) }
     }
 

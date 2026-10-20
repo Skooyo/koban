@@ -200,6 +200,19 @@ internal fun DeletePersonDialog(name: String, onConfirm: () -> Unit, onDismiss: 
     )
 }
 
+@Composable
+internal fun DeleteOwedItemDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete this item?") },
+        text = { Text("This removes what you owe for it.") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
 /** Mark paid for one split debt: pick the received payment, or cash. */
 @Composable
 internal fun DebtPaymentDialog(state: DebtPayment, onPick: (expenseId: String?) -> Unit, onDismiss: () -> Unit) {

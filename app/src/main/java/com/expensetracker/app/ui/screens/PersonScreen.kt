@@ -114,6 +114,7 @@ fun PersonScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var dialog by remember { mutableStateOf<Dialog?>(null) }
     var editing by remember { mutableStateOf<OwedItemEntity?>(null) }
+    var deletingItem by remember { mutableStateOf<OwedItemEntity?>(null) }
 
     LaunchedEffect(gone) { if (gone) onBack() }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
@@ -239,6 +240,15 @@ fun PersonScreen(
             },
             onDelete = {
                 editing = null
+                deletingItem = item
+            }
+        )
+    }
+    deletingItem?.let { item ->
+        DeleteOwedItemDialog(
+            onDismiss = { deletingItem = null },
+            onConfirm = {
+                deletingItem = null
                 viewModel.deleteItem(item.id)
             }
         )
@@ -303,7 +313,7 @@ private fun PersonContent(
             val balance = detail.balance
             val headline = PeopleMath.headline(name, balance)
             val amountColor = when (balance) {
-                is Balance.YouPay -> money.gold
+                is Balance.YouPay -> money.goldText
                 is Balance.PaysYou -> money.received
                 else -> null
             }
@@ -453,7 +463,11 @@ private fun DebtRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            MoneyAmount(amount = view.debt.amount, style = MaterialTheme.typography.bodyLarge)
+            MoneyAmount(
+                amount = view.debt.amount,
+                style = MaterialTheme.typography.bodyLarge,
+                color = LocalMoneyColors.current.received
+            )
             TextButton(onClick = onMarkPaid) { Text("Mark paid") }
         }
         view.suggestedRepayment?.let { suggested ->
@@ -489,7 +503,11 @@ private fun OwedItemRow(item: OwedItemEntity, onClick: () -> Unit, onMarkPaid: (
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            MoneyAmount(amount = item.amount, style = MaterialTheme.typography.bodyLarge)
+            MoneyAmount(
+                amount = item.amount,
+                style = MaterialTheme.typography.bodyLarge,
+                color = LocalMoneyColors.current.goldText
+            )
             TextButton(onClick = onMarkPaid) { Text("Mark paid") }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
