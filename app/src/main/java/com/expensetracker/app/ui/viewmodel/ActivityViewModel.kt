@@ -85,9 +85,10 @@ class ActivityViewModel @Inject constructor(
             // Full Mon–Sun weeks reach into the neighbor months, so watch the whole span.
             val spanStart = weekRanges.firstOrNull()?.first ?: monthStart
             val spanEnd = weekRanges.lastOrNull()?.second ?: monthEnd
+            // The header totals follow the list range: the whole month, or the selected full Mon–Sun week.
             combine(
-                expenseRepository.observeTotalForRange(monthStart, monthEnd),
-                expenseRepository.observeReceivedForRange(monthStart, monthEnd),
+                expenseRepository.observeTotalForRange(listStart, listEnd),
+                expenseRepository.observeReceivedForRange(listStart, listEnd),
                 expenseRepository.observeInRange(spanStart, spanEnd).mapLatest { span ->
                     expenseRepository.weekSummariesForMonth(year, month) to
                         span.filter { it.notificationPostTime in listStart until listEnd }

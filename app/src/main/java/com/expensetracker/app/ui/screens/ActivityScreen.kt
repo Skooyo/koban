@@ -122,7 +122,14 @@ fun ActivityScreen(
                         onPick = { sheetOpen = true },
                         modifier = Modifier.padding(top = 8.dp)
                     )
-                    NetSpendingTotal(total = uiState.monthTotal, large = true, modifier = Modifier.padding(top = 8.dp))
+                    val dayFormat = remember { SimpleDateFormat("d MMM", Locale.getDefault()) }
+                    val selectedLabel = uiState.weeks.firstOrNull { it.startMs == uiState.selectedWeek }?.let { weekLabel(it, dayFormat) }
+                    NetSpendingTotal(
+                        total = uiState.monthTotal,
+                        large = true,
+                        label = if (selectedLabel != null) "Spent, $selectedLabel" else "Spent",
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                     ReceivedNote(received = uiState.monthReceived)
                     WeekStrip(
                         weeks = uiState.weeks,
@@ -291,6 +298,9 @@ private fun MonthBar(
     }
 }
 
+private fun weekLabel(week: WeekSummary, dayFormat: SimpleDateFormat) =
+    "${dayFormat.format(week.startMs)} – ${dayFormat.format(week.endMs - 1)}"
+
 @Composable
 private fun WeekStrip(
     weeks: List<WeekSummary>,
@@ -321,7 +331,7 @@ private fun WeekStrip(
             ) {
                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     Text(
-                        text = "${dayFormat.format(week.startMs)} – ${dayFormat.format(week.endMs - 1)}",
+                        text = weekLabel(week, dayFormat),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

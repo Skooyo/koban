@@ -258,11 +258,12 @@ fun ReceivedNote(received: BigDecimal, modifier: Modifier = Modifier) {
 fun NetSpendingTotal(
     total: BigDecimal,
     modifier: Modifier = Modifier,
-    large: Boolean = false
+    large: Boolean = false,
+    label: String = "Spent"
 ) {
     Column(modifier = modifier) {
         Text(
-            text = "Spent",
+            text = label,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
