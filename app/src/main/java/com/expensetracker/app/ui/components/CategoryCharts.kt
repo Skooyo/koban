@@ -99,15 +99,18 @@ fun CategoryDonut(
     val whole = slices.fold(BigDecimal.ZERO) { a, b -> a + b.total }
     val summary = slices.joinToString(", ") { "${it.name} ${percentOf(it.total, whole)} percent" }
 
-    // Compact legend: the first 3 slices, then the rest folded into one gray row.
+    // Compact legend: the 3 largest named slices, then the rest folded into one gray row.
     val folding = compact && slices.size > COMPACT_ROWS
-    val legend = if (folding) {
-        val rest = slices.drop(COMPACT_ROWS - 1)
-        slices.take(COMPACT_ROWS - 1) +
-            DonutSlice(null, EVERYTHING_ELSE, rest.fold(BigDecimal.ZERO) { a, b -> a + b.total }, folded = true)
-    } else slices
     val other = LocalMoneyColors.current.other
-    val legendColors = if (folding) colors.take(COMPACT_ROWS - 1) + other else colors
+    val top = slices.indices.filter { !slices[it].folded }
+        .sortedByDescending { slices[it].total }
+        .take(COMPACT_ROWS - 1)
+    val legend = if (folding) {
+        val rest = slices.indices - top.toSet()
+        top.map { slices[it] } +
+            DonutSlice(null, EVERYTHING_ELSE, rest.fold(BigDecimal.ZERO) { a, i -> a + slices[i].total }, folded = true)
+    } else slices
+    val legendColors = if (folding) top.map { colors[it] } + other else colors
 
     val ring: @Composable (Modifier) -> Unit = { ringModifier ->
         Canvas(
