@@ -91,7 +91,8 @@ fun CategoryDonut(
     slices: List<DonutSlice>,
     onSelect: (DonutSlice) -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false
+    compact: Boolean = false,
+    onRingClick: (() -> Unit)? = null
 ) {
     if (slices.isEmpty()) return
     val colors = slices.map { sliceColor(it) }
@@ -116,6 +117,10 @@ fun CategoryDonut(
         Canvas(
             modifier = ringModifier
                 .size(if (compact) 104.dp else 176.dp)
+                .then(
+                    if (onRingClick != null) Modifier.clickable(role = Role.Button, onClickLabel = "Filter by category", onClick = onRingClick)
+                    else Modifier
+                )
                 .semantics { contentDescription = "Spending by category: $summary" }
         ) {
             val stroke = size.minDimension * 0.2f

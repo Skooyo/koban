@@ -168,7 +168,8 @@ fun ActivityScreen(
                         slices = uiState.slices,
                         onSelect = { viewModel.setCategoryFilter(it.categoryId ?: UNCATEGORIZED_FILTER) },
                         modifier = Modifier.padding(top = 12.dp),
-                        compact = true
+                        compact = true,
+                        onRingClick = { filterSheetOpen = true }
                     )
                 }
             }

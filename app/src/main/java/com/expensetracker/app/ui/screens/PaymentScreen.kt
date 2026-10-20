@@ -146,14 +146,19 @@ private fun PaymentContent(
     var pickingCategory by remember { mutableStateOf(false) }
     var pickingDate by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
-    val padVisible = !shopFocused && !noteFocused
+    // Add opens with the pad; edit opens without it until the amount is tapped.
+    var padRequested by remember { mutableStateOf(!isEditing) }
+    val padVisible = padRequested && !shopFocused && !noteFocused
     val valid = AmountInput.toAmount(form.amountText) != null
     val saving by viewModel.saving.collectAsStateWithLifecycle()
     // Back or Done hides the keyboard but leaves focus in Shop/Note; drop it so the number pad returns.
     val imeVisible = WindowInsets.isImeVisible
     var wasImeVisible by remember { mutableStateOf(false) }
     LaunchedEffect(imeVisible) {
-        if (wasImeVisible && !imeVisible) focusManager.clearFocus()
+        if (wasImeVisible && !imeVisible) {
+            focusManager.clearFocus()
+            if (!isEditing) padRequested = true
+        }
         wasImeVisible = imeVisible
     }
 
@@ -176,7 +181,10 @@ private fun PaymentContent(
                 text = form.amountText,
                 type = form.type,
                 caret = padVisible,
-                onClick = { focusManager.clearFocus() }
+                onClick = {
+                    focusManager.clearFocus()
+                    padRequested = true
+                }
             )
             val categoryName = categories.find { it.id == form.categoryId }?.name
                 ?: DefaultCategories.UNCATEGORIZED_NAME
@@ -207,7 +215,10 @@ private fun PaymentContent(
                     icon = Icons.Default.Storefront,
                     value = form.merchant,
                     onValueChange = viewModel::setMerchant,
-                    onFocus = { shopFocused = it },
+                    onFocus = {
+                        shopFocused = it
+                        if (it) padRequested = false
+                    },
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
@@ -217,7 +228,10 @@ private fun PaymentContent(
                 icon = Icons.Default.EditNote,
                 value = form.notes,
                 onValueChange = viewModel::setNotes,
-                onFocus = { noteFocused = it },
+                onFocus = {
+                    noteFocused = it
+                    if (it) padRequested = false
+                },
                 singleLine = false
             )
             if (form.categoryId != null && form.categoryId != loadedCategoryId && form.merchant.isNotBlank()) {
