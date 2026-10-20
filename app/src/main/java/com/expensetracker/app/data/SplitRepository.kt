@@ -202,10 +202,13 @@ class SplitRepository @Inject constructor(
     suspend fun deleteSplit(billId: String) {
         db.withTransaction {
             val bill = splitDao.getBill(billId) ?: return@withTransaction
-            val repaymentIds = splitDao.getDebts(billId).mapNotNull { it.repaymentExpenseId }
+            val debts = splitDao.getDebts(billId)
+            val repaymentIds = debts.mapNotNull { it.repaymentExpenseId }
             splitDao.deleteSharesByBill(billId)
             splitDao.deleteItemsByBill(billId)
             splitDao.deleteDebtsByBill(billId)
+            debts.filter { it.status == DebtStatus.OPEN }.map { it.personId }.toSet()
+                .forEach { clearSettleSuggestion(it) }
             splitDao.deleteBill(billId)
             // A repayment that still pays a debt in another bill stays used.
             val freed = repaymentIds.filter { splitDao.getDebtsByRepayment(it).isEmpty() }

@@ -174,22 +174,25 @@ class PeopleRepository @Inject constructor(
         db.withTransaction { settle(personId, null) }
     }
 
-    suspend fun confirmSettleSuggestion(personId: String) {
+    /**
+     * Settles up with the suggested RECEIVE linked. Returns false and closes nothing when there is no
+     * suggestion or it is stale (the receive changed, was used, or the net moved); a stale one is cleared.
+     */
+    suspend fun confirmSettleSuggestion(personId: String): Boolean =
         db.withTransaction {
-            val expenseId = splitDao.getPerson(personId)?.suggestedSettleExpenseId ?: return@withTransaction
+            val expenseId = splitDao.getPerson(personId)?.suggestedSettleExpenseId ?: return@withTransaction false
             val expense = expenseDao.getById(expenseId)
             val net = PeopleMath.net(
                 splitDao.getOpenDebtsFor(personId).map { it.amount },
                 splitDao.getOpenOwedItems(personId).map { it.amount }
             )
             if (expense == null || !splitRepository.isUsableRepayment(expense) || expense.amount.compareTo(net) != 0) {
-                // Stale: the receive changed, was used, or the net moved. Clear it, do not close.
                 splitRepository.clearSettleSuggestion(personId)
-                return@withTransaction
+                return@withTransaction false
             }
             settle(personId, expense)
+            true
         }
-    }
 
     suspend fun dismissSettleSuggestion(personId: String) {
         db.withTransaction { splitRepository.clearSettleSuggestion(personId) }
