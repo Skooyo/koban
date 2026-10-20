@@ -34,6 +34,8 @@ class ExpenseRepository @Inject constructor(
     /** Serialises dedup check + insert so racing notifications cannot both pass the check. */
     private val saveMutex = Mutex()
 
+    fun observeAllActive(): Flow<List<ExpenseEntity>> = expenseDao.observeAllActive()
+
     fun observeTotalForRange(start: Long, end: Long): Flow<BigDecimal?> =
         expenseDao.observeTotalForRange(start, end)
 

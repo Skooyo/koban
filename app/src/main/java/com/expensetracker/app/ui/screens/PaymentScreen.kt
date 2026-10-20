@@ -347,7 +347,7 @@ private fun TopRow(type: TransactionType, onClose: () -> Unit, onType: (Transact
 }
 
 @Composable
-private fun RowScope.TypeSegment(label: String, selected: Boolean, selectedColor: Color, onClick: () -> Unit) {
+internal fun RowScope.TypeSegment(label: String, selected: Boolean, selectedColor: Color, onClick: () -> Unit) {
     val lightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
     Box(
         modifier = Modifier

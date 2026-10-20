@@ -23,11 +23,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.YearMonth
+import java.time.ZoneId
 import javax.inject.Inject
 
 data class ActivityUiState(
@@ -39,8 +42,12 @@ data class ActivityUiState(
     val expenses: List<ExpenseEntity> = emptyList(),
     val slices: List<DonutSlice> = emptyList(),
     val categoryNames: Map<String, String> = emptyMap(),
-    val categoryFilter: String? = null
+    val categoryFilter: String? = null,
+    val showAll: Boolean = false
 )
+
+/** One month of the All view: its spent total (as the Month view's total) and its payments after the category filter. */
+data class ActivityMonthGroup(val month: YearMonth, val total: BigDecimal, val expenses: List<ExpenseEntity>)
 
 /** Payments, totals, weeks and donut slices of one month (or week), before the category filter. */
 private data class MonthData(
@@ -91,8 +98,8 @@ class ActivityViewModel @Inject constructor(
     val uiState: StateFlow<ActivityUiState> = combine(
         monthData,
         categoryRepository.observeAll(),
-        activitySelection.state.map { it.categoryFilter }.distinctUntilChanged()
-    ) { data, cats, filter ->
+        activitySelection.state.map { it.categoryFilter to it.showAll }.distinctUntilChanged()
+    ) { data, cats, (filter, showAll) ->
         ActivityUiState(
             month = data.month,
             canGoNext = MonthNav.next(data.month, YearMonth.now()) != null,
@@ -102,13 +109,38 @@ class ActivityViewModel @Inject constructor(
             expenses = data.expenses.filter { it.matchesCategory(filter) },
             slices = data.slices,
             categoryNames = cats.associate { it.id to it.name },
-            categoryFilter = filter
+            categoryFilter = filter,
+            showAll = showAll
         )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        ActivityUiState(month = activitySelection.state.value.month)
+        ActivityUiState(month = activitySelection.state.value.month, showAll = activitySelection.state.value.showAll)
     )
+
+    /** Every payment, newest first, split by month; null while loading. Only watched in the All view. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val allMonths: StateFlow<List<ActivityMonthGroup>?> = activitySelection.state
+        .map { it.showAll }
+        .distinctUntilChanged()
+        .flatMapLatest { showAll ->
+            if (!showAll) {
+                flowOf(null)
+            } else {
+                combine(
+                    expenseRepository.observeAllActive(),
+                    expenseRepository.observeMonthlySummaries(),
+                    activitySelection.state.map { it.categoryFilter }.distinctUntilChanged()
+                ) { expenses, months, filter ->
+                    val totals = months.associate { YearMonth.of(it.year, it.month + 1) to it.total }
+                    val zone = ZoneId.systemDefault()
+                    expenses.filter { it.matchesCategory(filter) }
+                        .groupBy { YearMonth.from(Instant.ofEpochMilli(it.notificationPostTime).atZone(zone)) }
+                        .map { (month, list) -> ActivityMonthGroup(month, totals[month] ?: BigDecimal.ZERO, list) }
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /** Months with payments, newest first, plus the current month even when it is empty. */
     val sheetMonths: StateFlow<List<MonthSummary>> = expenseRepository.observeMonthlySummaries()
@@ -145,6 +177,10 @@ class ActivityViewModel @Inject constructor(
 
     fun setCategoryFilter(filter: String?) {
         activitySelection.setCategoryFilter(filter)
+    }
+
+    fun setShowAll(showAll: Boolean) {
+        activitySelection.setShowAll(showAll)
     }
 
     fun categoryNameFor(expense: ExpenseEntity, names: Map<String, String>): String {

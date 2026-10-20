@@ -1,6 +1,8 @@
 package com.expensetracker.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -43,6 +47,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -61,12 +67,14 @@ import com.expensetracker.app.ui.components.RelativeBar
 import com.expensetracker.app.ui.components.UNCATEGORIZED_FILTER
 import com.expensetracker.app.ui.components.expensesByDay
 import com.expensetracker.app.ui.theme.LocalMoneyColors
+import com.expensetracker.app.ui.viewmodel.ActivityMonthGroup
 import com.expensetracker.app.ui.viewmodel.ActivityViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.YearMonth
 import java.util.Locale
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ActivityScreen(
     onAddPayment: () -> Unit,
@@ -78,6 +86,7 @@ fun ActivityScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val sheetMonths by viewModel.sheetMonths.collectAsStateWithLifecycle()
+    val allMonths by viewModel.allMonths.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
@@ -98,27 +107,34 @@ fun ActivityScreen(
         ) {
             item {
                 Text(text = "Activity", style = MaterialTheme.typography.headlineMedium)
-                MonthBar(
-                    label = monthLabel,
-                    canGoNext = uiState.canGoNext,
-                    onPrevious = viewModel::previousMonth,
-                    onNext = viewModel::nextMonth,
-                    onPick = { sheetOpen = true },
+                ViewSwitch(
+                    showAll = uiState.showAll,
+                    onShowAll = viewModel::setShowAll,
                     modifier = Modifier.padding(top = 8.dp)
                 )
-                NetSpendingTotal(total = uiState.monthTotal, large = true, modifier = Modifier.padding(top = 8.dp))
-                WeekStrip(
-                    weeks = uiState.weeks,
-                    selected = uiState.selectedWeek,
-                    onToggle = viewModel::toggleWeek,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
-                CategoryDonut(
-                    slices = uiState.slices,
-                    onSelect = { viewModel.setCategoryFilter(it.categoryId ?: UNCATEGORIZED_FILTER) },
-                    modifier = Modifier.padding(top = 12.dp),
-                    compact = true
-                )
+                if (!uiState.showAll) {
+                    MonthBar(
+                        label = monthLabel,
+                        canGoNext = uiState.canGoNext,
+                        onPrevious = viewModel::previousMonth,
+                        onNext = viewModel::nextMonth,
+                        onPick = { sheetOpen = true },
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    NetSpendingTotal(total = uiState.monthTotal, large = true, modifier = Modifier.padding(top = 8.dp))
+                    WeekStrip(
+                        weeks = uiState.weeks,
+                        selected = uiState.selectedWeek,
+                        onToggle = viewModel::toggleWeek,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                    CategoryDonut(
+                        slices = uiState.slices,
+                        onSelect = { viewModel.setCategoryFilter(it.categoryId ?: UNCATEGORIZED_FILTER) },
+                        modifier = Modifier.padding(top = 12.dp),
+                        compact = true
+                    )
+                }
                 CategoryFilterRow(
                     categories = categories,
                     selected = uiState.categoryFilter,
@@ -126,17 +142,29 @@ fun ActivityScreen(
                     modifier = Modifier.padding(top = 12.dp)
                 )
             }
-            if (uiState.expenses.isEmpty()) {
+            if (uiState.showAll) {
+                val groups = allMonths
+                if (groups != null && groups.isEmpty()) {
+                    item {
+                        EmptyText(if (uiState.categoryFilter != null) "No payments in this category." else "No payments yet.")
+                    }
+                }
+                groups?.forEach { group ->
+                    stickyHeader(key = "month-${group.month}") { MonthHeader(group) }
+                    expensesByDay(
+                        expenses = group.expenses,
+                        categoryName = { viewModel.categoryNameFor(it, uiState.categoryNames) },
+                        onEdit = { onEditPayment(it.id) }
+                    )
+                }
+            } else if (uiState.expenses.isEmpty()) {
                 item {
-                    Text(
-                        text = when {
+                    EmptyText(
+                        when {
                             uiState.categoryFilter != null -> "No payments in this category."
                             uiState.selectedWeek != null -> "No payments in this week."
                             else -> "No payments in $monthLabel."
-                        },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 24.dp)
+                        }
                     )
                 }
             } else {
@@ -180,6 +208,53 @@ internal fun AddPaymentFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
         contentColor = Ink
     ) {
         Text("＋ Add", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun EmptyText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 24.dp)
+    )
+}
+
+/** "Month" | "All" pill switch, styled as the payment page's Expense/Income switch. */
+@Composable
+private fun ViewSwitch(showAll: Boolean, onShowAll: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(4.dp)
+            .selectableGroup()
+    ) {
+        TypeSegment("Month", !showAll, MaterialTheme.colorScheme.inverseSurface) { onShowAll(false) }
+        TypeSegment("All", showAll, MaterialTheme.colorScheme.inverseSurface) { onShowAll(true) }
+    }
+}
+
+/** Sticky month header of the All view: month name and that month's spent total. */
+@Composable
+private fun MonthHeader(group: ActivityMonthGroup) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(top = 20.dp, bottom = 4.dp)
+            .semantics(mergeDescendants = true) { heading() },
+        verticalAlignment = Alignment.Bottom
+    ) {
+        Text(
+            text = MonthNav.label(group.month),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        MoneyAmount(amount = group.total, style = MaterialTheme.typography.titleMedium)
     }
 }
 
