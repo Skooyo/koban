@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -104,14 +105,14 @@ import java.util.Locale
 
 @Composable
 fun PaymentScreen(
-    onClose: () -> Unit,
+    onClose: (message: String?) -> Unit,
     onSplit: (expenseId: String) -> Unit,
     viewModel: PaymentViewModel = hiltViewModel()
 ) {
     LaunchedEffect(viewModel) {
         viewModel.events.collect {
             when (it) {
-                PaymentEvent.Close -> onClose()
+                is PaymentEvent.Close -> onClose(it.message)
                 is PaymentEvent.OpenSplit -> onSplit(it.expenseId)
             }
         }
@@ -124,7 +125,7 @@ fun PaymentScreen(
         isEditing = viewModel.isEditing,
         loadedCategoryId = viewModel.loadedCategoryId,
         categories = categories,
-        onClose = onClose,
+        onClose = { onClose(null) },
         viewModel = viewModel
     )
 }
@@ -144,6 +145,7 @@ private fun PaymentContent(
     var noteFocused by remember { mutableStateOf(false) }
     var pickingCategory by remember { mutableStateOf(false) }
     var pickingDate by remember { mutableStateOf(false) }
+    var confirmingDelete by remember { mutableStateOf(false) }
     val padVisible = !shopFocused && !noteFocused
     val valid = AmountInput.toAmount(form.amountText) != null
     val saving by viewModel.saving.collectAsStateWithLifecycle()
@@ -239,6 +241,16 @@ private fun PaymentContent(
                     .heightIn(min = 48.dp)
             ) { Text("Split this bill") }
         }
+        if (isEditing) {
+            TextButton(
+                onClick = { confirmingDelete = true },
+                enabled = !saving,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+            ) { Text("Delete payment") }
+        }
         Button(
             onClick = viewModel::save,
             enabled = valid,
@@ -267,6 +279,25 @@ private fun PaymentContent(
             selectedId = form.categoryId,
             onPick = viewModel::setCategory,
             onDismiss = { pickingCategory = false }
+        )
+    }
+    if (confirmingDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmingDelete = false },
+            title = { Text("Delete this payment?") },
+            text = { Text("It will no longer count in your totals.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmingDelete = false
+                        viewModel.delete()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingDelete = false }) { Text("Cancel") }
+            }
         )
     }
     if (pickingDate) {

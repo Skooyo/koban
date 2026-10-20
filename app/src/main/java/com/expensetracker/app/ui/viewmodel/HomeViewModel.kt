@@ -2,8 +2,10 @@ package com.expensetracker.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expensetracker.app.data.ActivitySelection
 import com.expensetracker.app.data.CategoryEntity
 import com.expensetracker.app.data.ExpenseRepository
+import com.expensetracker.app.data.PeriodCalculator
 import com.expensetracker.app.data.PeriodSummary
 import com.expensetracker.app.data.SpendingPeriod
 import com.expensetracker.app.listener.NotificationAccessHelper
@@ -12,6 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.time.YearMonth
 import java.util.Locale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +37,8 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val expenseRepository: ExpenseRepository,
-    private val categoryRepository: com.expensetracker.app.data.CategoryRepository
+    private val categoryRepository: com.expensetracker.app.data.CategoryRepository,
+    private val activitySelection: ActivitySelection
 ) : ViewModel() {
 
     private val accessGranted = MutableStateFlow(false)
@@ -68,6 +72,12 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun dayStamp() = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
+
+    /** Points the Activity tab at the current month, with the current Monday–Sunday week selected when [withWeek]. */
+    fun selectActivity(withWeek: Boolean) {
+        val weekStart = if (withWeek) PeriodCalculator.range(SpendingPeriod.WEEK).first else null
+        activitySelection.show(YearMonth.now(), weekStart)
+    }
 
     fun openNotificationSettings() {
         NotificationAccessHelper.openNotificationAccessSettings(context)

@@ -14,11 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,17 +37,15 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-/** One transaction. Tap the row to edit it when [showActions] is true. */
+/** One transaction. Tap the row to edit it. */
 @Composable
 fun ExpenseListCard(
     expense: ExpenseEntity,
     categoryName: String?,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     showConfidence: Boolean = false,
     compact: Boolean = false,
-    showActions: Boolean = true,
     timePattern: String = "HH:mm"
 ) {
     val time = remember(expense.notificationPostTime, timePattern) {
@@ -72,7 +66,7 @@ fun ExpenseListCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (showActions) Modifier.clickable(onClickLabel = "Edit", onClick = onEdit) else Modifier)
+            .clickable(onClickLabel = "Edit", onClick = onEdit)
             .height(IntrinsicSize.Min)
             .padding(vertical = if (compact) 8.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -135,42 +129,14 @@ fun ExpenseListCard(
             style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
             color = if (isRepayment) muted else MaterialTheme.colorScheme.onSurface
         )
-        if (showActions) {
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete $merchant", tint = muted)
-            }
-        }
     }
-}
-
-@Composable
-fun ExpenseItem(
-    expense: ExpenseEntity,
-    modifier: Modifier = Modifier,
-    showConfidence: Boolean = false,
-    categoryName: String? = null,
-    compact: Boolean = false,
-    timePattern: String = "HH:mm"
-) {
-    ExpenseListCard(
-        expense = expense,
-        categoryName = categoryName,
-        onEdit = {},
-        onDelete = {},
-        modifier = modifier,
-        showConfidence = showConfidence,
-        compact = compact,
-        showActions = false,
-        timePattern = timePattern
-    )
 }
 
 /** Transactions under one header per day. [expenses] must be sorted newest first. */
 fun LazyListScope.expensesByDay(
     expenses: List<ExpenseEntity>,
     categoryName: (ExpenseEntity) -> String?,
-    onEdit: (ExpenseEntity) -> Unit,
-    onDelete: (ExpenseEntity) -> Unit
+    onEdit: (ExpenseEntity) -> Unit
 ) {
     val dayKey = SimpleDateFormat("yyyyMMdd", Locale.US)
     expenses.groupBy { dayKey.format(Date(it.notificationPostTime)) }.forEach { (day, dayExpenses) ->
@@ -182,7 +148,6 @@ fun LazyListScope.expensesByDay(
                 expense = expense,
                 categoryName = categoryName(expense),
                 onEdit = { onEdit(expense) },
-                onDelete = { onDelete(expense) },
                 showConfidence = true
             )
         }

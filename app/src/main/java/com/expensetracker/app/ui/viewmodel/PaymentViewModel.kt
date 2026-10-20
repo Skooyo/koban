@@ -32,7 +32,8 @@ data class PaymentForm(
 )
 
 sealed interface PaymentEvent {
-    data object Close : PaymentEvent
+    /** [message] is shown as a snackbar by the screen under the page; null shows nothing. */
+    data class Close(val message: String?) : PaymentEvent
     data class OpenSplit(val expenseId: String) : PaymentEvent
 }
 
@@ -71,7 +72,7 @@ class PaymentViewModel @Inject constructor(
             viewModelScope.launch {
                 val expense = expenseRepository.getById(expenseId)
                 if (expense == null) {
-                    _events.send(PaymentEvent.Close)
+                    _events.send(PaymentEvent.Close(null))
                     return@launch
                 }
                 loadedCategoryId = expense.categoryId
@@ -97,7 +98,25 @@ class PaymentViewModel @Inject constructor(
     fun setMerchant(s: String) = edit { it.copy(merchant = s) }
     fun setNotes(s: String) = edit { it.copy(notes = s) }
 
-    fun save() = persist(PaymentEvent.Close)
+    fun save() {
+        val message = when {
+            isEditing -> null
+            _form.value?.type == TransactionType.RECEIVE -> "Income added"
+            else -> "Expense added"
+        }
+        persist(PaymentEvent.Close(message))
+    }
+
+    /** Same as the old row delete: the payment no longer counts in totals. */
+    fun delete() {
+        val id = expenseId ?: return
+        if (_saving.value) return
+        _saving.value = true
+        viewModelScope.launch {
+            expenseRepository.dismissExpense(id)
+            _events.send(PaymentEvent.Close("Payment deleted"))
+        }
+    }
 
     /** Saves first, so the split editor loads the new amount. Only an edited payment has an id to split. */
     fun saveAndSplit() {

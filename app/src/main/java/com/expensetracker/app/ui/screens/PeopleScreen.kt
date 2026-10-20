@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -26,8 +25,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -68,9 +67,9 @@ private fun groupTitle(group: PeopleMath.Group) = when (group) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PeopleScreen(
-    onBack: () -> Unit,
     onOpenPerson: (String) -> Unit,
     onOpenSplit: (String) -> Unit,
+    onSplitBill: () -> Unit,
     viewModel: PeopleViewModel = hiltViewModel()
 ) {
     val sections by viewModel.sections.collectAsStateWithLifecycle()
@@ -96,11 +95,6 @@ fun PeopleScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
                 }
             )
         },
@@ -125,6 +119,9 @@ fun PeopleScreen(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp)
         ) {
             item {
+                OutlinedButton(onClick = onSplitBill, modifier = Modifier.padding(bottom = 12.dp)) {
+                    Text("Split a bill")
+                }
                 OutlinedTextField(
                     value = query,
                     onValueChange = viewModel::setQuery,

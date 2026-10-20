@@ -128,9 +128,7 @@ fun ActivityScreen(
                 expensesByDay(
                     expenses = uiState.expenses,
                     categoryName = { viewModel.categoryNameFor(it, uiState.categoryNames) },
-                    onEdit = { onEditPayment(it.id) },
-                    // Activity rows never delete. Task 3 drops onDelete and the trash icon.
-                    onDelete = {}
+                    onEdit = { onEditPayment(it.id) }
                 )
             }
         }

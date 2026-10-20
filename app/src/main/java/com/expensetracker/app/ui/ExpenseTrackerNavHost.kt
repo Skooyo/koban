@@ -2,10 +2,9 @@ package com.expensetracker.app.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -14,6 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -23,10 +25,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.expensetracker.app.ui.navigation.Routes
-import com.expensetracker.app.ui.screens.ExpensesScreen
-import com.expensetracker.app.ui.screens.FilteredExpensesScreen
-import com.expensetracker.app.ui.screens.HistoryMonthsScreen
-import com.expensetracker.app.ui.screens.HistoryWeeksScreen
+import com.expensetracker.app.ui.screens.ActivityScreen
 import com.expensetracker.app.ui.screens.HomeScreen
 import com.expensetracker.app.ui.screens.NotificationDebugScreen
 import com.expensetracker.app.ui.screens.PaymentScreen
@@ -39,12 +38,30 @@ private data class BottomNavItem(val route: String, val label: String, val icon:
 
 private val bottomNavItems = listOf(
     BottomNavItem(Routes.HOME, "Home", Icons.Default.Home),
-    BottomNavItem(Routes.EXPENSES, "Expenses", Icons.Default.List),
-    BottomNavItem(Routes.HISTORY, "History", Icons.Default.CalendarMonth),
-    BottomNavItem(Routes.SETTINGS, "Settings", Icons.Default.Settings)
+    BottomNavItem(Routes.ACTIVITY, "Activity", Icons.AutoMirrored.Filled.ReceiptLong),
+    BottomNavItem(Routes.PEOPLE, "People", Icons.Default.People)
 )
 
-private val topLevelRoutes = setOf(Routes.HOME, Routes.EXPENSES, Routes.HISTORY, Routes.SETTINGS)
+private val topLevelRoutes = setOf(Routes.HOME, Routes.ACTIVITY, Routes.PEOPLE)
+
+/** Key under which the payment page hands its closing message to the screen below it. */
+private const val PAYMENT_MESSAGE = "paymentMessage"
+
+/** Switches tabs the way a bottom-bar tap does: one copy per tab, each tab keeps its state. */
+private fun NavController.navigateToTab(route: String) = navigate(route) {
+    popUpTo(graph.findStartDestination().id) {
+        saveState = true
+    }
+    launchSingleTop = true
+    restoreState = true
+}
+
+/** Pops the payment page, if it is still on top, and leaves [message] for the screen below. */
+private fun NavController.closePayment(entry: NavBackStackEntry, message: String?) {
+    if (currentBackStackEntry != entry) return
+    if (message != null) previousBackStackEntry?.savedStateHandle?.set(PAYMENT_MESSAGE, message)
+    popBackStack()
+}
 
 @Composable
 fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
@@ -65,15 +82,7 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
                             selected = navBackStackEntry?.destination?.hierarchy?.any {
                                 it.route == item.route
                             } == true,
-                            onClick = {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
+                            onClick = { navController.navigateToTab(item.route) }
                         )
                     }
                 }
@@ -85,24 +94,33 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
             startDestination = Routes.HOME,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Routes.HOME) {
+            composable(Routes.HOME) { entry ->
+                val message by entry.savedStateHandle.getStateFlow<String?>(PAYMENT_MESSAGE, null)
+                    .collectAsStateWithLifecycle()
                 HomeScreen(
-                    onNavigateToFiltered = { route -> navController.navigate(route) }
+                    onOpenActivity = { navController.navigateToTab(Routes.ACTIVITY) },
+                    onAddPayment = { navController.navigate(Routes.PAYMENT_NEW) { launchSingleTop = true } },
+                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) { launchSingleTop = true } },
+                    onOpenSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                    message = message,
+                    onMessageShown = { entry.savedStateHandle[PAYMENT_MESSAGE] = null }
                 )
             }
-            composable(Routes.EXPENSES) {
-                ExpensesScreen(
-                    onSplit = { id -> navController.navigate(Routes.splitNew(id)) },
-                    onPeople = { navController.navigate(Routes.PEOPLE) },
+            composable(Routes.ACTIVITY) { entry ->
+                val message by entry.savedStateHandle.getStateFlow<String?>(PAYMENT_MESSAGE, null)
+                    .collectAsStateWithLifecycle()
+                ActivityScreen(
                     onAddPayment = { navController.navigate(Routes.PAYMENT_NEW) { launchSingleTop = true } },
-                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) { launchSingleTop = true } }
+                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) { launchSingleTop = true } },
+                    message = message,
+                    onMessageShown = { entry.savedStateHandle[PAYMENT_MESSAGE] = null }
                 )
             }
             composable(Routes.PEOPLE) {
                 PeopleScreen(
-                    onBack = { navController.popBackStack() },
                     onOpenPerson = { id -> navController.navigate(Routes.person(id)) },
-                    onOpenSplit = { id -> navController.navigate(Routes.splitEdit(id)) }
+                    onOpenSplit = { id -> navController.navigate(Routes.splitEdit(id)) },
+                    onSplitBill = { navController.navigate(Routes.splitNew(null)) }
                 )
             }
             composable(
@@ -113,37 +131,6 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
                     personId = entry.arguments?.getString("personId").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onOpenSplit = { id -> navController.navigate(Routes.splitEdit(id)) }
-                )
-            }
-            composable(Routes.HISTORY) {
-                HistoryMonthsScreen(
-                    onMonthClick = { yearMonth ->
-                        navController.navigate(Routes.historyMonth(yearMonth))
-                    }
-                )
-            }
-            composable(
-                route = Routes.HISTORY_MONTH,
-                arguments = listOf(navArgument("yearMonth") { type = NavType.IntType })
-            ) {
-                HistoryWeeksScreen(
-                    onBack = { navController.popBackStack() },
-                    onWeekClick = { start, end, label ->
-                        navController.navigate(Routes.expensesFilter(start, end, label))
-                    }
-                )
-            }
-            composable(
-                route = Routes.EXPENSES_FILTER,
-                arguments = listOf(
-                    navArgument("start") { type = NavType.StringType },
-                    navArgument("end") { type = NavType.StringType },
-                    navArgument("title") { type = NavType.StringType }
-                )
-            ) {
-                FilteredExpensesScreen(
-                    onBack = { navController.popBackStack() },
-                    onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) { launchSingleTop = true } }
                 )
             }
             composable(
@@ -166,7 +153,7 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
             }
             composable(Routes.PAYMENT_NEW) { entry ->
                 PaymentScreen(
-                    onClose = { if (navController.currentBackStackEntry == entry) navController.popBackStack() },
+                    onClose = { message -> navController.closePayment(entry, message) },
                     onSplit = { id ->
                         if (navController.currentBackStackEntry == entry) {
                             navController.popBackStack()
@@ -180,7 +167,7 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
                 arguments = listOf(navArgument("expenseId") { type = NavType.StringType })
             ) { entry ->
                 PaymentScreen(
-                    onClose = { if (navController.currentBackStackEntry == entry) navController.popBackStack() },
+                    onClose = { message -> navController.closePayment(entry, message) },
                     onSplit = { id ->
                         if (navController.currentBackStackEntry == entry) {
                             navController.popBackStack()
@@ -191,6 +178,7 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier) {
             }
             composable(Routes.SETTINGS) {
                 SettingsScreen(
+                    onBack = { navController.popBackStack() },
                     onOpenNotificationDebug = {
                         navController.navigate(Routes.NOTIFICATION_DEBUG)
                     }
