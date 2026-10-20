@@ -47,6 +47,6 @@ object RepaymentMatcher {
         return a.zip(b).firstOrNull { (x, y) -> x != y }?.let { (x, y) -> x < y } ?: false
     }
 
-    private fun words(text: String): Set<String> =
+    internal fun words(text: String): Set<String> =
         text.lowercase().split(Regex("[^\\p{L}]+")).filter { it.length >= 3 }.toSet()
 }
