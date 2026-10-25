@@ -14,9 +14,11 @@ import androidx.room.TypeConverters
         SplitPersonEntity::class,
         SplitItemShareEntity::class,
         SplitDebtEntity::class,
-        OwedItemEntity::class
+        OwedItemEntity::class,
+        PendingPaymentEntity::class,
+        DroppedNotificationEntity::class
     ],
-    version = 8,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(
@@ -24,11 +26,13 @@ import androidx.room.TypeConverters
     ExpenseStatusConverter::class,
     ParseConfidenceConverter::class,
     TransactionTypeConverter::class,
-    DebtStatusConverter::class
+    DebtStatusConverter::class,
+    CaptureFormatConverter::class
 )
 abstract class ExpenseDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun categoryDao(): CategoryDao
     abstract fun merchantCategoryDao(): MerchantCategoryDao
     abstract fun splitDao(): SplitDao
+    abstract fun pendingPaymentDao(): PendingPaymentDao
 }

@@ -598,7 +598,7 @@ private fun NumberPad(onKey: (Char) -> Unit, onBackspace: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CategorySheet(
+internal fun CategorySheet(
     categories: List<CategoryEntity>,
     selectedId: String?,
     onPick: (String?) -> Unit,
@@ -646,7 +646,7 @@ private fun CategorySheet(
 }
 
 /** "Today", "Yesterday", or "Mon, 12 Oct". */
-private fun dateLabel(time: Long): String {
+internal fun dateLabel(time: Long): String {
     val day = Calendar.getInstance().apply { timeInMillis = time }
     val today = Calendar.getInstance()
     fun same(a: Calendar, b: Calendar) =

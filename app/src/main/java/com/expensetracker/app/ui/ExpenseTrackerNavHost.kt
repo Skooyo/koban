@@ -12,12 +12,20 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import android.app.Activity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
@@ -31,14 +39,17 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.expensetracker.app.ui.navigation.Routes
 import com.expensetracker.app.ui.screens.ActivityScreen
+import com.expensetracker.app.ui.screens.CheckPaymentsScreen
 import com.expensetracker.app.ui.screens.HomeScreen
 import com.expensetracker.app.ui.screens.NotificationDebugScreen
+import com.expensetracker.app.ui.screens.PaymentAppsScreen
 import com.expensetracker.app.ui.screens.PaymentScreen
 import com.expensetracker.app.ui.screens.PeopleScreen
 import com.expensetracker.app.ui.screens.PersonScreen
 import com.expensetracker.app.ui.screens.SettingsScreen
 import com.expensetracker.app.ui.screens.SplitEditorScreen
 import com.expensetracker.app.ui.viewmodel.AppViewModel
+import kotlinx.coroutines.flow.first
 
 private data class BottomNavItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -76,6 +87,28 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier, appViewModel: AppViewMo
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in topLevelRoutes
+
+    // Auto-open: one check per start of the activity, so backing out does not reopen the swipe screen.
+    val activity = LocalContext.current as? Activity
+    var autoOpenTurn by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) {
+        if (appViewModel.takeAutoOpenTurn()) autoOpenTurn++
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        appViewModel.onActivityStop(activity?.isChangingConfigurations == true)
+    }
+    LaunchedEffect(autoOpenTurn) {
+        if (autoOpenTurn == 0) return@LaunchedEffect
+        val count = appViewModel.waitingCountNow()
+        // Waits for the graph on a cold start.
+        val route = navController.currentBackStackEntryFlow.first().destination.route
+        // The payment-apps picker comes before the swipe screen.
+        if (route in topLevelRoutes && appViewModel.paymentAppsDue()) {
+            navController.navigate(Routes.PAYMENT_APPS) { launchSingleTop = true }
+        } else if (count > 0 && route in topLevelRoutes) {
+            navController.navigate(Routes.CHECK) { launchSingleTop = true }
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -121,6 +154,8 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier, appViewModel: AppViewMo
                     onAddPayment = { navController.navigate(Routes.PAYMENT_NEW) { launchSingleTop = true } },
                     onEditPayment = { id -> navController.navigate(Routes.paymentEdit(id)) { launchSingleTop = true } },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                    onCheckPayments = { navController.navigate(Routes.CHECK) { launchSingleTop = true } },
+                    onChoosePaymentApps = { navController.navigate(Routes.PAYMENT_APPS) { launchSingleTop = true } },
                     message = message,
                     onMessageShown = { entry.savedStateHandle[PAYMENT_MESSAGE] = null }
                 )
@@ -195,13 +230,24 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier, appViewModel: AppViewMo
                     }
                 )
             }
+            composable(Routes.CHECK) { entry ->
+                CheckPaymentsScreen(onClose = {
+                    if (navController.currentBackStackEntry == entry) navController.popBackStack()
+                })
+            }
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenNotificationDebug = {
                         navController.navigate(Routes.NOTIFICATION_DEBUG)
-                    }
+                    },
+                    onOpenPaymentApps = { navController.navigate(Routes.PAYMENT_APPS) { launchSingleTop = true } }
                 )
+            }
+            composable(Routes.PAYMENT_APPS) { entry ->
+                PaymentAppsScreen(onClose = {
+                    if (navController.currentBackStackEntry == entry) navController.popBackStack()
+                })
             }
             composable(Routes.NOTIFICATION_DEBUG) {
                 NotificationDebugScreen(onBack = { navController.popBackStack() })

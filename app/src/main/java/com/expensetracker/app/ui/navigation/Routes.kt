@@ -8,12 +8,15 @@ object Routes {
     const val SETTINGS = "settings"
     const val NOTIFICATION_DEBUG = "settings/notification_debug"
 
+    const val PAYMENT_APPS = "settings/payment_apps"
+
     const val PEOPLE = "people"
     const val PERSON = "people/{personId}"
     const val SPLIT_NEW = "split/new?expenseId={expenseId}"
     const val SPLIT_EDIT = "split/edit/{billId}"
     const val PAYMENT_NEW = "payment/new"
     const val PAYMENT_EDIT = "payment/edit/{expenseId}"
+    const val CHECK = "check"
 
     fun paymentEdit(id: String) = "payment/edit/${Uri.encode(id)}"
 

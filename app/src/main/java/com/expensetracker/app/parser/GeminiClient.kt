@@ -2,6 +2,8 @@ package com.expensetracker.app.parser
 
 import android.util.Log
 import com.expensetracker.app.BuildConfig
+import com.expensetracker.app.data.SettingsRepository
+import kotlinx.coroutines.flow.first
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -20,10 +22,10 @@ import javax.inject.Singleton
  */
 @Singleton
 class GeminiClient @Inject constructor(
-    private val httpClient: OkHttpClient
+    private val httpClient: OkHttpClient,
+    private val settingsRepository: SettingsRepository
 ) {
-    val isConfigured: Boolean
-        get() = BuildConfig.GEMINI_API_KEY.isNotBlank()
+    suspend fun isConfigured(): Boolean = settingsRepository.geminiApiKey.first().isNotBlank()
 
     val primaryModel: String
         get() = BuildConfig.GEMINI_MODEL_PRIMARY.ifBlank { DEFAULT_PRIMARY }
@@ -31,14 +33,11 @@ class GeminiClient @Inject constructor(
     val secondaryModel: String
         get() = BuildConfig.GEMINI_MODEL_SECONDARY.ifBlank { DEFAULT_SECONDARY }
 
-    val modelsLabel: String
-        get() = "$primaryModel ↔ $secondaryModel"
-
     private val preferredIndex = AtomicInteger(0)
     private val cooldownUntilMs = LongArray(2)
 
     /** Notification classification. Runs on the caller's thread. */
-    fun parsePaymentNotification(notificationText: String): LlmParseResult =
+    suspend fun parsePaymentNotification(notificationText: String): LlmParseResult =
         generate(
             SYSTEM_PROMPT,
             JSONArray().put(JSONObject().put("text", notificationText))
@@ -51,13 +50,14 @@ class GeminiClient @Inject constructor(
      * or rate limit. A body that [parse] rejects (returns null) counts as a failed attempt.
      * Runs on the caller's thread — invoke from a background dispatcher / coroutine.
      */
-    fun <T : Any> generate(
+    suspend fun <T : Any> generate(
         systemPrompt: String,
         userParts: JSONArray,
         callTimeoutSeconds: Long = DEFAULT_CALL_TIMEOUT_SECONDS,
         parse: (String) -> T?
     ): T? {
-        if (!isConfigured) return null
+        val apiKey = settingsRepository.geminiApiKey.first()
+        if (apiKey.isBlank()) return null
 
         val client = if (callTimeoutSeconds == DEFAULT_CALL_TIMEOUT_SECONDS) {
             httpClient
@@ -79,7 +79,7 @@ class GeminiClient @Inject constructor(
                 continue
             }
 
-            when (val attempt = callModel(client, model, systemPrompt, userParts, parse)) {
+            when (val attempt = callModel(client, apiKey, model, systemPrompt, userParts, parse)) {
                 is ModelAttempt.Success -> {
                     preferredIndex.set(index)
                     clearCooldown(index)
@@ -99,13 +99,14 @@ class GeminiClient @Inject constructor(
 
     private fun <T : Any> callModel(
         client: OkHttpClient,
+        apiKey: String,
         model: String,
         systemPrompt: String,
         userParts: JSONArray,
         parse: (String) -> T?
     ): ModelAttempt<T> {
         return try {
-            val encodedKey = URLEncoder.encode(BuildConfig.GEMINI_API_KEY, Charsets.UTF_8.name())
+            val encodedKey = URLEncoder.encode(apiKey, Charsets.UTF_8.name())
             val url =
                 "$GENERATE_CONTENT_BASE/${model}:generateContent?key=$encodedKey"
             val request = Request.Builder()
@@ -132,7 +133,7 @@ class GeminiClient @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Gemini call failed ($model): ${e.message}")
+            Log.w(TAG, "Gemini call failed ($model): ${e.javaClass.simpleName}")
             ModelAttempt.Failed
         }
     }

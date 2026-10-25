@@ -11,9 +11,8 @@ import com.expensetracker.app.listener.OemBatteryHelper
 import com.expensetracker.app.listener.ReconnectResult
 import com.expensetracker.app.listener.RecentNotificationsStore
 import com.expensetracker.app.parser.AmountFormatter
-import com.expensetracker.app.parser.ExpenseNotificationParser
-import com.expensetracker.app.parser.ExpenseParseResult
-import com.expensetracker.app.parser.ParseSource
+import com.expensetracker.app.parser.PaymentRules
+import com.expensetracker.app.parser.RuleMatch
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
@@ -30,42 +29,36 @@ data class SettingsUiState(
     val isXiaomiDevice: Boolean = false,
     val xiaomiBackgroundChecklist: List<String> = emptyList(),
     val allowlistedPackages: Set<String> = emptySet(),
-    val recentPackages: List<String> = emptyList(),
     val capturedNotificationCount: Int = 0,
     val categories: List<CategoryEntity> = emptyList(),
     val regexTestInput: String = "",
     val regexTestResult: String? = null,
     val reconnectMessage: String? = null,
-    val llmParsingEnabled: Boolean = true,
-    val geminiKeyConfigured: Boolean = false,
-    val geminiModelsLabel: String = ""
+    val geminiPrefillEnabled: Boolean = false,
+    val geminiApiKey: String = ""
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
-    private val categoryRepository: CategoryRepository,
-    private val expenseNotificationParser: ExpenseNotificationParser
+    private val categoryRepository: CategoryRepository
 ) : ViewModel() {
 
     private val accessGranted = MutableStateFlow(false)
     private val regexInput = MutableStateFlow("")
     private val regexResult = MutableStateFlow<String?>(null)
-    private val recentPackages = MutableStateFlow(RecentNotificationsStore.uniquePackages())
     private val reconnectMessage = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<SettingsUiState> = kotlinx.coroutines.flow.combine(
         kotlinx.coroutines.flow.combine(
             accessGranted,
             settingsRepository.allowlistedPackages,
-            recentPackages,
             RecentNotificationsStore.notifications
-        ) { granted, allowlist, recent, captured ->
+        ) { granted, allowlist, captured ->
             ListenerSettingsSlice(
                 isAccessGranted = granted,
                 allowlistedPackages = allowlist,
-                recentPackages = recent,
                 capturedNotificationCount = captured.size
             )
         },
@@ -77,8 +70,11 @@ class SettingsViewModel @Inject constructor(
         ) { categories, input, result, reconnect ->
             FormSettingsSlice(categories, input, result, reconnect)
         },
-        settingsRepository.llmParsingEnabled
-    ) { listener, form, llmEnabled ->
+        kotlinx.coroutines.flow.combine(
+            settingsRepository.geminiPrefillEnabled,
+            settingsRepository.geminiApiKey
+        ) { enabled, key -> enabled to key }
+    ) { listener, form, gemini ->
         SettingsUiState(
             isAccessGranted = listener.isAccessGranted,
             isBatteryOptimizationIgnored = NotificationAccessHelper.isBatteryOptimizationIgnored(context),
@@ -89,24 +85,18 @@ class SettingsViewModel @Inject constructor(
                 emptyList()
             },
             allowlistedPackages = listener.allowlistedPackages,
-            recentPackages = listener.recentPackages,
             capturedNotificationCount = listener.capturedNotificationCount,
             categories = form.categories,
             regexTestInput = form.input,
             regexTestResult = form.result,
             reconnectMessage = form.reconnectMessage,
-            llmParsingEnabled = llmEnabled,
-            geminiKeyConfigured = expenseNotificationParser.isLlmConfigured,
-            geminiModelsLabel = expenseNotificationParser.modelsLabel
+            geminiPrefillEnabled = gemini.first,
+            geminiApiKey = gemini.second
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState(
-        geminiKeyConfigured = expenseNotificationParser.isLlmConfigured,
-        geminiModelsLabel = expenseNotificationParser.modelsLabel
-    ))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
     fun refresh() {
         accessGranted.value = NotificationAccessHelper.isNotificationAccessGranted(context)
-        recentPackages.value = RecentNotificationsStore.uniquePackages()
         NotificationAccessHelper.ensureListenerActive(context)
     }
 
@@ -151,21 +141,15 @@ class SettingsViewModel @Inject constructor(
         NotificationAccessHelper.openNotificationAccessSettings(context)
     }
 
-    fun setLlmParsingEnabled(enabled: Boolean) {
+    fun setGeminiPrefillEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            settingsRepository.setLlmParsingEnabled(enabled)
+            settingsRepository.setGeminiPrefillEnabled(enabled)
         }
     }
 
-    fun addPackage(packageName: String) {
+    fun saveGeminiApiKey(key: String) {
         viewModelScope.launch {
-            settingsRepository.addPackage(packageName)
-        }
-    }
-
-    fun removePackage(packageName: String) {
-        viewModelScope.launch {
-            settingsRepository.removePackage(packageName)
+            settingsRepository.setGeminiApiKey(key)
         }
     }
 
@@ -175,33 +159,17 @@ class SettingsViewModel @Inject constructor(
 
     fun runRegexTest() {
         viewModelScope.launch {
-            regexResult.value = "Parsing…"
-            val input = regexInput.value
-            regexResult.value = when (val parsed = expenseNotificationParser.parse(input)) {
-                is ExpenseParseResult.Success -> {
-                    val expense = parsed.expense
-                    val via = when (parsed.source) {
-                        ParseSource.LLM -> "LLM"
-                        ParseSource.REGEX -> "regex"
-                    }
+            val input = regexInput.value.trim()
+            regexResult.value = when (val match = PaymentRules.match("", input)) {
+                is RuleMatch.Matched -> {
+                    val expense = match.expense
                     "Amount: ${expense.currency} ${AmountFormatter.formatDisplay(expense.amount)}\n" +
                         "Merchant: ${expense.merchant ?: "—"}\n" +
                         "Type: ${expense.transactionType.name.lowercase()}\n" +
-                        "Confidence: ${expense.confidence.name.lowercase()}\n" +
-                        "Parser: $via"
+                        "Format: ${match.format.name.lowercase()}"
                 }
-                is ExpenseParseResult.SkippedNotTransaction -> {
-                    val reason = parsed.reason?.takeIf { it.isNotBlank() } ?: "not a money transaction"
-                    "Skipped — not a transaction ($reason)"
-                }
-                ExpenseParseResult.NoAmount -> "No payment amount found in text"
+                RuleMatch.NoMatch -> "No rule matched this text"
             }
-        }
-    }
-
-    fun addPackageManually(packageName: String) {
-        viewModelScope.launch {
-            settingsRepository.addPackage(packageName)
         }
     }
 
@@ -221,7 +189,6 @@ class SettingsViewModel @Inject constructor(
 private data class ListenerSettingsSlice(
     val isAccessGranted: Boolean,
     val allowlistedPackages: Set<String>,
-    val recentPackages: List<String>,
     val capturedNotificationCount: Int
 )
 

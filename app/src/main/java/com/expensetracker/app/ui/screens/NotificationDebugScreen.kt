@@ -284,7 +284,7 @@ private fun CapturedNotificationCard(notification: CapturedNotification) {
 private fun NotificationDebugFilter.label(): String = when (this) {
     NotificationDebugFilter.ALL -> "All"
     NotificationDebugFilter.POSTED_ONLY -> "Posted"
-    NotificationDebugFilter.SAVED -> "Saved"
+    NotificationDebugFilter.WAITING -> "Waiting"
     NotificationDebugFilter.SKIPPED -> "Skipped"
 }
 
@@ -296,10 +296,9 @@ private fun NotificationCaptureEvent.label(): String = when (this) {
 
 private fun NotificationDisposition.label(): String = when (this) {
     NotificationDisposition.PENDING -> "Pending"
-    NotificationDisposition.SAVED -> "Saved"
+    NotificationDisposition.WAITING -> "Waiting for check"
     NotificationDisposition.SKIPPED_ALLOWLIST -> "Allowlist"
-    NotificationDisposition.SKIPPED_NO_AMOUNT -> "No amount"
-    NotificationDisposition.SKIPPED_NOT_TRANSACTION -> "Not transaction"
+    NotificationDisposition.SKIPPED_NO_RULE -> "No rule matched"
     NotificationDisposition.SKIPPED_DUPLICATE -> "Duplicate"
     NotificationDisposition.SKIPPED_GROUP_SUMMARY -> "Group"
     NotificationDisposition.SKIPPED_EMPTY -> "Empty"
@@ -309,7 +308,7 @@ private fun NotificationDisposition.label(): String = when (this) {
 
 @Composable
 private fun NotificationDisposition.color(): Color = when (this) {
-    NotificationDisposition.SAVED -> Color(0xFF2E7D32)
+    NotificationDisposition.WAITING -> Color(0xFF2E7D32)
     NotificationDisposition.PENDING -> MaterialTheme.colorScheme.primary
     NotificationDisposition.INFO_ONLY -> MaterialTheme.colorScheme.onSurfaceVariant
     else -> Color(0xFFE65100)

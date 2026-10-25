@@ -2,6 +2,7 @@ package com.expensetracker.app.data
 
 import androidx.room.TypeConverter
 import com.expensetracker.app.parser.AmountFormatter
+import com.expensetracker.app.parser.CaptureFormat
 import java.math.BigDecimal
 
 class BigDecimalConverters {
@@ -44,4 +45,12 @@ class TransactionTypeConverter {
 
     @TypeConverter
     fun toType(value: String): TransactionType = TransactionType.valueOf(value)
+}
+
+class CaptureFormatConverter {
+    @TypeConverter
+    fun fromFormat(format: CaptureFormat): String = format.name
+
+    @TypeConverter
+    fun toFormat(value: String): CaptureFormat = CaptureFormat.valueOf(value)
 }

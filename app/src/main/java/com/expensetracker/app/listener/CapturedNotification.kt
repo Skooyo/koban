@@ -10,10 +10,9 @@ enum class NotificationCaptureEvent {
 
 enum class NotificationDisposition {
     PENDING,
-    SAVED,
+    WAITING,
     SKIPPED_ALLOWLIST,
-    SKIPPED_NO_AMOUNT,
-    SKIPPED_NOT_TRANSACTION,
+    SKIPPED_NO_RULE,
     SKIPPED_DUPLICATE,
     SKIPPED_GROUP_SUMMARY,
     SKIPPED_EMPTY,

@@ -5,8 +5,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.expensetracker.app.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -15,25 +17,40 @@ import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
+/** Holds the Gemini key. Excluded from backup in res/xml/backup_rules.xml and data_extraction_rules.xml. */
+private val Context.secretsDataStore: DataStore<Preferences> by preferencesDataStore(name = "secrets")
+
 @Singleton
 class SettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val allowlistKey = stringSetPreferencesKey("payment_app_allowlist")
+    private val chosenKey = booleanPreferencesKey("payment_apps_chosen")
     private val darkModeKey = booleanPreferencesKey("dark_mode")
-    private val llmParsingKey = booleanPreferencesKey("llm_parsing_enabled")
+    private val geminiPrefillKey = booleanPreferencesKey("gemini_prefill_enabled")
+    private val geminiApiKeyKey = stringPreferencesKey("gemini_api_key")
 
     val allowlistedPackages: Flow<Set<String>> = context.dataStore.data.map { prefs ->
         prefs[allowlistKey] ?: emptySet()
+    }
+
+    /** Unset means: chosen if an older version already stored a real list, else not yet. */
+    val paymentAppsChosen: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[chosenKey] ?: !prefs[allowlistKey].isNullOrEmpty()
     }
 
     val darkModeEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[darkModeKey] ?: true
     }
 
-    /** When true and a Gemini API key is built in, use LLM parsing with regex fallback. */
-    val llmParsingEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[llmParsingKey] ?: true
+    /** Off by default. When on and a key exists, Gemini pre-fills waiting payments. */
+    val geminiPrefillEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[geminiPrefillKey] ?: false
+    }
+
+    /** The user's own key. Defaults to the build-time key from .env. Never log it. */
+    val geminiApiKey: Flow<String> = context.secretsDataStore.data.map { prefs ->
+        prefs[geminiApiKeyKey] ?: BuildConfig.GEMINI_API_KEY
     }
 
     suspend fun setDarkMode(enabled: Boolean) {
@@ -42,25 +59,23 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    suspend fun setLlmParsingEnabled(enabled: Boolean) {
+    suspend fun setGeminiPrefillEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs ->
-            prefs[llmParsingKey] = enabled
+            prefs[geminiPrefillKey] = enabled
         }
     }
 
-    suspend fun addPackage(packageName: String) {
-        val normalized = packageName.trim()
-        if (normalized.isEmpty()) return
-        context.dataStore.edit { prefs ->
-            val current = prefs[allowlistKey] ?: emptySet()
-            prefs[allowlistKey] = current + normalized
+    suspend fun setGeminiApiKey(key: String) {
+        context.secretsDataStore.edit { prefs ->
+            prefs[geminiApiKeyKey] = key.trim()
         }
     }
 
-    suspend fun removePackage(packageName: String) {
+    /** Writes the allowlist and marks the choice as made, so the picker stops opening by itself. */
+    suspend fun setPaymentApps(packages: Set<String>) {
         context.dataStore.edit { prefs ->
-            val current = prefs[allowlistKey] ?: emptySet()
-            prefs[allowlistKey] = current - packageName
+            prefs[allowlistKey] = packages
+            prefs[chosenKey] = true
         }
     }
 }

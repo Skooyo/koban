@@ -25,4 +25,19 @@ class MerchantNormalizerTest {
         assertNull(MerchantNormalizer.clean("  "))
         assertNull(MerchantNormalizer.clean(null))
     }
+
+    @Test
+    fun clean_stripsTrailingDate() {
+        assertEquals("KEDAI CONTOH", MerchantNormalizer.clean("KEDAI CONTOH 20/10/2026"))
+    }
+
+    @Test
+    fun clean_stripsDateAndTime() {
+        assertEquals("KEDAI CONTOH", MerchantNormalizer.clean("KEDAI CONTOH on 20 Oct 2026, 12:45"))
+    }
+
+    @Test
+    fun clean_keepsNumbersInName() {
+        assertEquals("99 SPEEDMART 1234", MerchantNormalizer.clean("99 SPEEDMART 1234"))
+    }
 }

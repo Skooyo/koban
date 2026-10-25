@@ -16,12 +16,23 @@ object MerchantNormalizer {
         Regex("""\s+ref(?:erence)?[\s.:#].*$""", RegexOption.IGNORE_CASE)
     )
 
+    private val months = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec"
+    /** Dates and times that banks append to the merchant. Digits inside a name stay. */
+    private val dateTime = listOf(
+        Regex("""[\s,]*\b\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]m)?\b""", RegexOption.IGNORE_CASE),
+        Regex("""(?:\s+on)?\s+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b""", RegexOption.IGNORE_CASE),
+        Regex("""(?:\s+on)?\s+\d{1,2}\s+(?:$months)[a-z]*\.?,?\s+\d{2,4}\b""", RegexOption.IGNORE_CASE)
+    )
+
     fun clean(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
         var value = raw.trim()
             .trim('"', '\'', '“', '”', '‘', '’')
             .trim()
 
+        for (pattern in dateTime) {
+            value = value.replace(pattern, "").trim()
+        }
         for (pattern in trailingJunk) {
             value = value.replace(pattern, "").trim()
         }

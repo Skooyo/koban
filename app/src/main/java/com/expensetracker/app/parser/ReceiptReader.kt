@@ -20,9 +20,11 @@ class ReceiptReader @Inject constructor(
     @ApplicationContext private val context: Context,
     private val geminiClient: GeminiClient
 ) {
+    suspend fun hasKey(): Boolean = geminiClient.isConfigured()
+
     /** Returns null if the model is not configured, the image is unreadable, or every model fails. */
     suspend fun read(imageUri: Uri): ReceiptDraft? = withContext(Dispatchers.IO) {
-        if (!geminiClient.isConfigured) return@withContext null
+        if (!geminiClient.isConfigured()) return@withContext null
         val jpeg = encodeJpeg(imageUri) ?: return@withContext null
         val parts = JSONArray()
             .put(

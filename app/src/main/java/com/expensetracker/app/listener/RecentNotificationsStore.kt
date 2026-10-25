@@ -58,10 +58,6 @@ object RecentNotificationsStore {
         items.toList()
     }
 
-    fun uniquePackages(): List<String> = synchronized(lock) {
-        items.map { it.packageName }.distinct().sorted()
-    }
-
     private fun publish() {
         val list = items.toList()
         _notifications.value = list

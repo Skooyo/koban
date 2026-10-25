@@ -183,7 +183,11 @@ class SplitEditorViewModel @Inject constructor(
                     it.copy(
                         step = SplitStep.Items,
                         items = emptyList(),
-                        message = "Couldn't read this receipt. Add the items by hand."
+                        message = if (receiptReader.hasKey()) {
+                            "Couldn't read this receipt. Add the items by hand."
+                        } else {
+                            "Receipt scanning needs a Gemini key. Add one in Settings."
+                        }
                     )
                 }
             } else {

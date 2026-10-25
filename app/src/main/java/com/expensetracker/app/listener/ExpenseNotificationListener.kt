@@ -3,13 +3,16 @@ package com.expensetracker.app.listener
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import com.expensetracker.app.data.ExpenseRepository
+import com.expensetracker.app.data.MerchantCategoryRepository
+import com.expensetracker.app.data.PendingPaymentRepository
 import com.expensetracker.app.data.SettingsRepository
 import com.expensetracker.app.di.NotificationListenerEntryPoint
 import com.expensetracker.app.parser.AmountFormatter
-import com.expensetracker.app.parser.ExpenseNotificationParser
-import com.expensetracker.app.parser.ExpenseParseResult
-import com.expensetracker.app.parser.ParseSource
+import com.expensetracker.app.parser.GeminiClient
+import com.expensetracker.app.parser.LlmParseResult
+import com.expensetracker.app.parser.MerchantNormalizer
+import com.expensetracker.app.parser.PaymentRules
+import com.expensetracker.app.parser.RuleMatch
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,13 +27,16 @@ class ExpenseNotificationListener : NotificationListenerService() {
     private val processingKeys = Collections.synchronizedSet(mutableSetOf<String>())
 
     @Volatile
-    private var expenseRepository: ExpenseRepository? = null
+    private var pendingPaymentRepository: PendingPaymentRepository? = null
 
     @Volatile
     private var settingsRepository: SettingsRepository? = null
 
     @Volatile
-    private var expenseNotificationParser: ExpenseNotificationParser? = null
+    private var geminiClient: GeminiClient? = null
+
+    @Volatile
+    private var merchantCategoryRepository: MerchantCategoryRepository? = null
 
     @Volatile
     private var listenerConnected = false
@@ -204,11 +210,10 @@ class ExpenseNotificationListener : NotificationListenerService() {
                 return
             }
             val settings = settingsRepository!!
-            val expenses = expenseRepository!!
-            val parser = expenseNotificationParser!!
+            val pending = pendingPaymentRepository!!
 
             val allowlist = settings.allowlistedPackages.first()
-            if (allowlist.isNotEmpty() && sbn.packageName !in allowlist) {
+            if (allowlist.isEmpty() || sbn.packageName !in allowlist) {
                 RecentNotificationsStore.update(
                     captureId,
                     NotificationDisposition.SKIPPED_ALLOWLIST,
@@ -217,43 +222,28 @@ class ExpenseNotificationListener : NotificationListenerService() {
                 return
             }
 
-            when (val parseResult = parser.parse(parseText)) {
-                is ExpenseParseResult.SkippedNotTransaction -> {
-                    val reason = parseResult.reason?.takeIf { it.isNotBlank() }
-                        ?: "Not a money transaction"
-                    RecentNotificationsStore.update(
-                        captureId,
-                        NotificationDisposition.SKIPPED_NOT_TRANSACTION,
-                        reason
-                    )
-                    return
-                }
-                ExpenseParseResult.NoAmount -> {
-                    RecentNotificationsStore.update(
-                        captureId,
-                        NotificationDisposition.SKIPPED_NO_AMOUNT,
-                        "No payment amount found in body"
-                    )
-                    return
-                }
-                is ExpenseParseResult.Success -> {
-                    val parsed = parseResult.expense
-                    val saved = expenses.saveFromNotification(
+            when (val match = PaymentRules.match(sbn.packageName, parseText)) {
+                RuleMatch.NoMatch -> RecentNotificationsStore.update(
+                    captureId,
+                    NotificationDisposition.SKIPPED_NO_RULE,
+                    "No rule matched this text"
+                )
+                is RuleMatch.Matched -> {
+                    val parsed = match.expense
+                    val id = pending.capture(
                         parsed = parsed,
+                        format = match.format,
                         rawText = parseText,
                         sourcePackage = sbn.packageName,
                         notificationPostTime = sbn.postTime,
                         notificationKey = sbn.key
                     )
-                    if (saved) {
-                        val via = when (parseResult.source) {
-                            ParseSource.LLM -> "via LLM"
-                            ParseSource.REGEX -> "via regex"
-                        }
+                    if (id != null) {
                         val summary =
-                            "${parsed.merchant ?: "Unknown"} · RM ${AmountFormatter.formatDisplay(parsed.amount)} · $via"
-                        RecentNotificationsStore.update(captureId, NotificationDisposition.SAVED, summary)
-                        NotificationAccessHelper.logDebug("Saved expense: $summary")
+                            "${parsed.merchant ?: "Unknown"} · RM ${AmountFormatter.formatDisplay(parsed.amount)}"
+                        RecentNotificationsStore.update(captureId, NotificationDisposition.WAITING, summary)
+                        NotificationAccessHelper.logDebug("Waiting for check: $summary")
+                        prefillWithGemini(id, parseText)
                     } else {
                         RecentNotificationsStore.update(
                             captureId,
@@ -270,6 +260,28 @@ class ExpenseNotificationListener : NotificationListenerService() {
                 e.message ?: "Save failed"
             )
             NotificationAccessHelper.logDebug("Failed to save notification: ${e.message}")
+        }
+    }
+
+    /** Optional enrich step. Any failure leaves the regex values as they are. */
+    private suspend fun prefillWithGemini(id: String, text: String) {
+        try {
+            val gemini = geminiClient ?: return
+            val memory = merchantCategoryRepository ?: return
+            if (!settingsRepository!!.geminiPrefillEnabled.first() || !gemini.isConfigured()) return
+            when (val result = gemini.parsePaymentNotification(text)) {
+                is LlmParseResult.Success -> {
+                    val merchant = MerchantNormalizer.clean(result.expense.merchant)
+                    pendingPaymentRepository!!.enrich(
+                        id, merchant, memory.categoryIdForMerchant(merchant), false
+                    )
+                }
+                is LlmParseResult.NotTransaction ->
+                    pendingPaymentRepository!!.enrich(id, null, null, true)
+                LlmParseResult.Failed -> Unit
+            }
+        } catch (e: Exception) {
+            NotificationAccessHelper.logDebug("Gemini pre-fill skipped: ${e.javaClass.simpleName}")
         }
     }
 
@@ -309,17 +321,19 @@ class ExpenseNotificationListener : NotificationListenerService() {
     }
 
     private fun ensureRepositories(): Boolean {
-        if (expenseRepository != null &&
+        if (pendingPaymentRepository != null &&
             settingsRepository != null &&
-            expenseNotificationParser != null
+            geminiClient != null &&
+            merchantCategoryRepository != null
         ) {
             return true
         }
 
         synchronized(initLock) {
-            if (expenseRepository != null &&
+            if (pendingPaymentRepository != null &&
                 settingsRepository != null &&
-                expenseNotificationParser != null
+                geminiClient != null &&
+                merchantCategoryRepository != null
             ) {
                 return true
             }
@@ -328,9 +342,10 @@ class ExpenseNotificationListener : NotificationListenerService() {
                     applicationContext,
                     NotificationListenerEntryPoint::class.java
                 )
-                expenseRepository = entryPoint.expenseRepository()
+                pendingPaymentRepository = entryPoint.pendingPaymentRepository()
                 settingsRepository = entryPoint.settingsRepository()
-                expenseNotificationParser = entryPoint.expenseNotificationParser()
+                geminiClient = entryPoint.geminiClient()
+                merchantCategoryRepository = entryPoint.merchantCategoryRepository()
                 true
             } catch (e: Exception) {
                 NotificationAccessHelper.logDebug("Failed to init repositories: ${e.message}")

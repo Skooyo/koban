@@ -46,7 +46,8 @@ object NotificationParser {
             currency = "MYR",
             merchant = merchant,
             confidence = confidence,
-            transactionType = transactionType
+            transactionType = transactionType,
+            directionClear = isDirectionClear(body)
         )
     }
 
@@ -58,6 +59,10 @@ object NotificationParser {
             else -> TransactionType.WITHDRAW
         }
     }
+
+    /** True when exactly one of a debit word or a credit word shows, so [detectTransactionType] is not a guess. */
+    fun isDirectionClear(text: String): Boolean =
+        creditKeywords.containsMatchIn(text) != debitKeywords.containsMatchIn(text)
 
     fun findAllAmounts(text: String): List<BigDecimal> {
         val matches = mutableListOf<BigDecimal>()

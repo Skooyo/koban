@@ -9,5 +9,7 @@ data class ParsedExpense(
     val currency: String,
     val merchant: String?,
     val confidence: ParseConfidence,
-    val transactionType: TransactionType = TransactionType.WITHDRAW
+    val transactionType: TransactionType = TransactionType.WITHDRAW,
+    /** False when the text shows no payment word, or both a debit and a credit word. */
+    val directionClear: Boolean = true
 )

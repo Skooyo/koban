@@ -38,7 +38,9 @@ class HomeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val expenseRepository: ExpenseRepository,
     private val categoryRepository: com.expensetracker.app.data.CategoryRepository,
-    private val activitySelection: ActivitySelection
+    private val activitySelection: ActivitySelection,
+    pendingPaymentRepository: com.expensetracker.app.data.PendingPaymentRepository,
+    settingsRepository: com.expensetracker.app.data.SettingsRepository
 ) : ViewModel() {
 
     private val accessGranted = MutableStateFlow(false)
@@ -64,6 +66,17 @@ class HomeViewModel @Inject constructor(
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
+
+    /** Waiting payments; Home shows a banner when there is one or more. */
+    val waitingCount: StateFlow<Int> = pendingPaymentRepository.observeCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    /** True once the user has chosen payment apps and chose none. */
+    val listensToNoApp: StateFlow<Boolean> = combine(
+        settingsRepository.paymentAppsChosen,
+        settingsRepository.allowlistedPackages
+    ) { chosen, list -> chosen && list.isEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     /** Called on every resume. */
     fun refreshAccessStatus() {

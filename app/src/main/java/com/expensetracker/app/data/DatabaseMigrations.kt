@@ -94,3 +94,17 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         db.execSQL("ALTER TABLE split_bills ADD COLUMN manual INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS pending_payments (id TEXT NOT NULL, amount TEXT NOT NULL, currency TEXT NOT NULL, merchant TEXT, transactionType TEXT NOT NULL, sourcePackage TEXT NOT NULL, rawNotificationText TEXT NOT NULL, notificationPostTime INTEGER NOT NULL, notificationKey TEXT, dedupKey TEXT NOT NULL, format TEXT NOT NULL, categoryId TEXT, likelyPromotion INTEGER NOT NULL, createdAt INTEGER NOT NULL, edited INTEGER NOT NULL, PRIMARY KEY(id))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_payments_notificationKey ON pending_payments (notificationKey)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS dropped_notifications (dedupKey TEXT NOT NULL, notificationKey TEXT, droppedAt INTEGER NOT NULL, PRIMARY KEY(dedupKey))")
+    }
+}
+
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE pending_payments ADD COLUMN directionUnclear INTEGER NOT NULL DEFAULT 0")
+    }
+}

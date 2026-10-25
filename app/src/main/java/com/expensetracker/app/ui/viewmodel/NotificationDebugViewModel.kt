@@ -25,7 +25,7 @@ import javax.inject.Inject
 enum class NotificationDebugFilter {
     ALL,
     POSTED_ONLY,
-    SAVED,
+    WAITING,
     SKIPPED
 }
 
@@ -43,11 +43,11 @@ data class NotificationDebugUiState(
             NotificationDebugFilter.POSTED_ONLY -> notifications.filter {
                 it.event == NotificationCaptureEvent.POSTED
             }
-            NotificationDebugFilter.SAVED -> notifications.filter {
-                it.disposition == NotificationDisposition.SAVED
+            NotificationDebugFilter.WAITING -> notifications.filter {
+                it.disposition == NotificationDisposition.WAITING
             }
             NotificationDebugFilter.SKIPPED -> notifications.filter {
-                it.disposition != NotificationDisposition.SAVED &&
+                it.disposition != NotificationDisposition.WAITING &&
                     it.disposition != NotificationDisposition.PENDING &&
                     it.disposition != NotificationDisposition.INFO_ONLY
             }

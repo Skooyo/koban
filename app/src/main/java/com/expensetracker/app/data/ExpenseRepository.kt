@@ -2,7 +2,6 @@ package com.expensetracker.app.data
 
 import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.DedupKeyGenerator
-import com.expensetracker.app.parser.ParsedExpense
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -28,10 +27,10 @@ class ExpenseRepository @Inject constructor(
         private const val RECENT_IN_PERIOD = 5
 
         /** How far either side of a notification the same amount counts as the same payment. */
-        private const val AMOUNT_DEDUP_WINDOW_MS = 5 * 60 * 1000L
+        const val AMOUNT_DEDUP_WINDOW_MS = 5 * 60 * 1000L
     }
 
-    /** Serialises dedup check + insert so racing notifications cannot both pass the check. */
+    /** Serialises dedup check + insert so two racing saves cannot both pass the check. */
     private val saveMutex = Mutex()
 
     fun observeAllActive(): Flow<List<ExpenseEntity>> = expenseDao.observeAllActive()
@@ -121,62 +120,73 @@ class ExpenseRepository @Inject constructor(
         }
     }
 
-    suspend fun saveFromNotification(
-        parsed: ParsedExpense,
-        rawText: String,
-        sourcePackage: String,
-        notificationPostTime: Long,
+    /**
+     * True when an expense already covers this payment: same notification, same dedup key
+     * near [postTime], or the same amount and direction within the amount window.
+     */
+    suspend fun hasExpenseFor(
+        amount: BigDecimal,
+        transactionType: TransactionType,
+        merchant: String?,
+        postTime: Long,
+        dedupKey: String,
         notificationKey: String?
     ): Boolean {
-        val dedupKey = DedupKeyGenerator.generate(
-            packageName = sourcePackage,
-            amount = parsed.amount,
-            merchant = parsed.merchant,
-            postTime = notificationPostTime
-        )
-        val amount = AmountFormatter.toMoney(parsed.amount)
+        if (notificationKey != null && expenseDao.findByNotificationKey(notificationKey) != null) return true
+        val lookback = postTime - DedupKeyGenerator.dedupLookbackMs()
+        if (expenseDao.findByDedupKeySince(dedupKey, lookback) != null) return true
+        return expenseDao.findByAmountInWindow(
+            amount = AmountFormatter.toMoney(amount),
+            transactionType = transactionType,
+            // Two transfers of one amount from different senders are not duplicates.
+            matchMerchant = transactionType == TransactionType.RECEIVE,
+            merchant = merchant,
+            windowStart = postTime - AMOUNT_DEDUP_WINDOW_MS,
+            windowEnd = postTime + AMOUNT_DEDUP_WINDOW_MS
+        ) != null
+    }
+
+    /** Saves a waiting payment the owner confirmed, with the card's values. False when it already exists. */
+    suspend fun saveConfirmed(payment: PendingPaymentEntity): Boolean {
+        val amount = AmountFormatter.toMoney(payment.amount)
 
         return saveMutex.withLock {
-            if (notificationKey != null) {
-                val sameNotification = expenseDao.findByNotificationKey(notificationKey)
-                if (sameNotification != null) return@withLock false
-            }
-
-            val lookback = System.currentTimeMillis() - DedupKeyGenerator.dedupLookbackMs()
-            val existing = expenseDao.findByDedupKeySince(dedupKey, lookback)
-            if (existing != null) return@withLock false
-
-            val sameAmountNearby = expenseDao.findByAmountInWindow(
+            val duplicate = hasExpenseFor(
                 amount = amount,
-                transactionType = parsed.transactionType,
-                // Two transfers of one amount from different senders are not duplicates.
-                matchMerchant = parsed.transactionType == TransactionType.RECEIVE,
-                merchant = parsed.merchant,
-                windowStart = notificationPostTime - AMOUNT_DEDUP_WINDOW_MS,
-                windowEnd = notificationPostTime + AMOUNT_DEDUP_WINDOW_MS
+                transactionType = payment.transactionType,
+                merchant = payment.merchant,
+                postTime = payment.notificationPostTime,
+                dedupKey = payment.dedupKey,
+                notificationKey = payment.notificationKey
             )
-            if (sameAmountNearby != null) return@withLock false
+            if (duplicate) return@withLock false
 
-            val categoryId = merchantCategoryRepository.categoryIdForMerchant(parsed.merchant)
+            // The card's category wins over the merchant memory.
+            val categoryId = payment.categoryId
+                ?: merchantCategoryRepository.categoryIdForMerchant(payment.merchant)
 
             val entity = ExpenseEntity(
                 id = UUID.randomUUID().toString(),
                 amount = amount,
-                currency = parsed.currency,
-                merchant = parsed.merchant,
-                rawNotificationText = rawText,
-                sourcePackage = sourcePackage,
-                notificationPostTime = notificationPostTime,
+                currency = payment.currency,
+                merchant = payment.merchant,
+                rawNotificationText = payment.rawNotificationText,
+                sourcePackage = payment.sourcePackage,
+                notificationPostTime = payment.notificationPostTime,
                 createdAt = System.currentTimeMillis(),
-                dedupKey = dedupKey,
-                status = ExpenseStatus.AUTO_SAVED,
-                confidence = parsed.confidence,
-                notificationKey = notificationKey,
+                dedupKey = payment.dedupKey,
+                status = if (payment.edited) ExpenseStatus.EDITED else ExpenseStatus.AUTO_SAVED,
+                // The owner checked this payment.
+                confidence = ParseConfidence.HIGH,
+                notificationKey = payment.notificationKey,
                 categoryId = categoryId,
                 notes = null,
-                transactionType = parsed.transactionType
+                transactionType = payment.transactionType
             )
             val inserted = expenseDao.insert(entity) != -1L
+            if (inserted && payment.edited) {
+                merchantCategoryRepository.saveMapping(payment.merchant, categoryId)
+            }
             if (inserted && entity.transactionType == TransactionType.RECEIVE) {
                 try {
                     splitRepository.suggestRepayment(entity)
