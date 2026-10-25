@@ -34,7 +34,9 @@ data class OpenDebtView(
     val personName: String,
     val billMerchant: String?,
     val billTime: Long,
-    val suggestedRepayment: ExpenseEntity?
+    val suggestedRepayment: ExpenseEntity?,
+    /** Added by hand on the person's page, so it opens an edit form, not the split editor. */
+    val manual: Boolean = false
 )
 
 @Singleton
@@ -62,7 +64,8 @@ class SplitRepository @Inject constructor(
                     personName = row.personName,
                     billMerchant = row.merchant,
                     billTime = row.billTime,
-                    suggestedRepayment = debt.suggestedRepaymentExpenseId?.let { expenseDao.getById(it) }
+                    suggestedRepayment = debt.suggestedRepaymentExpenseId?.let { expenseDao.getById(it) },
+                    manual = row.manual
                 )
             }
         }

@@ -170,6 +170,77 @@ class PeopleRepository @Inject constructor(
         }
     }
 
+    /**
+     * Adds money [personId] owes the owner without a bill, for example cash lent. It is stored as a
+     * manual split bill with one debt, so repayment matching, Mark paid and Settle up treat it like any debt.
+     */
+    suspend fun addOwedToMe(personId: String, description: String, amount: BigDecimal, itemDate: Long) {
+        validateOwedItem(description, amount)
+        db.withTransaction {
+            val now = System.currentTimeMillis()
+            val billId = UUID.randomUUID().toString()
+            splitDao.insertBill(
+                SplitBillEntity(
+                    id = billId,
+                    merchant = description.trim(),
+                    billTime = itemDate,
+                    currency = "MYR",
+                    printedTotal = null,
+                    serviceCharge = BigDecimal.ZERO,
+                    tax = BigDecimal.ZERO,
+                    discount = BigDecimal.ZERO,
+                    rounding = BigDecimal.ZERO,
+                    linkedExpenseId = null,
+                    createdAt = now,
+                    manual = true
+                )
+            )
+            splitDao.insertDebts(
+                listOf(
+                    SplitDebtEntity(
+                        id = UUID.randomUUID().toString(),
+                        billId = billId,
+                        personId = personId,
+                        amount = AmountFormatter.toMoney(amount),
+                        status = DebtStatus.OPEN,
+                        repaymentExpenseId = null,
+                        suggestedRepaymentExpenseId = null,
+                        paidAt = null
+                    )
+                )
+            )
+            splitRepository.clearSettleSuggestion(personId)
+        }
+    }
+
+    /** Edits an open hand-added debt. A pending repayment suggestion that includes it is dropped. */
+    suspend fun updateOwedToMe(debtId: String, description: String, amount: BigDecimal, itemDate: Long) {
+        validateOwedItem(description, amount)
+        db.withTransaction {
+            val (debt, bill) = openManualDebt(debtId) ?: return@withTransaction
+            splitDao.insertBill(bill.copy(merchant = description.trim(), billTime = itemDate))
+            debt.suggestedRepaymentExpenseId?.let { stale ->
+                splitDao.getOpenDebts().filter { it.suggestedRepaymentExpenseId == stale }
+                    .forEach { splitDao.updateDebt(it.copy(suggestedRepaymentExpenseId = null)) }
+            }
+            splitDao.updateDebt(
+                debt.copy(amount = AmountFormatter.toMoney(amount), suggestedRepaymentExpenseId = null)
+            )
+            splitRepository.clearSettleSuggestion(debt.personId)
+        }
+    }
+
+    suspend fun deleteOwedToMe(debtId: String) {
+        val billId = db.withTransaction { openManualDebt(debtId)?.second?.id } ?: return
+        splitRepository.deleteSplit(billId)
+    }
+
+    private suspend fun openManualDebt(debtId: String): Pair<SplitDebtEntity, SplitBillEntity>? {
+        val debt = splitDao.getDebt(debtId) ?: return null
+        val bill = splitDao.getBill(debt.billId) ?: return null
+        return if (bill.manual && debt.status == DebtStatus.OPEN) debt to bill else null
+    }
+
     suspend fun settleUp(personId: String) {
         db.withTransaction { settle(personId, null) }
     }

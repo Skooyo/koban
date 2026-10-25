@@ -20,7 +20,9 @@ data class SplitBillEntity(
     val discount: BigDecimal,
     val rounding: BigDecimal,
     val linkedExpenseId: String?,
-    val createdAt: Long
+    val createdAt: Long,
+    /** True for a debt added by hand on a person's page: no receipt, no items, hidden from past splits. */
+    @ColumnInfo(defaultValue = "0") val manual: Boolean = false
 )
 
 @Entity(tableName = "split_items", indices = [Index("billId")])

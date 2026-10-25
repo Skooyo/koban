@@ -21,7 +21,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.data.ExpenseEntity
-import com.expensetracker.app.data.OwedItemEntity
 import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.ui.components.PastDatePickerDialog
 import com.expensetracker.app.ui.viewmodel.DebtPayment
@@ -90,25 +89,28 @@ internal fun RenameDialog(name: String, onDismiss: () -> Unit, onSave: suspend (
     )
 }
 
-/** Add (when [item] is null) or edit one thing the owner owes. */
+/** Add (when [amount] is null) or edit one hand-entered amount, owed either way. */
 @Composable
 internal fun OwedItemDialog(
-    item: OwedItemEntity?,
+    title: String,
     onDismiss: () -> Unit,
     onSave: suspend (description: String, amount: BigDecimal, itemDate: Long) -> Unit,
-    onDelete: (() -> Unit)?
+    onDelete: (() -> Unit)?,
+    description: String = "",
+    amount: BigDecimal? = null,
+    itemDate: Long? = null
 ) {
     val scope = rememberCoroutineScope()
-    var description by remember { mutableStateOf(item?.description.orEmpty()) }
-    var amountText by remember { mutableStateOf(item?.amount?.let(AmountFormatter::formatDisplay).orEmpty()) }
-    var itemDate by remember { mutableStateOf(item?.itemDate ?: System.currentTimeMillis()) }
+    var description by remember { mutableStateOf(description) }
+    var amountText by remember { mutableStateOf(amount?.let(AmountFormatter::formatDisplay).orEmpty()) }
+    var itemDate by remember { mutableStateOf(itemDate ?: System.currentTimeMillis()) }
     var pickingDate by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (item == null) "Add what I owe" else "Edit what I owe") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -201,11 +203,11 @@ internal fun DeletePersonDialog(name: String, onConfirm: () -> Unit, onDismiss: 
 }
 
 @Composable
-internal fun DeleteOwedItemDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+internal fun DeleteOwedItemDialog(text: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Delete this item?") },
-        text = { Text("This removes what you owe for it.") },
+        text = { Text(text) },
         confirmButton = {
             TextButton(onClick = onConfirm) { Text("Delete", color = MaterialTheme.colorScheme.error) }
         },

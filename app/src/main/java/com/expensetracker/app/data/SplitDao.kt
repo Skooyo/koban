@@ -16,12 +16,13 @@ data class OpenDebtRow(
     val personName: String,
     val merchant: String?,
     val billTime: Long,
-    val amount: BigDecimal
+    val amount: BigDecimal,
+    val manual: Boolean
 )
 
 @Dao
 interface SplitDao {
-    @Query("SELECT * FROM split_bills ORDER BY billTime DESC")
+    @Query("SELECT * FROM split_bills WHERE manual = 0 ORDER BY billTime DESC")
     fun observeBills(): Flow<List<SplitBillEntity>>
 
     @Query("SELECT * FROM split_bills WHERE id = :billId")
@@ -55,7 +56,7 @@ interface SplitDao {
         """
         SELECT d.id AS debtId, d.billId AS billId, d.personId AS personId,
                p.name AS personName, b.merchant AS merchant, b.billTime AS billTime,
-               d.amount AS amount
+               d.amount AS amount, b.manual AS manual
         FROM split_debts d
         JOIN split_people p ON p.id = d.personId
         JOIN split_bills b ON b.id = d.billId
@@ -85,20 +86,6 @@ interface SplitDao {
 
     @Query("SELECT * FROM split_people WHERE id = :id")
     fun observePerson(id: String): Flow<SplitPersonEntity?>
-
-    @Query(
-        """
-        SELECT d.id AS debtId, d.billId AS billId, d.personId AS personId,
-               p.name AS personName, b.merchant AS merchant, b.billTime AS billTime,
-               d.amount AS amount
-        FROM split_debts d
-        JOIN split_people p ON p.id = d.personId
-        JOIN split_bills b ON b.id = d.billId
-        WHERE d.status = 'OPEN' AND d.personId = :personId
-        ORDER BY b.billTime ASC
-        """
-    )
-    fun observeOpenDebtsFor(personId: String): Flow<List<OpenDebtRow>>
 
     @Query("SELECT * FROM split_debts WHERE status = 'OPEN' AND personId = :personId")
     suspend fun getOpenDebtsFor(personId: String): List<SplitDebtEntity>

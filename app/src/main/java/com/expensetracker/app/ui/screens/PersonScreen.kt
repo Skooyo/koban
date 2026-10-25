@@ -96,7 +96,7 @@ private fun decodeQr(path: String): ImageBitmap? {
 /** A finished QR load; [bitmap] is null when the file can't be read. */
 private class QrLoad(val bitmap: ImageBitmap?)
 
-private enum class Dialog { RENAME, DELETE, SETTLE, ADD_ITEM }
+private enum class Dialog { RENAME, DELETE, SETTLE, ADD_ITEM, ADD_OWED_TO_ME }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +116,8 @@ fun PersonScreen(
     var dialog by remember { mutableStateOf<Dialog?>(null) }
     var editing by remember { mutableStateOf<OwedItemEntity?>(null) }
     var deletingItem by remember { mutableStateOf<OwedItemEntity?>(null) }
+    var editingDebt by remember { mutableStateOf<OpenDebtView?>(null) }
+    var deletingDebt by remember { mutableStateOf<OpenDebtView?>(null) }
 
     LaunchedEffect(gone) { if (gone) onBack() }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
@@ -198,7 +200,8 @@ fun PersonScreen(
             onSettleUp = { dialog = Dialog.SETTLE },
             onConfirmSettle = viewModel::confirmSettle,
             onDismissSettle = viewModel::dismissSettle,
-            onOpenSplit = onOpenSplit,
+            onOpenDebt = { view -> if (view.manual) editingDebt = view else onOpenSplit(view.debt.billId) },
+            onAddOwedToMe = { dialog = Dialog.ADD_OWED_TO_ME },
             onMarkDebtPaid = viewModel::startPaying,
             onConfirmDebt = viewModel::confirmDebtSuggestion,
             onDismissDebt = viewModel::dismissDebtSuggestion,
@@ -227,16 +230,51 @@ fun PersonScreen(
             }
         )
         Dialog.ADD_ITEM -> OwedItemDialog(
-            item = null,
+            title = "Add what I owe",
             onDismiss = { dialog = null },
             onSave = viewModel::addItem,
             onDelete = null
         )
+        Dialog.ADD_OWED_TO_ME -> OwedItemDialog(
+            title = "Add what $name owes me",
+            onDismiss = { dialog = null },
+            onSave = viewModel::addOwedToMe,
+            onDelete = null
+        )
         null -> Unit
+    }
+    editingDebt?.let { view ->
+        OwedItemDialog(
+            title = "Edit what $name owes me",
+            description = view.billMerchant.orEmpty(),
+            amount = view.debt.amount,
+            itemDate = view.billTime,
+            onDismiss = { editingDebt = null },
+            onSave = { description, amount, itemDate ->
+                viewModel.updateOwedToMe(view.debt.id, description, amount, itemDate)
+            },
+            onDelete = {
+                editingDebt = null
+                deletingDebt = view
+            }
+        )
+    }
+    deletingDebt?.let { view ->
+        DeleteOwedItemDialog(
+            text = "This removes what $name owes you for it.",
+            onDismiss = { deletingDebt = null },
+            onConfirm = {
+                deletingDebt = null
+                viewModel.deleteOwedToMe(view.debt.id)
+            }
+        )
     }
     editing?.let { item ->
         OwedItemDialog(
-            item = item,
+            title = "Edit what I owe",
+            description = item.description,
+            amount = item.amount,
+            itemDate = item.itemDate,
             onDismiss = { editing = null },
             onSave = { description, amount, itemDate ->
                 viewModel.updateItem(item.copy(description = description, amount = amount, itemDate = itemDate))
@@ -249,6 +287,7 @@ fun PersonScreen(
     }
     deletingItem?.let { item ->
         DeleteOwedItemDialog(
+            text = "This removes what you owe for it.",
             onDismiss = { deletingItem = null },
             onConfirm = {
                 deletingItem = null
@@ -271,7 +310,8 @@ private fun PersonContent(
     onSettleUp: () -> Unit,
     onConfirmSettle: () -> Unit,
     onDismissSettle: () -> Unit,
-    onOpenSplit: (String) -> Unit,
+    onOpenDebt: (OpenDebtView) -> Unit,
+    onAddOwedToMe: () -> Unit,
     onMarkDebtPaid: (OpenDebtView) -> Unit,
     onConfirmDebt: (String) -> Unit,
     onDismissDebt: (String) -> Unit,
@@ -363,17 +403,18 @@ private fun PersonContent(
                 }
             }
         }
-        if (detail.owedToMe.isNotEmpty()) {
-            item { SectionTitle("$name owes you") }
-            items(detail.owedToMe, key = { "debt-${it.debt.id}" }) { view ->
-                DebtRow(
-                    view = view,
-                    onOpenSplit = { onOpenSplit(view.debt.billId) },
-                    onMarkPaid = { onMarkDebtPaid(view) },
-                    onConfirm = { onConfirmDebt(view.debt.id) },
-                    onDismiss = { onDismissDebt(view.debt.id) }
-                )
-            }
+        item { SectionTitle("$name owes you") }
+        items(detail.owedToMe, key = { "debt-${it.debt.id}" }) { view ->
+            DebtRow(
+                view = view,
+                onOpen = { onOpenDebt(view) },
+                onMarkPaid = { onMarkDebtPaid(view) },
+                onConfirm = { onConfirmDebt(view.debt.id) },
+                onDismiss = { onDismissDebt(view.debt.id) }
+            )
+        }
+        item {
+            TextButton(onClick = onAddOwedToMe) { Text("+ Add what $name owes me") }
         }
         item { SectionTitle("You owe $name") }
         items(detail.iOwe, key = { "item-${it.id}" }) { item ->
@@ -444,7 +485,7 @@ private fun SectionTitle(text: String) {
 @Composable
 private fun DebtRow(
     view: OpenDebtView,
-    onOpenSplit: () -> Unit,
+    onOpen: () -> Unit,
     onMarkPaid: () -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
@@ -455,7 +496,7 @@ private fun DebtRow(
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = 56.dp)
-                    .clickable(onClickLabel = "Open split", role = Role.Button, onClick = onOpenSplit)
+                    .clickable(onClickLabel = if (view.manual) "Edit" else "Open split", role = Role.Button, onClick = onOpen)
                     .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.Center
             ) {

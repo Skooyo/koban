@@ -16,7 +16,7 @@ import androidx.room.TypeConverters
         SplitDebtEntity::class,
         OwedItemEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(

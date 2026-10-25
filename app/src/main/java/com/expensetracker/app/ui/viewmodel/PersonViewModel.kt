@@ -74,6 +74,14 @@ class PersonViewModel @Inject constructor(
 
     fun markItemPaid(id: String) = run { peopleRepository.markOwedItemPaid(id) }
 
+    suspend fun addOwedToMe(description: String, amount: BigDecimal, itemDate: Long) =
+        peopleRepository.addOwedToMe(personId, description, amount, itemDate)
+
+    suspend fun updateOwedToMe(debtId: String, description: String, amount: BigDecimal, itemDate: Long) =
+        peopleRepository.updateOwedToMe(debtId, description, amount, itemDate)
+
+    fun deleteOwedToMe(debtId: String) = run { peopleRepository.deleteOwedToMe(debtId) }
+
     fun delete() = run { peopleRepository.archivePerson(personId) }
 
     fun setQr(uri: Uri) = run {
