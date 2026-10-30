@@ -31,3 +31,9 @@ Thumbs.db
 # Local agent worktrees and scratch
 .claude/worktrees/
 .superpowers/
+
+# Local phone database backups (real personal data)
+backups/
+
+# Launch video build files
+brag-output/

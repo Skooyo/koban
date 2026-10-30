@@ -36,11 +36,11 @@ Home · Activity · People · Settings
 
 ## Demo
 
-A 21-second demo with sound: a payment notification becomes an expense, spending by category, a bill split from a receipt photo, and a repayment confirmed. Click the image to play it. The video and screenshots are from before the swipe screen, when payments were saved without a check.
+A 37-second demo with sound: regex reads a payment notification, you swipe right to save it and left to drop a promotion, then spending by month or week, a cash payment on a number pad, a bill split from a receipt photo, and who owes you. Click the image to play it. The swipe screen is redrawn from the app's Compose code; the other screens are real app recordings. All data is made up.
 
 [![Koban demo video](docs/demo/koban-demo.jpg)](docs/demo/koban-demo.mp4)
 
-Home, Expenses and History in dark mode (the default) and light mode. All merchants and amounts are sample data.
+Home, Expenses and History in dark mode (the default) and light mode, from before the three-tab layout and the swipe screen. All merchants and amounts are sample data.
 
 ![Home, Expenses and History screens in dark mode](docs/screenshots/screens-dark.png)
 
