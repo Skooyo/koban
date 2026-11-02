@@ -36,7 +36,7 @@ Home · Activity · People · Settings
 
 ## Demo
 
-A 37-second demo with sound: regex reads a payment notification, you swipe right to save it and left to drop a promotion, then spending by month or week, a cash payment on a number pad, a bill split from a receipt photo, and who owes you. Click the image to play it. The swipe screen is redrawn from the app's Compose code; the other screens are real app recordings. All data is made up.
+A 37-second demo with sound: regex reads a payment notification, you swipe right to save it and left to drop a promotion, then spending by month or week, a cash payment on a number pad, a bill split from a receipt photo that the phone reads and checks against the printed total, and who owes you. Click the image to play it. The swipe screen is redrawn from the app's Compose code; the other screens are real app recordings. All data is made up.
 
 [![Koban demo video](docs/demo/koban-demo.jpg)](docs/demo/koban-demo.mp4)
 
