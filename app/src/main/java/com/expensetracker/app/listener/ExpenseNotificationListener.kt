@@ -41,12 +41,19 @@ class ExpenseNotificationListener : NotificationListenerService() {
     @Volatile
     private var listenerConnected = false
 
+    /** The allowlist. Null until it loads; until then the log shows all apps. */
+    @Volatile
+    private var watchedPackages: Set<String>? = null
+
     private val initLock = Any()
 
     override fun onCreate() {
         super.onCreate()
         NotificationListenerBridge.register(this)
         ensureRepositories()
+        scope.launch {
+            if (ensureRepositories()) settingsRepository!!.allowlistedPackages.collect { watchedPackages = it }
+        }
         NotificationAccessHelper.logDebug("Notification listener created")
     }
 
@@ -316,7 +323,8 @@ class ExpenseNotificationListener : NotificationListenerService() {
             disposition = disposition,
             detail = detail
         )
-        RecentNotificationsStore.add(captured)
+        // Only watched apps go in the log, so other apps do not push payments out of its 200 rows.
+        if (watchedPackages?.contains(sbn.packageName) != false) RecentNotificationsStore.add(captured)
         return captured.id
     }
 
