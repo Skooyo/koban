@@ -12,7 +12,7 @@ Android app that tracks spending by reading bank and wallet payment notification
 
 Koban listens to payment alerts from the banking and e-wallet apps you pick. Regex rules read the amount, merchant and direction, and the payment waits on a swipe screen: swipe right to save it, swipe left to drop it. Nothing counts in your totals until you say yes. You get day / week / month spending with categories, bill splits from a receipt photo, and a list of who owes you — without typing every purchase by hand.
 
-It is built for Malaysian Ringgit notifications (`RM` / `MYR`). Maybank and Touch 'n Go have exact rules; other apps use a generic rule. The default build makes no network call to read a notification. [Google AI Studio](https://aistudio.google.com/) Receipt photos are read on the phone with ML Kit, offline. Gemini is optional: it only pre-fills cards.
+It is built for Malaysian Ringgit notifications (`RM` / `MYR`). Maybank and Touch 'n Go have exact rules; other apps use a generic rule. The default build makes no network call to read a notification. Receipt photos are read on the phone with ML Kit, offline. [Google AI Studio](https://aistudio.google.com/) Gemini is optional: it only pre-fills cards.
 
 ```text
 Bank / wallet notification (apps you picked)
