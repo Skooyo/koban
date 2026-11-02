@@ -121,15 +121,20 @@ interface ExpenseDao {
         windowEnd: Long
     ): ExpenseEntity?
 
+    /**
+     * The same notification read again. Some apps (Touch 'n Go) reuse one key for every
+     * payment, so the post time must match too.
+     */
     @Query(
         """
         SELECT * FROM expenses
         WHERE notificationKey = :notificationKey
+        AND notificationPostTime = :postTime
         AND status != 'DISMISSED'
         LIMIT 1
         """
     )
-    suspend fun findByNotificationKey(notificationKey: String): ExpenseEntity?
+    suspend fun findByNotificationKey(notificationKey: String, postTime: Long): ExpenseEntity?
 
     /** Active rows of one type since [since] that no split has adjusted yet, newest first. */
     @Query(

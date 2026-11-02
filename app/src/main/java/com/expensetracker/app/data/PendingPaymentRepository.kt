@@ -38,6 +38,9 @@ class PendingPaymentRepository @Inject constructor(
         private const val TAG = "PendingPaymentRepo"
         private const val HOLD_MS = 4000L
         private const val DROP_MARKER_TTL_MS = 30L * 24 * 60 * 60 * 1000
+
+        /** Some apps reuse one notification key for every payment, so a drop marker keys on the post time too. */
+        private fun dropKey(notificationKey: String?, postTime: Long) = notificationKey?.let { "$it@$postTime" }
     }
 
     private class Held(val id: String, val save: Boolean, val job: Job)
@@ -82,7 +85,7 @@ class PendingPaymentRepository @Inject constructor(
                 notificationKey = notificationKey
             )
             if (isExpense) return@withLock null
-            if (dao.findByKeys(dedupKey, notificationKey) != null) return@withLock null
+            if (dao.findByKeys(dedupKey, notificationKey, notificationPostTime) != null) return@withLock null
             val sameAmountWaiting = dao.findByAmountInWindow(
                 amount = amount,
                 transactionType = parsed.transactionType,
@@ -92,7 +95,7 @@ class PendingPaymentRepository @Inject constructor(
                 windowEnd = notificationPostTime + ExpenseRepository.AMOUNT_DEDUP_WINDOW_MS
             )
             if (sameAmountWaiting != null) return@withLock null
-            if (dao.findDropped(dedupKey, notificationKey) != null) return@withLock null
+            if (dao.findDropped(dedupKey, dropKey(notificationKey, notificationPostTime)) != null) return@withLock null
 
             val id = UUID.randomUUID().toString()
             dao.insert(
@@ -211,7 +214,7 @@ class PendingPaymentRepository @Inject constructor(
                         dao.insertDropped(
                             DroppedNotificationEntity(
                                 dedupKey = payment.dedupKey,
-                                notificationKey = payment.notificationKey,
+                                notificationKey = dropKey(payment.notificationKey, payment.notificationPostTime),
                                 droppedAt = System.currentTimeMillis()
                             )
                         )

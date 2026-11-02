@@ -132,7 +132,7 @@ class ExpenseRepository @Inject constructor(
         dedupKey: String,
         notificationKey: String?
     ): Boolean {
-        if (notificationKey != null && expenseDao.findByNotificationKey(notificationKey) != null) return true
+        if (notificationKey != null && expenseDao.findByNotificationKey(notificationKey, postTime) != null) return true
         val lookback = postTime - DedupKeyGenerator.dedupLookbackMs()
         if (expenseDao.findByDedupKeySince(dedupKey, lookback) != null) return true
         return expenseDao.findByAmountInWindow(

@@ -61,11 +61,15 @@ interface PendingPaymentDao {
     @Query("DELETE FROM pending_payments WHERE id = :id")
     suspend fun deleteById(id: String)
 
-    /** A null [notificationKey] matches nothing, because NULL = NULL is not true in SQL. */
+    /**
+     * A null [notificationKey] matches nothing, because NULL = NULL is not true in SQL.
+     * The key matches only with the same post time: some apps reuse one key for every payment.
+     */
     @Query(
-        "SELECT * FROM pending_payments WHERE dedupKey = :dedupKey OR notificationKey = :notificationKey LIMIT 1"
+        "SELECT * FROM pending_payments WHERE dedupKey = :dedupKey " +
+            "OR (notificationKey = :notificationKey AND notificationPostTime = :postTime) LIMIT 1"
     )
-    suspend fun findByKeys(dedupKey: String, notificationKey: String?): PendingPaymentEntity?
+    suspend fun findByKeys(dedupKey: String, notificationKey: String?, postTime: Long): PendingPaymentEntity?
 
     /** Same rule as [ExpenseDao.findByAmountInWindow], so one payment told by two apps is one card. */
     @Query(
