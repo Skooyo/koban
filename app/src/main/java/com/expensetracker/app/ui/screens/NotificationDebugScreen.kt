@@ -164,7 +164,7 @@ fun NotificationDebugScreen(
                     count = uiState.filteredNotifications.size,
                     key = { index -> uiState.filteredNotifications[index].id }
                 ) { index ->
-                    CapturedNotificationCard(uiState.filteredNotifications[index])
+                    CapturedNotificationCard(uiState.filteredNotifications[index], viewModel::markAsPayment)
                 }
             }
         }
@@ -227,7 +227,10 @@ private fun StatusCard(
 }
 
 @Composable
-private fun CapturedNotificationCard(notification: CapturedNotification) {
+private fun CapturedNotificationCard(
+    notification: CapturedNotification,
+    onMarkAsPayment: (CapturedNotification) -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -277,6 +280,14 @@ private fun CapturedNotificationCard(notification: CapturedNotification) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // Any logged notification the app did not turn into a card: skipped, missed or only seen in the tray.
+            if (notification.disposition != NotificationDisposition.WAITING &&
+                notification.disposition != NotificationDisposition.PENDING
+            ) {
+                OutlinedButton(onClick = { onMarkAsPayment(notification) }) {
+                    Text("Add as payment")
+                }
+            }
         }
     }
 }

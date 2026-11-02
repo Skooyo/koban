@@ -5,6 +5,8 @@ import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.CaptureFormat
 import com.expensetracker.app.parser.DedupKeyGenerator
 import com.expensetracker.app.parser.ParsedExpense
+import com.expensetracker.app.parser.PaymentRules
+import com.expensetracker.app.parser.RuleMatch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -97,29 +99,59 @@ class PendingPaymentRepository @Inject constructor(
             if (sameAmountWaiting != null) return@withLock null
             if (dao.findDropped(dedupKey, dropKey(notificationKey, notificationPostTime)) != null) return@withLock null
 
-            val id = UUID.randomUUID().toString()
-            dao.insert(
-                PendingPaymentEntity(
-                    id = id,
-                    amount = amount,
-                    currency = parsed.currency,
-                    merchant = parsed.merchant,
-                    transactionType = parsed.transactionType,
-                    sourcePackage = sourcePackage,
-                    rawNotificationText = rawText,
-                    notificationPostTime = notificationPostTime,
-                    notificationKey = notificationKey,
-                    dedupKey = dedupKey,
-                    format = format,
-                    categoryId = null,
-                    likelyPromotion = false,
-                    createdAt = now,
-                    edited = false,
-                    directionUnclear = !parsed.directionClear
-                )
-            )
-            id
+            insertCard(parsed, format, rawText, sourcePackage, notificationPostTime, notificationKey, dedupKey, now)
         }
+    }
+
+    /**
+     * Makes a card for a logged notification the app skipped or missed, when the owner says it is a
+     * real payment. No duplicate check applies, now or on save. False when the text has no amount.
+     */
+    suspend fun forceCapture(sourcePackage: String, rawText: String, notificationPostTime: Long): Boolean {
+        val match = PaymentRules.match(sourcePackage, rawText) as? RuleMatch.Matched ?: return false
+        mutex.withLock {
+            insertCard(
+                match.expense, match.format, rawText, sourcePackage, notificationPostTime,
+                notificationKey = null,
+                dedupKey = ExpenseRepository.FORCED_DEDUP_PREFIX + UUID.randomUUID(),
+                now = System.currentTimeMillis()
+            )
+        }
+        return true
+    }
+
+    private suspend fun insertCard(
+        parsed: ParsedExpense,
+        format: CaptureFormat,
+        rawText: String,
+        sourcePackage: String,
+        notificationPostTime: Long,
+        notificationKey: String?,
+        dedupKey: String,
+        now: Long
+    ): String {
+        val id = UUID.randomUUID().toString()
+        dao.insert(
+            PendingPaymentEntity(
+                id = id,
+                amount = AmountFormatter.toMoney(parsed.amount),
+                currency = parsed.currency,
+                merchant = parsed.merchant,
+                transactionType = parsed.transactionType,
+                sourcePackage = sourcePackage,
+                rawNotificationText = rawText,
+                notificationPostTime = notificationPostTime,
+                notificationKey = notificationKey,
+                dedupKey = dedupKey,
+                format = format,
+                categoryId = null,
+                likelyPromotion = false,
+                createdAt = now,
+                edited = false,
+                directionUnclear = !parsed.directionClear
+            )
+        )
+        return id
     }
 
     /** Waiting payments, oldest first, without the held one. */
@@ -134,9 +166,14 @@ class PendingPaymentRepository @Inject constructor(
         dao.update(
             payment.copy(
                 amount = amount,
-                dedupKey = DedupKeyGenerator.generate(
-                    payment.sourcePackage, amount, payment.merchant, payment.notificationPostTime
-                ),
+                // A forced card keeps its key, so an edit does not bring the duplicate check back.
+                dedupKey = if (payment.dedupKey.startsWith(ExpenseRepository.FORCED_DEDUP_PREFIX)) {
+                    payment.dedupKey
+                } else {
+                    DedupKeyGenerator.generate(
+                        payment.sourcePackage, amount, payment.merchant, payment.notificationPostTime
+                    )
+                },
                 edited = true
             )
         )

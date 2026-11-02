@@ -28,6 +28,9 @@ class ExpenseRepository @Inject constructor(
 
         /** How far either side of a notification the same amount counts as the same payment. */
         const val AMOUNT_DEDUP_WINDOW_MS = 5 * 60 * 1000L
+
+        /** Dedup key start of a card the owner marked as a real payment: no duplicate check applies. */
+        const val FORCED_DEDUP_PREFIX = "forced:"
     }
 
     /** Serialises dedup check + insert so two racing saves cannot both pass the check. */
@@ -151,7 +154,7 @@ class ExpenseRepository @Inject constructor(
         val amount = AmountFormatter.toMoney(payment.amount)
 
         return saveMutex.withLock {
-            val duplicate = hasExpenseFor(
+            val duplicate = !payment.dedupKey.startsWith(FORCED_DEDUP_PREFIX) && hasExpenseFor(
                 amount = amount,
                 transactionType = payment.transactionType,
                 merchant = payment.merchant,

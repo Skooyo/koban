@@ -2,6 +2,7 @@ package com.expensetracker.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expensetracker.app.data.PendingPaymentRepository
 import com.expensetracker.app.listener.CapturedNotification
 import com.expensetracker.app.listener.ListenerDebugState
 import com.expensetracker.app.listener.NotificationAccessHelper
@@ -56,7 +57,8 @@ data class NotificationDebugUiState(
 
 @HiltViewModel
 class NotificationDebugViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val pendingPaymentRepository: PendingPaymentRepository
 ) : ViewModel() {
 
     private val accessGranted = MutableStateFlow(false)
@@ -129,6 +131,24 @@ class NotificationDebugViewModel @Inject constructor(
             "Snapshotted active status-bar notifications"
         } else {
             "Listener not connected — toggle notification access off/on, then try again"
+        }
+    }
+
+    /** The owner says a logged notification is a real payment: make its card. */
+    fun markAsPayment(notification: CapturedNotification) {
+        viewModelScope.launch {
+            val added = pendingPaymentRepository.forceCapture(
+                notification.packageName, notification.body, notification.postTime
+            )
+            if (added) {
+                RecentNotificationsStore.update(
+                    notification.id,
+                    NotificationDisposition.WAITING,
+                    "Added as a card. Check it on the Home screen."
+                )
+            } else {
+                refreshMessage.value = "No RM amount in this text. Add the payment by hand."
+            }
         }
     }
 
