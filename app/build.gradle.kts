@@ -124,6 +124,7 @@ dependencies {
 
     implementation(libs.okhttp)
     implementation(libs.org.json)
+    implementation(libs.mlkit.text.recognition)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

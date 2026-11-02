@@ -255,8 +255,7 @@ fun SettingsScreen(
                 )
                 Text(
                     text = "Uses your own Google AI Studio key, kept on this phone only. " +
-                        "When on, each waiting payment is sent to Google to clean the merchant name. " +
-                        "Receipt scanning also needs this key.",
+                        "When on, each waiting payment is sent to Google to clean the merchant name.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

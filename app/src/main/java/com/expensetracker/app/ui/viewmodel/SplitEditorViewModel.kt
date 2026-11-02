@@ -17,6 +17,7 @@ import com.expensetracker.app.data.SplitMath
 import com.expensetracker.app.data.SplitPersonEntity
 import com.expensetracker.app.data.SplitRepository
 import com.expensetracker.app.parser.AmountFormatter
+import com.expensetracker.app.parser.ReceiptRead
 import com.expensetracker.app.parser.ReceiptReader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -68,6 +69,8 @@ data class SplitEditorState(
     val candidates: List<ExpenseEntity> = emptyList(),
     val selectedExpenseId: String? = null,
     val message: String? = null,
+    /** Informational line from the receipt reader (not an error). */
+    val readNote: String? = null,
     val error: String? = null,
     val saving: Boolean = false,
     val finished: Boolean = false
@@ -170,45 +173,51 @@ class SplitEditorViewModel @Inject constructor(
 
     /** Reads the receipt, then deletes the cached camera photo. Photos are not kept. */
     fun readReceipt(uri: Uri) {
-        _state.update { it.copy(step = SplitStep.Reading, message = null) }
+        _state.update { it.copy(step = SplitStep.Reading, message = null, readNote = null) }
         readJob?.cancel()
         readJob = viewModelScope.launch {
-            val draft = try {
+            val read = try {
                 receiptReader.read(uri)
             } finally {
                 photoFile().delete()
             }
-            if (draft == null) {
+            if (read == null) {
                 _state.update {
                     it.copy(
                         step = SplitStep.Items,
                         items = emptyList(),
-                        message = if (receiptReader.hasKey()) {
-                            "Couldn't read this receipt. Add the items by hand."
-                        } else {
-                            "Receipt scanning needs a Gemini key. Add one in Settings."
-                        }
+                        printedTotal = null,
+                        serviceCharge = "",
+                        tax = "",
+                        discount = "",
+                        rounding = "",
+                        merchant = "",
+                        readNote = null,
+                        message = "Couldn't read this receipt. Add the items by hand."
                     )
                 }
-            } else {
-                _state.update {
-                    it.copy(
-                        step = SplitStep.Items,
-                        merchant = draft.merchant.orEmpty(),
-                        billTime = draft.dateMillis ?: it.billTime,
-                        printedTotal = draft.printedTotal,
-                        items = draft.items.map { item ->
-                            ItemRow(
-                                nextKey++, item.name, item.quantity.toString(),
-                                AmountFormatter.formatDisplay(item.price)
-                            )
-                        },
-                        serviceCharge = chargeText(draft.serviceCharge),
-                        tax = chargeText(draft.tax),
-                        discount = chargeText(draft.discount),
-                        rounding = chargeText(draft.rounding)
-                    )
-                }
+                return@launch
+            }
+            val draft = read.draft
+            _state.update {
+                it.copy(
+                    step = SplitStep.Items,
+                    merchant = draft.merchant.orEmpty(),
+                    billTime = draft.dateMillis ?: it.billTime,
+                    printedTotal = draft.printedTotal,
+                    items = draft.items.map { item ->
+                        ItemRow(
+                            nextKey++, item.name, item.quantity.toString(),
+                            AmountFormatter.formatDisplay(item.price)
+                        )
+                    },
+                    serviceCharge = chargeText(draft.serviceCharge),
+                    tax = chargeText(draft.tax),
+                    discount = chargeText(draft.discount),
+                    rounding = chargeText(draft.rounding),
+                    readNote = readNote(read),
+                    message = if (draft.printedTotal == null) "No total found on the receipt. Check the items." else null
+                )
             }
         }
     }
@@ -408,6 +417,15 @@ class SplitEditorViewModel @Inject constructor(
     // ---- Derived values (pure, used by the screen) ----
 
     companion object {
+        /** Info line for an accepted read. Null otherwise: the mismatch warning or an error message covers it. */
+        fun readNote(read: ReceiptRead): String? {
+            val total = read.draft.printedTotal ?: return null
+            if (!read.accepted) return null
+            val calculated = if (read.calculated.isEmpty()) "" else
+                " with a calculated " + read.calculated.joinToString(" and ")
+            return "Matches the receipt total of RM ${AmountFormatter.formatDisplay(total)}$calculated."
+        }
+
         /** Null when any row has a bad name, quantity or price. */
         fun parseItems(s: SplitEditorState): List<DraftItem>? = s.items.map { row ->
             val price = AmountFormatter.parseInput(row.price)

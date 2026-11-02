@@ -214,6 +214,14 @@ private fun ItemsStep(modifier: Modifier, state: SplitEditorState, vm: SplitEdit
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
+            state.readNote?.takeIf { diff == null }?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
         item {
             OutlinedTextField(
