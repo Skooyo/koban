@@ -12,7 +12,7 @@ Android app that tracks spending by reading bank and wallet payment notification
 
 Koban listens to payment alerts from the banking and e-wallet apps you pick. Regex rules read the amount, merchant and direction, and the payment waits on a swipe screen: swipe right to save it, swipe left to drop it. Nothing counts in your totals until you say yes. You get day / week / month spending with categories, bill splits from a receipt photo, and a list of who owes you — without typing every purchase by hand.
 
-It is built for Malaysian Ringgit notifications (`RM` / `MYR`). Maybank and Touch 'n Go have exact rules; other apps use a generic rule. The default build makes no network call to read a notification. [Google AI Studio](https://aistudio.google.com/) Gemini is optional: it can pre-fill cards and it reads receipt photos.
+It is built for Malaysian Ringgit notifications (`RM` / `MYR`). Maybank and Touch 'n Go have exact rules; other apps use a generic rule. The default build makes no network call to read a notification. [Google AI Studio](https://aistudio.google.com/) Receipt photos are read on the phone with ML Kit, offline. Gemini is optional: it only pre-fills cards.
 
 ```text
 Bank / wallet notification (apps you picked)
@@ -61,7 +61,7 @@ Each spending category takes the color of a ringgit note (RM10 red, RM1 blue, RM
 - **Optional Gemini pre-fill** — off by default; with your own key, Gemini (3.1 / 3.5 Flash Lite, with rate-limit failover) fills merchant and category and tags **Likely promotion**. It never saves anything by itself
 - **Duplicate protection** — skips the same payment when it arrives from multiple apps or twice within a short window; a dropped payment does not come back
 - **Spending views** — day / week / month totals with a category donut, money received, and an All view
-- **Bill splits** — read a receipt photo (needs a Gemini key), tap who had what; only your share counts as spending
+- **Bill splits** — read a receipt photo on the phone (ML Kit Document Scanner and on-device text recognition, offline, no key), tap who had what; only your share counts as spending
 - **People** — track who owes you and whom you owe, store a friend's payment QR, and get a suggested match when a repayment arrives
 - **Background reliability** — keep-alive service, boot restart, and reconnect helpers (including Xiaomi/HyperOS guidance)
 - **Debug log** — inspect every notification the listener saw and why it was captured or skipped
@@ -88,7 +88,7 @@ Each spending category takes the color of a ringgit note (RM10 red, RM1 blue, RM
 
 ### Optional: Google AI Studio (Gemini)
 
-Gemini is off by default. With a key it does two things: it pre-fills merchant and category on waiting cards and tags likely promotions, and it reads receipt photos for bill splits. Without a key, capture works the same, and receipt scanning asks for a key.
+Gemini is off by default. With a key it pre-fills merchant and category on waiting cards and tags likely promotions. Without a key, capture works the same, and receipt scanning still works because it runs on the phone.
 
 Turn it on in **Settings → Gemini (optional)**: switch on **Use Gemini to pre-fill** and paste your key into **Gemini API key**. The key is stored in app-private storage that is excluded from Android backup.
 
@@ -151,7 +151,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | DI | Hilt |
 | Storage | Room (expenses, categories), DataStore (settings) |
 | Listener | `NotificationListenerService` + foreground keep-alive |
-| Parsing | Regex rules (`PaymentRules`, `NotificationParser`); optional Gemini via OkHttp for pre-fill and receipts |
+| Parsing | Regex rules (`PaymentRules`, `NotificationParser`); ML Kit Document Scanner and text recognition plus a rule engine (`ReceiptRules`) for receipts; optional Gemini via OkHttp for notification pre-fill |
 | Min SDK | 26 · Target / Compile SDK 35 |
 
 Key packages under `app/src/main/java/com/expensetracker/app/`:
@@ -165,7 +165,7 @@ Key packages under `app/src/main/java/com/expensetracker/app/`:
 
 - Expense data stays **on device** in a local Room database.
 - Notification text is read on device by regex. The default build sends nothing to a server.
-- With **Use Gemini to pre-fill** on, the text of each waiting payment is sent to Google AI Studio (Gemini). Receipt photos go to Gemini when you scan one.
+- With **Use Gemini to pre-fill** on, the text of each waiting payment is sent to Google AI Studio (Gemini). Receipt photos never leave the phone: ML Kit reads them on the device.
 - `.env` is gitignored. Do not publish APKs that contain a personal API key.
 
 ## Troubleshooting
@@ -187,7 +187,7 @@ Key packages under `app/src/main/java/com/expensetracker/app/`:
 It should keep listening in the background via the notification listener and keep-alive service, but OEM battery policies can still stop it. Use the Settings checklist on Xiaomi devices.
 
 **Will it work without Gemini / Google AI Studio?**  
-Yes. Capture is regex only and needs no key. Without a key you lose the pre-fill and receipt scanning.
+Yes. Capture is regex only and needs no key. Without a key you lose only the pre-fill. Receipts are read on the phone.
 
 **Why confirm every payment?**  
 Automatic saving let promotions through and put dates into merchant names. A swipe takes a second, and nothing wrong reaches your totals.

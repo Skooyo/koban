@@ -171,7 +171,16 @@ class SplitEditorViewModel @Inject constructor(
 
     private fun photoFile() = File(File(context.cacheDir, "receipts"), "receipt.jpg")
 
-    /** Reads the receipt, then deletes the cached camera photo. Photos are not kept. */
+    /** Deletes only the file this Uri names: the camera photo or a scanner file in the cache. Never a gallery Uri. */
+    private fun deleteReadFile(uri: Uri) {
+        when {
+            uri.authority == "${context.packageName}.fileprovider" && uri.lastPathSegment == "receipt.jpg" ->
+                photoFile().delete()
+            isCacheFile(uri.scheme, uri.path, context.cacheDir) -> File(uri.path!!).delete()
+        }
+    }
+
+    /** Reads the receipt, then deletes the cached photo it read. Photos are not kept. */
     fun readReceipt(uri: Uri) {
         _state.update { it.copy(step = SplitStep.Reading, message = null, readNote = null) }
         readJob?.cancel()
@@ -179,7 +188,7 @@ class SplitEditorViewModel @Inject constructor(
             val read = try {
                 receiptReader.read(uri)
             } finally {
-                photoFile().delete()
+                deleteReadFile(uri)
             }
             if (read == null) {
                 _state.update {
@@ -417,6 +426,13 @@ class SplitEditorViewModel @Inject constructor(
     // ---- Derived values (pure, used by the screen) ----
 
     companion object {
+        /** The scanner's file:// JPEG is ours to delete only when it sits inside the app cache. */
+        fun isCacheFile(scheme: String?, path: String?, cacheDir: File): Boolean {
+            if (scheme != "file" || path == null) return false
+            val root = cacheDir.canonicalFile
+            return File(path).canonicalFile.startsWith(root) && File(path).canonicalFile != root
+        }
+
         /** Info line for an accepted read. Null otherwise: the mismatch warning or an error message covers it. */
         fun readNote(read: ReceiptRead): String? {
             val total = read.draft.printedTotal ?: return null

@@ -76,7 +76,7 @@ private const val TILT_DP_PER_DEGREE = 18f
 private const val STACK_DEPTH = 3
 private const val CHOOSE_DIRECTION_MESSAGE = "Choose Spent or Received first."
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null

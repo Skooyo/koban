@@ -1,9 +1,11 @@
 package com.expensetracker.app.ui.screens
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.parser.AmountFormatter
+import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import com.expensetracker.app.ui.components.MoneyAmount
 import com.expensetracker.app.ui.viewmodel.ItemRow
 import com.expensetracker.app.ui.viewmodel.SplitEditorState
@@ -168,6 +173,36 @@ private fun PhotoStep(modifier: Modifier, vm: SplitEditorViewModel) {
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) vm.readReceipt(uri)
     }
+    val activity = LocalContext.current.findActivity()
+    fun takeWithCamera() {
+        val uri = vm.newPhotoUri()
+        pending = uri
+        camera.launch(uri)
+    }
+    val scanner = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        val uri = GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.pages?.firstOrNull()?.imageUri
+        if (uri != null) vm.readReceipt(uri)
+    }
+    fun takePhoto() {
+        if (activity == null) return takeWithCamera()
+        val options = GmsDocumentScannerOptions.Builder()
+            .setGalleryImportAllowed(false)
+            .setPageLimit(1)
+            .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+            .build()
+        try {
+            GmsDocumentScanning.getClient(options).getStartScanIntent(activity)
+                .addOnSuccessListener { sender ->
+                    runCatching { scanner.launch(IntentSenderRequest.Builder(sender).build()) }
+                        .onFailure { takeWithCamera() }
+                }
+                .addOnFailureListener { takeWithCamera() }
+        } catch (e: Exception) {
+            takeWithCamera()
+        }
+    }
     Column(
         modifier = modifier.padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -179,11 +214,7 @@ private fun PhotoStep(modifier: Modifier, vm: SplitEditorViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Button(
-            onClick = {
-                val uri = vm.newPhotoUri()
-                pending = uri
-                camera.launch(uri)
-            },
+            onClick = ::takePhoto,
             modifier = Modifier.fillMaxWidth()
         ) { Text("Take photo") }
         OutlinedButton(onClick = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.fillMaxWidth()) {
