@@ -30,7 +30,7 @@ class ReceiptReader @Inject constructor(
             }
             val lines = text.textBlocks.flatMap { it.lines }.mapNotNull { line ->
                 val box = line.boundingBox ?: return@mapNotNull null
-                OcrLine(line.text, box.left, box.top, box.right, box.bottom)
+                OcrLine(line.text, box.left, box.top, box.right, box.bottom, line.angle)
             }
             ReceiptRules.read(lines)
         } catch (e: kotlinx.coroutines.CancellationException) {

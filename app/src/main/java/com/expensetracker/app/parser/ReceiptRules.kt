@@ -19,7 +19,15 @@ data class ReceiptDraft(
 )
 
 /** One recognized text line with its box in image pixels. */
-data class OcrLine(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int)
+/** [angle] is ML Kit's line rotation in degrees; negative means the right end sits higher. */
+data class OcrLine(
+    val text: String,
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int,
+    val angle: Float = 0f
+)
 
 /** `calculated` holds display phrases for charges the rules computed, e.g. "10% service charge". */
 data class ReceiptRead(val draft: ReceiptDraft, val accepted: Boolean, val calculated: List<String>)
@@ -97,10 +105,14 @@ object ReceiptRules {
 
     /** Join lines whose vertical centers sit inside one row band, left to right, one space between parts. */
     internal fun rows(lines: List<OcrLine>): List<String> {
+        // A tilted photo lifts one end of every row, so a price on the far right can leave its item's row.
+        // Undo the tilt before banding: shift each line's center by the receipt's slope at its x.
+        val slope = Math.tan(Math.toRadians(skew(lines)))
+        fun center(l: OcrLine) = (l.top + l.bottom) / 2.0 - (l.left + l.right) / 2.0 * slope
         class Band(val cy: Double, val h: Int, val parts: MutableList<Pair<Int, String>>)
         val bands = mutableListOf<Band>()
-        for (l in lines.sortedBy { (it.top + it.bottom) / 2.0 }) {
-            val cy = (l.top + l.bottom) / 2.0
+        for (l in lines.sortedBy(::center)) {
+            val cy = center(l)
             val h = maxOf(1, l.bottom - l.top)
             val band = bands.firstOrNull { Math.abs(it.cy - cy) < 0.5 * minOf(h, it.h) }
             if (band != null) band.parts += l.left to l.text else bands += Band(cy, h, mutableListOf(l.left to l.text))
@@ -108,6 +120,12 @@ object ReceiptRules {
         return bands.map { b ->
             b.parts.sortedWith(compareBy({ it.first }, { it.second })).joinToString(" ") { it.second }.trim()
         }
+    }
+
+    /** The receipt's tilt: the median angle of long lines. A short line, such as a lone price, often reports 0. */
+    private fun skew(lines: List<OcrLine>): Double {
+        val angles = lines.filter { it.right - it.left >= 4 * (it.bottom - it.top) }.map { it.angle.toDouble() }.sorted()
+        return if (angles.isEmpty()) 0.0 else angles[angles.size / 2]
     }
 
     /** Repair OCR damage on amounts at the end of a row: "14 00", "79, 60", "-0. 03", "1O.50". */
