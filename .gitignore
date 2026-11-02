@@ -37,3 +37,6 @@ backups/
 
 # Launch video build files
 brag-output/
+
+# Receipt OCR benchmark data (third-party SROIE receipts, not ours to publish)
+receipt-bench/
