@@ -15,6 +15,8 @@ import com.expensetracker.app.parser.PaymentRules
 import com.expensetracker.app.parser.ReceiptCloudClient
 import com.expensetracker.app.parser.Registration
 import com.expensetracker.app.parser.RuleMatch
+import com.expensetracker.app.update.UpdateRepository
+import com.expensetracker.app.update.UpdateState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
@@ -46,7 +48,8 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val categoryRepository: CategoryRepository,
-    private val receiptCloudClient: ReceiptCloudClient
+    private val receiptCloudClient: ReceiptCloudClient,
+    private val updateRepository: UpdateRepository
 ) : ViewModel() {
 
     private val accessGranted = MutableStateFlow(false)
@@ -167,6 +170,13 @@ class SettingsViewModel @Inject constructor(
 
     fun setOnlineFeatures(on: Boolean) {
         viewModelScope.launch { settingsRepository.setOnlineFeatures(on) }
+    }
+
+    val updateState: StateFlow<UpdateState> = updateRepository.state
+
+    /** Does nothing with Online features off: [UpdateRepository.check] reads the setting. */
+    fun checkForUpdates() {
+        viewModelScope.launch { updateRepository.check(manual = true) }
     }
 
     fun removeOnlineAccess() {
