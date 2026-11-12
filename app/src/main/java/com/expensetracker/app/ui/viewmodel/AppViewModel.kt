@@ -8,6 +8,8 @@ import com.expensetracker.app.data.PeopleRepository
 import com.expensetracker.app.data.SettingsRepository
 import com.expensetracker.app.groups.GroupRepository
 import com.expensetracker.app.listener.NotificationAccessHelper
+import com.expensetracker.app.update.UpdateRepository
+import com.expensetracker.app.update.UpdateState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,12 +26,23 @@ class AppViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     peopleRepository: PeopleRepository,
     private val pendingPaymentRepository: PendingPaymentRepository,
-    groupRepository: GroupRepository
+    groupRepository: GroupRepository,
+    private val updateRepository: UpdateRepository
 ) : ViewModel() {
     init {
         // Sends shared totals at app start and after payment changes.
         groupRepository.start()
+        // At most once a day, and only with Online features on.
+        viewModelScope.launch { updateRepository.check(manual = false) }
     }
+
+    val updateState: StateFlow<UpdateState> = updateRepository.state
+
+    fun installUpdate() {
+        viewModelScope.launch { updateRepository.downloadAndInstall() }
+    }
+
+    fun dismissUpdate() = updateRepository.later()
 
     val darkModeEnabled: StateFlow<Boolean> = settingsRepository.darkModeEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)

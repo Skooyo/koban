@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expensetracker.app.ui.components.UpdateDialog
 import com.expensetracker.app.ui.theme.ExpenseTrackerTheme
 import com.expensetracker.app.ui.viewmodel.AppViewModel
 
@@ -12,8 +13,14 @@ import com.expensetracker.app.ui.viewmodel.AppViewModel
 fun ExpenseTrackerApp(modifier: Modifier = Modifier) {
     val appViewModel: AppViewModel = hiltViewModel()
     val darkMode by appViewModel.darkModeEnabled.collectAsStateWithLifecycle(initialValue = true)
+    val updateState by appViewModel.updateState.collectAsStateWithLifecycle()
 
     ExpenseTrackerTheme(darkTheme = darkMode) {
         ExpenseTrackerNavHost(modifier = modifier)
+        UpdateDialog(
+            state = updateState,
+            onUpdate = appViewModel::installUpdate,
+            onDismiss = appViewModel::dismissUpdate
+        )
     }
 }

@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
@@ -79,6 +80,10 @@
 
         <receiver
             android:name=".listener.ListenerWatchdogReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".update.UpdateInstallReceiver"
             android:exported="false" />
     </application>
 </manifest>

@@ -26,6 +26,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -41,9 +42,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expensetracker.app.BuildConfig
 import com.expensetracker.app.ui.components.ListenerStatusBanner
 import com.expensetracker.app.ui.viewmodel.AppViewModel
 import com.expensetracker.app.ui.viewmodel.SettingsViewModel
+import com.expensetracker.app.update.UpdateState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -269,6 +272,39 @@ fun SettingsScreen(
                         )
                     }
                     Switch(checked = online, onCheckedChange = null)
+                }
+            }
+
+            item {
+                val online by viewModel.onlineFeatures.collectAsStateWithLifecycle()
+                val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "App version", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = BuildConfig.VERSION_NAME,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(onClick = viewModel::checkForUpdates, enabled = online) {
+                        Text("Check for updates")
+                    }
+                }
+                val note = when {
+                    !online -> "Turn on Online features to check for updates."
+                    updateState == UpdateState.UpToDate -> "Koban is up to date."
+                    else -> null
+                }
+                if (note != null) {
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
