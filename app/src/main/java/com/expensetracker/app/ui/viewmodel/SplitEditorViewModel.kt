@@ -63,6 +63,8 @@ data class SplitEditorState(
     val locked: Boolean = false,
     /** A saved bill reopened with "Edit items". Without it, a saved bill is only viewed. */
     val editing: Boolean = false,
+    /** Back was pressed while editing a saved bill; the screen asks before it drops the edits. */
+    val confirmDiscard: Boolean = false,
     val merchant: String = "",
     val billTime: Long = System.currentTimeMillis(),
     val printedTotal: BigDecimal? = null,
@@ -437,6 +439,11 @@ class SplitEditorViewModel @Inject constructor(
                 SplitStep.Photo
             }
             SplitStep.Items -> {
+                // ponytail: "editing" counts as changed even with no edit; compare with the saved draft if this asks too often.
+                if (s.billId != null && s.editing) {
+                    _state.update { it.copy(confirmDiscard = true) }
+                    return true
+                }
                 dropPhoto()
                 if (s.billId != null) return false else SplitStep.Photo
             }
@@ -448,6 +455,14 @@ class SplitEditorViewModel @Inject constructor(
         _state.update { it.copy(step = target, error = null) }
         return true
     }
+
+    /** Clears the flag and cleans up as [back] did before the dialog; the screen then leaves the flow. */
+    fun discardEdits() {
+        _state.update { it.copy(confirmDiscard = false) }
+        dropPhoto()
+    }
+
+    fun keepEditing() = _state.update { it.copy(confirmDiscard = false) }
 
     // ---- Save ----
 

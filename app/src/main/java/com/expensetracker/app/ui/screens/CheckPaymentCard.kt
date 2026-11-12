@@ -36,10 +36,13 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,6 +69,7 @@ import com.expensetracker.app.data.TransactionType
 import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.CaptureFormat
 import com.expensetracker.app.ui.components.AmountInput
+import com.expensetracker.app.ui.components.DiscardChangesDialog
 import com.expensetracker.app.ui.components.PastDatePickerDialog
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.theme.categoryColor
@@ -287,9 +291,28 @@ internal fun EditPaymentSheet(
     var pickingCategory by rememberSaveable { mutableStateOf(false) }
     var pickingDate by rememberSaveable { mutableStateOf(false) }
     val amount = AmountInput.toAmount(amountText)?.takeIf { it.signum() > 0 }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val changed = amountText != AmountInput.fromAmount(payment.amount) ||
+        type != payment.transactionType ||
+        merchant != payment.merchant.orEmpty() ||
+        categoryId != card.categoryId ||
+        time != payment.notificationPostTime
+    var confirmingDiscard by remember { mutableStateOf(false) }
+    // The sheet state keeps its first lambda, so read `changed` through a State.
+    val latestChanged = rememberUpdatedState(changed)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = {
+            // Swipe-down and Back both ask to hide; with changes, ask first and stay open.
+            val block = it == SheetValue.Hidden && latestChanged.value
+            if (block) confirmingDiscard = true
+            !block
+        }
+    )
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = { if (changed) confirmingDiscard = true else onDismiss() },
+        sheetState = sheetState
+    ) {
         Column(
             modifier = Modifier
                 .verticalScroll(rememberScrollState())
@@ -375,6 +398,15 @@ internal fun EditPaymentSheet(
         }
     }
 
+    if (confirmingDiscard) {
+        DiscardChangesDialog(
+            onDiscard = {
+                confirmingDiscard = false
+                onDismiss()
+            },
+            onKeepEditing = { confirmingDiscard = false }
+        )
+    }
     if (pickingCategory) {
         CategorySheet(
             categories = categories,
