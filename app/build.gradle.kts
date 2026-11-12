@@ -35,7 +35,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.expensetracker.app"
+        applicationId = "io.github.skooyo.koban"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -50,6 +50,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
