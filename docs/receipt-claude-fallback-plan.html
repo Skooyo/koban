@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koban receipt reading: plan</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root { --ink:#1d2330; --muted:#5b6475; --line:#d9dee7; --app:#e8f1ff; --appb:#3d7be0; --srv:#fff3e3; --srvb:#d98a1c; --ext:#eef8ef; --extb:#3a9a4a; --bad:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:#f7f8fa; }
+  main { max-width:960px; margin:0 auto; padding:32px 20px 80px; }
+  h1 { font-size:28px; margin:0 0 4px; }
+  h2 { font-size:21px; margin:44px 0 10px; padding-top:12px; border-top:1px solid var(--line); }
+  h3 { font-size:17px; margin:24px 0 6px; }
+  p.lead { color:var(--muted); margin-top:0; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px 20px; margin:14px 0; }
+  .tldr { border-left:5px solid var(--appb); }
+  table { border-collapse:collapse; width:100%; background:#fff; font-size:15px; }
+  th, td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:#f0f2f6; }
+  code, pre.code { background:#eef0f4; border-radius:4px; font-size:14px; }
+  code { padding:1px 5px; }
+  pre.code { padding:12px 14px; overflow-x:auto; border:1px solid var(--line); }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .app { background:var(--app); border:2px solid var(--appb); border-radius:10px; padding:14px 16px; }
+  .srv { background:var(--srv); border:2px solid var(--srvb); border-radius:10px; padding:14px 16px; }
+  .app h3, .srv h3 { margin-top:0; }
+  .tag { display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:20px; margin-right:6px; }
+  .tag.new { background:#dff3e2; color:#21692c; }
+  .tag.chg { background:#fdebd0; color:#8a5207; }
+  .tag.keep { background:#e6e9ef; color:#4a5263; }
+  .tag.del { background:#f8dcd8; color:#9b2a1d; }
+  .warn { color:var(--bad); font-weight:600; }
+  .mermaid { background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px; margin:14px 0; }
+  ol li, ul li { margin:4px 0; }
+  .small { font-size:14px; color:var(--muted); }
+  @media (max-width:720px){ .cols { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Koban receipt reading: plan</h1>
+<p class="lead">Part A fixes item and price pairing on the phone. Part B adds Claude as a fallback. Part C sets up AWS for 20 to 50 friends. Status: plan only, no code changed. Updated 2026-11-12: invite codes, 10 receipts a day, Gemini removed.</p>
+
+<div class="card tldr">
+  <strong>Summary</strong>
+  <ol>
+    <li>The phone keeps ML Kit and the receipt rules. Most receipts never leave the phone.</li>
+    <li>When the items do not add up to the total, you can tap "Read with Claude". The phone sends the photo to <em>your</em> server.</li>
+    <li>Friends join with an invite code from you. Each code works on 2 phones, and you can cancel it.</li>
+    <li>One small Linux server on AWS is enough for 50 people. It holds the Claude key and the limits.</li>
+    <li>Gemini goes out of the app completely.</li>
+  </ol>
+</div>
+
+<!-- ================================================================ -->
+<h2>Part A. Fix item and price pairing on the phone</h2>
+
+<p>You used the document scanner and some names did not pair with their prices. The scanner flattens the page, but a long receipt still curls a little. The rules pair a name and a price only when their vertical centers are within <strong>half a line height</strong> (<code>ReceiptRules.rows()</code>). On a wide receipt, a small slope moves the price more than that.</p>
+
+<div class="card">
+<svg viewBox="0 0 860 250" width="100%" role="img" aria-label="A tilted row: the name on the left and the price on the right sit at different heights, so the rules split them into two rows.">
+  <style>.t{font:15px ui-monospace,Consolas,monospace}.l{font:13px system-ui;fill:#5b6475}</style>
+  <text x="20" y="24" class="l">What the rules see today (tolerance band = half a line height)</text>
+  <rect x="20" y="60" width="820" height="16" fill="#3d7be0" opacity=".12"/>
+  <line x1="20" y1="68" x2="840" y2="68" stroke="#3d7be0" stroke-dasharray="4 4"/>
+  <text x="30" y="73" class="t">1  Kimista (Large) (26.00/ea)</text>
+  <text x="740" y="96" class="t" fill="#c0392b">26.00</text>
+  <text x="600" y="120" class="l" fill="#c0392b">price center is outside the band, so it becomes its own row</text>
+  <text x="20" y="160" class="l">After the fix: straighten the boxes with the line angle first, then pair</text>
+  <rect x="20" y="190" width="820" height="16" fill="#3a9a4a" opacity=".14"/>
+  <text x="30" y="203" class="t">1  Kimista (Large) (26.00/ea)</text>
+  <text x="740" y="203" class="t" fill="#21692c">26.00</text>
+</svg>
+</div>
+
+<table>
+<tr><th>#</th><th>Step</th><th>Time</th></tr>
+<tr><td>A1</td><td>Add a debug view that shows the raw ML Kit lines (text and box) for the last scan. Scan the Menya Hanabi receipt again and send me the dump. The tilt is the most likely cause, but I have not seen your phone's output.</td><td>30 min</td></tr>
+<tr><td>A2</td><td>Read <code>Text.Line.angle</code> from ML Kit. Rotate each box center by the median angle before <code>rows()</code> groups the lines.</td><td>45 min</td></tr>
+<tr><td>A3</td><td>Add the dump of this receipt (shop name changed) as a unit test. Run the SROIE benchmark: the restaurant score must stay at 73% or more, and "wrong and not flagged" must stay at 0.</td><td>30 min</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2>Part B. Claude as a fallback</h2>
+
+<h3>B1. What lives where</h3>
+<div class="cols">
+  <div class="app">
+    <h3>Android app (Koban)</h3>
+    <ul>
+      <li><span class="tag keep">keep</span>Document scanner, ML Kit, <code>ReceiptRules</code></li>
+      <li><span class="tag new">new</span>Invite code field in Settings (typed once)</li>
+      <li><span class="tag new">new</span>Device token, stored in DataStore</li>
+      <li><span class="tag new">new</span><code>ReceiptCloudClient</code>: one HTTPS call</li>
+      <li><span class="tag new">new</span>"Read with Claude" button on the mismatch warning</li>
+      <li><span class="tag chg">change</span>Shrink the photo (longest side 1600 px, JPEG) before upload</li>
+      <li><span class="tag chg">change</span>Delete the photo after the fallback, not before</li>
+      <li><span class="tag del">remove</span>All Gemini code (see B5)</li>
+    </ul>
+    <p class="small"><strong>Not in the app:</strong> the Claude key, the prompt, the limits.</p>
+  </div>
+  <div class="srv">
+    <h3>Your server</h3>
+    <ul>
+      <li><span class="tag new">new</span><code>POST /v1/devices</code>: invite code in, device token out</li>
+      <li><span class="tag new">new</span><code>POST /v1/receipts/read</code>: image in, receipt JSON out</li>
+      <li><span class="tag new">new</span>Limits: per device, per invite code, total per day</li>
+      <li><span class="tag new">new</span>SQLite file: invite codes, devices, call counts</li>
+      <li><span class="tag new">new</span>Admin command: make or cancel an invite code</li>
+      <li><span class="tag keep">keep</span>Claude API key, in an environment file</li>
+      <li><span class="tag new">new</span>Fixed prompt and JSON schema</li>
+    </ul>
+    <p class="small"><strong>Not on the server:</strong> the photo after the reply. It is not stored.</p>
+  </div>
+</div>
+
+<pre class="mermaid">
+flowchart LR
+  subgraph Phone["Android phone: Koban"]
+    S[Document scanner] --> O[ML Kit OCR]
+    O --> R[ReceiptRules]
+    R -->|sum matches| I[Items step]
+    R -->|sum does not match| W[Mismatch warning]
+    W -->|tap Read with Claude| C[ReceiptCloudClient]
+    C -->|JSON| V[Check sum again]
+    V --> I
+    T[(Device token)] -.-> C
+  end
+  subgraph Server["Your server"]
+    A[Check token] --> L{Under all limits?}
+    L -->|no| E[HTTP 429]
+    L -->|yes| P[Add fixed prompt and schema]
+    P --> K[(Claude API key)]
+    DB[(SQLite)] -.-> A
+    DB -.-> L
+  end
+  C -->|HTTPS: image + token| A
+  K --> CL[Claude API]
+  CL -->|receipt JSON| C
+  E -.-> C
+  classDef phone fill:#e8f1ff,stroke:#3d7be0;
+  classDef srv fill:#fff3e3,stroke:#d98a1c;
+  classDef ext fill:#eef8ef,stroke:#3a9a4a;
+  class S,O,R,I,W,C,V,T phone;
+  class A,L,E,P,K,DB srv;
+  class CL ext;
+</pre>
+
+<h3>B2. A friend joins with an invite code</h3>
+<p>An invite code replaces the "5 new devices per IP" limit. That IP limit was a problem: 10 friends on the same Wi-Fi share one IP, so the 6th friend would be blocked. With invite codes, only people you choose can make a token.</p>
+<pre class="mermaid">
+sequenceDiagram
+  participant You as You (admin)
+  participant Srv as Your server
+  participant F as Friend's phone
+  You->>Srv: koban-admin new-code "Aisyah"
+  Srv-->>You: Code K7QX-M2PA (2 devices)
+  You->>F: Send the code on WhatsApp
+  F->>Srv: POST /v1/devices { invite: K7QX-M2PA }
+  Srv->>Srv: Code exists, not cancelled, fewer than 2 devices?
+  Srv-->>F: { token }
+  F->>F: Save token in DataStore
+  Note over You,Srv: To stop a person: koban-admin cancel "Aisyah". All their tokens stop.
+</pre>
+
+<h3>B3. One receipt that the rules cannot read</h3>
+<pre class="mermaid">
+sequenceDiagram
+  participant U as Friend
+  participant App as Koban app
+  participant Srv as Your server
+  participant C as Claude API
+  U->>App: Scan receipt
+  App->>App: ML Kit + ReceiptRules (on the phone)
+  App-->>U: "Items do not match the total"
+  U->>App: Tap "Read with Claude"
+  App->>Srv: POST /v1/receipts/read (image, Bearer token)
+  Srv->>Srv: Token valid? Under device, code and daily limits?
+  alt over a limit
+    Srv-->>App: 429 + time to wait
+    App-->>U: "Limit reached. Edit the items by hand."
+  else under all limits
+    Srv->>C: Image + fixed prompt + JSON schema
+    C-->>Srv: Receipt JSON
+    Srv->>Srv: Count +1, drop the image
+    Srv-->>App: Receipt JSON
+    App->>App: Check items + charges = total
+    App-->>U: Items step
+  end
+</pre>
+
+<h3>B4. Limits</h3>
+<table>
+<tr><th>Limit</th><th>Value</th><th>What it stops</th></tr>
+<tr><td>Who can join</td><td>Invite code only. 1 code per friend, 2 phones per code.</td><td>Strangers who find the server URL in the APK</td></tr>
+<tr><td>Per device</td><td><strong>10 receipts a day</strong></td><td>One phone that calls in a loop</td></tr>
+<tr><td>Per invite code</td><td>15 receipts a day</td><td>One person with 2 phones who uses both at the limit</td></tr>
+<tr><td><strong>Total for the server</strong></td><td>150 receipts a day</td><td><strong>A large bill</strong>, even if a code leaks</td></tr>
+<tr><td>Image</td><td>2 MB or less, JPEG or PNG</td><td>Large uploads and other file types</td></tr>
+</table>
+<p class="small">All values are in one config file on the server. The day resets at midnight Malaysia time (UTC+8).</p>
+
+<h3>B5. Remove Gemini from the app</h3>
+<p>Gemini is still used in one place: the optional pre-fill of payment cards from notifications. Removing it deletes that pre-fill; the payment rules still read notifications as today.</p>
+<table>
+<tr><th>File</th><th>Change</th></tr>
+<tr><td><code>parser/GeminiClient.kt</code>, <code>LlmParseResult.kt</code>, <code>LlmResponseParser.kt</code>, <code>LlmResponseParserTest.kt</code></td><td>Delete</td></tr>
+<tr><td><code>listener/ExpenseNotificationListener.kt</code>, <code>di/NotificationListenerEntryPoint.kt</code></td><td>Remove <code>prefillWithGemini</code> and the client</td></tr>
+<tr><td><code>di/AppModule.kt</code></td><td>Build the <code>OkHttpClient</code> here (the receipt client needs it)</td></tr>
+<tr><td><code>SettingsRepository</code>, <code>SettingsViewModel</code>, <code>SettingsScreen</code></td><td>Remove the Gemini key field and the pre-fill switch</td></tr>
+<tr><td><code>PendingPaymentRepository.kt</code></td><td>Remove the Gemini suggestion fields</td></tr>
+<tr><td><code>app/build.gradle.kts</code>, <code>.env</code></td><td>Remove the three <code>GEMINI_*</code> fields. Then cancel the old key in Google AI Studio, because the APK from 2026-11-12 contains it.</td></tr>
+</table>
+<p class="small">Check first: a Room column for Gemini suggestions needs a database migration if one exists. About 45 minutes in total.</p>
+
+<!-- ================================================================ -->
+<h2>Part C. AWS setup for 20 to 50 friends</h2>
+
+<p><strong>Recommendation: one small Linux server.</strong> 50 people at 10 receipts a day is at most 150 calls a day, about one call every 10 minutes. Most of the time is waiting for Claude, not CPU. A server with 0.5 to 1 GB of memory is enough. If your current Claude server is a Linux VPS, put the new service on it and pay nothing extra.</p>
+
+<h3>C1. Diagram</h3>
+<pre class="mermaid">
+flowchart LR
+  P1[Friend's phone] -->|HTTPS 443| IP
+  P2[Friend's phone] -->|HTTPS 443| IP
+  Admin[You: SSH from your IP only] -->|22| IP
+  subgraph AWS["AWS, region ap-southeast-1 Singapore"]
+    IP[Static IP] --> FW{Firewall: 80, 443 open; 22 your IP only}
+    FW --> CA
+    subgraph VPS["Linux server: EC2 t4g.micro or Lightsail"]
+      CA[Caddy: HTTPS certificate, auto renew] -->|localhost:8080| SV[koban-receipts service]
+      SV --> DB[(SQLite file)]
+      ENV[(Env file: ANTHROPIC_API_KEY, chmod 600)] -.-> SV
+    end
+    BUD[AWS Budgets: email at $10]
+  end
+  SV -->|HTTPS| CL[Claude API]
+  CON[Anthropic Console: monthly spend limit] -.-> CL
+  classDef srv fill:#fff3e3,stroke:#d98a1c;
+  classDef ext fill:#eef8ef,stroke:#3a9a4a;
+  classDef phone fill:#e8f1ff,stroke:#3d7be0;
+  class IP,FW,CA,SV,DB,ENV,BUD srv;
+  class CL,CON ext;
+  class P1,P2,Admin phone;
+</pre>
+
+<h3>C2. Parts</h3>
+<table>
+<tr><th>Part</th><th>Choice</th><th>Why</th></tr>
+<tr><td>Server</td><td>Your current Linux VPS. If you need a new one: Lightsail Linux, 0.5 GB or 1 GB plan, Singapore.</td><td>Fixed monthly price, firewall and static IP in one screen</td></tr>
+<tr><td>Fixed address</td><td>Lightsail static IP, or EC2 Elastic IP</td><td>The IP stays the same after a restart</td></tr>
+<tr><td>Name</td><td>A subdomain you own, for example <code>receipts.yourname.com</code>. No domain: use <code>&lt;ip-with-dashes&gt;.sslip.io</code> (free).</td><td>HTTPS certificates need a name, not a bare IP</td></tr>
+<tr><td>HTTPS</td><td>Caddy</td><td>Gets and renews the Let's Encrypt certificate itself. The config is 2 lines.</td></tr>
+<tr><td>Service</td><td>One Python (FastAPI) app with the official <code>anthropic</code> SDK, run by systemd</td><td>Restarts after a crash or a reboot</td></tr>
+<tr><td>Data</td><td>One SQLite file</td><td>50 users do not need a database server. If the file is lost, friends type their invite code again.</td></tr>
+<tr><td>Spend guards</td><td>Monthly spend limit in the Anthropic Console, and an AWS Budgets email at $10</td><td>A hard stop that does not depend on your code</td></tr>
+<tr><td>Updates</td><td><code>unattended-upgrades</code> (Ubuntu)</td><td>Security patches install by themselves</td></tr>
+</table>
+
+<h3>C3. Setup steps</h3>
+<table>
+<tr><th>#</th><th>Step</th><th>Time</th></tr>
+<tr><td>1</td><td>Choose the server: your current VPS, or create a Lightsail Ubuntu instance in Singapore.</td><td>10 min</td></tr>
+<tr><td>2</td><td>Attach a static IP. Point the DNS name at it (A record), or use the sslip.io name.</td><td>10 min</td></tr>
+<tr><td>3</td><td>Firewall: open 80 and 443 to all; open 22 only to your IP.</td><td>5 min</td></tr>
+<tr><td>4</td><td>Install Caddy and write the Caddyfile (below).</td><td>10 min</td></tr>
+<tr><td>5</td><td>Copy the service, make the env file with the Claude key (<code>chmod 600</code>), add the systemd unit, start it.</td><td>20 min</td></tr>
+<tr><td>6</td><td>Set the Anthropic Console spend limit and the AWS Budgets alert.</td><td>10 min</td></tr>
+<tr><td>7</td><td>Make your own invite code. Test with <code>curl</code>: good image, bad token, 11th call, 3 MB file.</td><td>20 min</td></tr>
+<tr><td>8</td><td>Build the APK with the server URL, install it, scan 5 receipts.</td><td>20 min</td></tr>
+</table>
+
+<pre class="code">
+# /etc/caddy/Caddyfile
+receipts.yourname.com {
+    reverse_proxy 127.0.0.1:8080
+}
+</pre>
+
+<pre class="code">
+# /etc/systemd/system/koban-receipts.service
+[Service]
+EnvironmentFile=/etc/koban-receipts.env
+ExecStart=/opt/koban-receipts/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8080
+Restart=always
+User=koban
+[Install]
+WantedBy=multi-user.target
+</pre>
+
+<h3>C4. Monthly cost</h3>
+<table>
+<tr><th>Item</th><th>Normal use (about 100 Claude reads a month)</th><th>Worst case (150 a day, every day)</th></tr>
+<tr><td>Server on your current VPS</td><td>$0 extra</td><td>$0 extra</td></tr>
+<tr><td>New Lightsail server (Linux, 0.5 GB, public IPv4)</td><td>$5</td><td>$5</td></tr>
+<tr><td>Claude Opus 5.5</td><td>about $1.60</td><td>about $72</td></tr>
+<tr><td>Claude Sonnet 5.5</td><td>about $0.80</td><td>about $36</td></tr>
+<tr><td>Claude Haiku 5.5</td><td>about $0.04</td><td>about $1.80</td></tr>
+</table>
+<p class="small">Claude prices are the Claude API list prices for 2026-11, at about 2,100 input and 400 output tokens per receipt. Through Amazon Bedrock the prices are different. The worst case cannot go higher, because the server stops at 150 a day.</p>
+
+<h3>C5. Option not chosen: serverless</h3>
+<p>API Gateway + Lambda + DynamoDB also works and needs no OS updates. It has 3 services to set up instead of 1 server, and the invite and limit logic moves into DynamoDB. Choose it only if you want no server to look after. For 50 friends, the single server is less work.</p>
+
+<!-- ================================================================ -->
+<h2>Part D. Update check in the app</h2>
+<p>Yes, this works without the Play Store. The same server tells the app which version is the newest.</p>
+<pre class="mermaid">
+sequenceDiagram
+  participant App as Koban app
+  participant Srv as Your server
+  App->>Srv: GET /v1/app/latest (at app start, at most once a day)
+  Srv-->>App: { versionCode: 5, versionName: "1.4", url, sha256, notes }
+  alt server versionCode > installed versionCode
+    App-->>App: Show "Update to 1.4" dialog with the notes
+    App->>Srv: Download the APK
+    App->>App: Check sha256, then open the Android installer
+  end
+</pre>
+<table>
+<tr><th>Item</th><th>Detail</th></tr>
+<tr><td>Signing key</td><td class="warn">Required first. Android installs an update only when it has the same signature. Today's APK uses the debug key from this PC. Make one release keystore, keep 2 backups, and sign every APK with it. If you lose it, every friend must uninstall and install again.</td></tr>
+<tr><td>App changes</td><td>Permission <code>REQUEST_INSTALL_PACKAGES</code>, a <code>FileProvider</code> for the downloaded file, one dialog. Android asks each friend once to allow installs from Koban.</td></tr>
+<tr><td>Server changes</td><td>A <code>latest.json</code> file and the APK, served by Caddy. To publish: increase <code>versionCode</code>, build, copy 2 files.</td></tr>
+<tr><td>Time</td><td>Keystore 20 min, app 1.5 h, server 15 min</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2>Build order and time</h2>
+<table>
+<tr><th>#</th><th>Work</th><th>Time</th></tr>
+<tr><td>1</td><td>B5: remove Gemini, cancel the old key</td><td>45 min</td></tr>
+<tr><td>2</td><td>Part A: pairing fix (needs your OCR dump)</td><td>1.75 h</td></tr>
+<tr><td>3</td><td>Server service: routes, invite codes, limits, admin command</td><td>2 h</td></tr>
+<tr><td>4</td><td>Part C: AWS setup</td><td>1.75 h</td></tr>
+<tr><td>5</td><td>App: invite field, receipt client, button, 429 message</td><td>2 h</td></tr>
+<tr><td>6</td><td>Part D: release keystore and update check</td><td>2 h</td></tr>
+</table>
+<p><strong>Total:</strong> about 10 hours.</p>
+
+<h2>Open decisions for you</h2>
+<ol>
+  <li><strong>Which server?</strong> Your current Claude VPS (Linux or Windows? EC2 or Lightsail?), or a new Lightsail server.</li>
+  <li><strong>Domain:</strong> do you own one, or use sslip.io?</li>
+  <li><strong>Model:</strong> Opus 5.5, Sonnet 5.5 or Haiku 5.5. Test 5 receipts on two of them first.</li>
+  <li><strong>Does your current server call Claude directly or through Bedrock?</strong> This changes the SDK client and the price.</li>
+</ol>
+
+</main>
+<script>mermaid.initialize({ startOnLoad:true, theme:"neutral", securityLevel:"strict" });</script>
+</body>
+</html>
