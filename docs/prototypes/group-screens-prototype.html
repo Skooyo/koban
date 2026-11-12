@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<!-- PROTOTYPE — throwaway. Question: what do the group screens look like? (ticket "What do the group screens look like?", map "Map: Group spending tracker").
+     Three group layouts (?variant=A|B|C) x six screens (?screen=list|group|member|me|requests|off). Data is fake. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE · Group screens</title>
+<style>
+  :root { --bg:#171c28; --surf:#1f2535; --surf2:#262d40; --line:#3a4256; --ink:#e6e9f2; --mut:#9aa3b8; --pri:#7aa2f7; --onpri:#0d1b3d; --err:#f28b82; --ok:#81c995; --warn:#fdd663; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#0e111a; font:15px/1.45 system-ui,"Segoe UI",Roboto,sans-serif; color:var(--ink); display:flex; justify-content:center; padding:24px 0 140px; }
+  .phone { width:400px; min-height:820px; background:var(--bg); border-radius:28px; border:1px solid #2a3145; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+  .top { display:flex; align-items:center; gap:14px; padding:18px 20px 6px; font-size:22px; font-weight:700; }
+  .top .act { margin-left:auto; font-size:14px; color:var(--pri); font-weight:600; }
+  .scroll { flex:1; padding:6px 20px 30px; overflow:auto; }
+  h1 { font-size:24px; margin:6px 0 2px; } h3 { font-size:15px; margin:16px 0 6px; }
+  .mut { color:var(--mut); } .err { color:var(--err); } .ok { color:var(--ok); } .warn { color:var(--warn); }
+  .small { font-size:12px; }
+  .card { background:var(--surf2); border-radius:14px; padding:14px; margin:10px 0; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:6px 0; }
+  .seg { display:inline-flex; background:var(--surf); border:1px solid var(--line); border-radius:18px; overflow:hidden; font-size:13px; }
+  .seg span { padding:5px 12px; } .seg span.on { background:var(--pri); color:var(--onpri); font-weight:600; }
+  .bar { height:8px; background:#2f3850; border-radius:4px; overflow:hidden; margin-top:4px; }
+  .bar i { display:block; height:100%; background:var(--pri); border-radius:4px; }
+  .bar i.over { background:var(--err); } .bar i.near { background:var(--warn); }
+  .rank { width:22px; color:var(--mut); font-weight:700; }
+  .av { width:30px; height:30px; border-radius:50%; background:#34406a; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex:none; }
+  .chip { display:inline-block; font-size:12px; padding:3px 10px; border-radius:12px; background:#2f3850; color:var(--mut); margin:2px 4px 2px 0; }
+  .chip.on { background:var(--pri); color:var(--onpri); }
+  .btn { display:block; width:100%; text-align:center; padding:11px; border-radius:22px; font-weight:600; border:1px solid var(--line); background:transparent; color:var(--pri); margin-top:10px; font:inherit; font-weight:600; }
+  .btn.fill { background:var(--pri); color:var(--onpri); border-color:var(--pri); }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th, td { padding:6px 4px; border-bottom:1px solid var(--line); text-align:right; }
+  th:first-child, td:first-child { text-align:left; } th { color:var(--mut); font-weight:600; }
+  td.hi { color:var(--warn); font-weight:700; }
+  .badge { background:var(--err); color:#200; border-radius:9px; font-size:11px; padding:1px 7px; font-weight:700; margin-left:6px; }
+  .note { border-left:3px solid var(--line); padding-left:10px; }
+  /* layout D: 8dp scale. 16 screen edge, 24 between sections, 16 inside a surface */
+  .d { display:flex; flex-direction:column; gap:24px; padding-top:8px; }
+  .d .bar2 { display:flex; justify-content:space-between; align-items:center; }
+  .d .upd { font-size:12px; color:var(--mut); margin-top:8px; }
+  .hero { background:#232b45; border-radius:24px; padding:20px; }
+  .hero .lab { font-size:13px; color:var(--mut); }
+  .hero .big { font-size:40px; font-weight:800; letter-spacing:-1px; font-variant-numeric:tabular-nums; line-height:1.1; margin:4px 0 6px; }
+  .hero .place { font-size:15px; } .hero .place b { color:var(--pri); }
+  .hero .bud { margin-top:16px; padding-top:16px; border-top:1px solid #33405f; }
+  .sechead { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .sechead h2 { font-size:17px; margin:0; }
+  .ib { width:48px; height:48px; border-radius:50%; border:0; background:transparent; color:var(--mut); font-size:18px; cursor:pointer; margin-right:-12px; }
+  .help { background:var(--surf); border-radius:16px; padding:12px 16px; font-size:13px; color:var(--mut); margin-bottom:8px; }
+  .list { background:var(--surf2); border-radius:20px; overflow:hidden; }
+  .lr { padding:12px 16px; min-height:72px; cursor:pointer; border-top:1px solid #323a52; }
+  .lr:first-child { border-top:0; }
+  .lr.me { background:#2b3658; }
+  .lr .top1 { display:flex; align-items:center; gap:12px; }
+  .lr .nm { flex:1; min-width:0; }
+  .lr .nm b { font-size:15px; } .lr .amt { font-weight:700; font-variant-numeric:tabular-nums; font-size:15px; }
+  .lr .chev { color:var(--mut); width:16px; text-align:center; transition:transform .2s; } .lr.open .chev { transform:rotate(180deg); }
+  .st { font-size:12px; font-weight:600; } .st.ok { color:var(--ok); } .st.near { color:var(--warn); } .st.over { color:var(--err); } .st.none { color:var(--mut); font-weight:500; }
+  .ring { width:44px; height:44px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+  .ring .av { width:36px; height:36px; background:#2b3557; }
+  .rk { width:14px; font-size:13px; color:var(--mut); font-weight:700; text-align:center; flex:none; }
+  .stack { display:flex; height:6px; border-radius:3px; overflow:hidden; margin:10px 0 0 70px; gap:2px; }
+  .det { margin:12px 0 4px 70px; }
+  .det .c { display:flex; align-items:center; gap:8px; font-size:13px; padding:3px 0; }
+  .det .c span:nth-child(2) { flex:1; color:var(--mut); } .det .c span:last-child { font-variant-numeric:tabular-nums; }
+  .dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .stale { font-size:12px; color:var(--warn); margin:6px 0 0 70px; }
+  .codecard { background:var(--surf); border-radius:20px; padding:16px; display:flex; justify-content:space-between; align-items:center; }
+  .codecard button { min-height:48px; padding:0 16px; border-radius:24px; border:1px solid var(--line); background:transparent; color:var(--pri); font:inherit; font-weight:600; }
+  /* prototype switcher — not part of the design */
+  .sw { position:fixed; bottom:12px; left:50%; transform:translateX(-50%); background:#fff; color:#111; border-radius:18px; box-shadow:0 6px 24px rgba(0,0,0,.5); padding:8px 10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; max-width:760px; justify-content:center; font-size:13px; }
+  .sw button { border:0; background:#eee; border-radius:999px; padding:5px 10px; cursor:pointer; font:inherit; }
+  .sw button.on { background:#111; color:#fff; } .sw b { padding:0 4px; }
+  .state { position:fixed; top:12px; right:12px; width:260px; background:#fff; color:#111; font:12px/1.4 Consolas,monospace; padding:10px; border-radius:10px; white-space:pre-wrap; }
+  @media (max-width:1000px) { .state { display:none; } }
+</style>
+</head>
+<body>
+<div class="phone" id="phone"></div>
+<div class="sw" id="sw"></div>
+<div class="state" id="state"></div>
+<script>
+const VARIANTS = { A: "Ranking first", B: "Category table", C: "Member cards", D: "Refined C (Mobbin)" };
+const SCREENS = { list: "Group list", group: "Group", member: "Member card", me: "What others see about me", requests: "Join requests", off: "Online off" };
+const p = new URLSearchParams(location.search);
+let variant = VARIANTS[p.get("variant")] ? p.get("variant") : "D";
+let open = "Dave";
+let screen = SCREENS[p.get("screen")] ? p.get("screen") : "group";
+let period = "Month";
+
+// Fake data: month totals in RM per category. Budgets are personal limits.
+const M = [
+  { a: "Aisyah", cats: { "Food & Dining": 612, Transport: 140, Shopping: 220, Entertainment: 95 }, budgets: { "Food & Dining": 600, Total: 1200 }, upd: "today 14:02" },
+  { a: "Dave", me: true, cats: { "Food & Dining": 480, Transport: 210, Shopping: 160, Coffee: 74 }, budgets: { "Food & Dining": 500 }, upd: "today 14:30" },
+  { a: "Ken", cats: { "Food & Dining": 390, Transport: 60, Bills: 310, Makan: 120 }, budgets: {}, upd: "3 days ago" },
+  { a: "Mei", cats: { "Food & Dining": 300, Shopping: 410, Health: 80 }, budgets: { Shopping: 350 }, upd: "today 09:15" },
+];
+const wk = x => Math.round(x * 0.27);
+const val = x => period === "Month" ? x : wk(x);
+const tot = m => Object.values(m.cats).reduce((s, x) => s + val(x), 0);
+const rm = x => "RM " + x.toLocaleString("en-MY");
+const ranked = () => [...M].sort((x, y) => tot(y) - tot(x));
+const shared = () => { const c = {}; M.forEach(m => Object.keys(m.cats).forEach(k => c[k.toLowerCase()] = (c[k.toLowerCase()] || 0) + 1)); return Object.keys(c).filter(k => c[k] >= 2); };
+const name = k => { for (const m of M) for (const c of Object.keys(m.cats)) if (c.toLowerCase() === k) return c; return k; };
+const spentFor = (m, cat) => cat === "Total" ? tot(m) : val(m.cats[cat] || 0);
+
+function budgetBars(m) {
+  const b = Object.entries(m.budgets);
+  if (!b.length) return `<div class="mut small">No budgets</div>`;
+  return b.map(([cat, lim]) => {
+    const limit = period === "Month" ? lim : wk(lim), s = spentFor(m, cat), pct = Math.round(s / limit * 100);
+    const cls = pct > 100 ? "over" : pct >= 80 ? "near" : "";
+    return `<div class="small row" style="margin:8px 0 0"><span>${cat}</span><span class="${pct > 100 ? "err" : pct >= 80 ? "warn" : "mut"}">${rm(s)} of ${rm(limit)} (${pct}%)</span></div><div class="bar"><i class="${cls}" style="width:${Math.min(pct, 100)}%"></i></div>`;
+  }).join("");
+}
+const head = (title, act = "") => `<div class="top"><span>←</span><span>${title}</span>${act ? `<span class="act">${act}</span>` : ""}</div>`;
+const controls = () => `<div class="row"><span class="seg"><span class="${period === "Week" ? "on" : ""}" onclick="setP('Week')">Week</span><span class="${period === "Month" ? "on" : ""}" onclick="setP('Month')">Month</span></span></div><div class="mut small">${period === "Month" ? "November 2026" : "Mon 9 – Sun 15 Nov"} · pull down to refresh</div>`;
+
+function groupA() {
+  const r = ranked(), max = tot(r[0]);
+  const cats = shared();
+  return controls() + `<h3>Total</h3>` + r.map((m, i) => `<div class="card" style="padding:10px 12px;margin:6px 0"><div class="row" style="margin:0"><span class="rank">${i + 1}</span><span class="av">${m.a[0]}</span><span style="flex:1">${m.a}${m.me ? " <span class='mut small'>(you)</span>" : ""}</span><b>${rm(tot(m))}</b></div><div class="bar"><i style="width:${tot(m) / max * 100}%"></i></div>${m.upd.includes("days") ? `<div class="small warn" style="margin-top:4px">Last updated ${m.upd}</div>` : ""}</div>`).join("")
+    + `<h3>By category</h3><div>${cats.map((k, i) => `<span class="chip ${i === 0 ? "on" : ""}">${name(k)}</span>`).join("")}</div>`
+    + [...M].filter(m => Object.keys(m.cats).some(c => c.toLowerCase() === cats[0])).sort((x, y) => val(y.cats[name(cats[0])] || 0) - val(x.cats[name(cats[0])] || 0)).map((m, i) => `<div class="row small"><span>${i + 1}. ${m.a}</span><span>${rm(val(m.cats[name(cats[0])] || 0))}</span></div>`).join("")
+    + `<div class="mut small" style="margin-top:6px">Only categories that 2 or more members share. Tap a member for their own categories and budgets.</div>`;
+}
+function groupB() {
+  const cats = shared().map(name), r = ranked();
+  return controls() + `<div class="card" style="padding:8px"><table><tr><th>Member</th>${cats.map(c => `<th>${c.split(" ")[0]}</th>`).join("")}<th>Total</th></tr>`
+    + r.map(m => { const best = {}; return `<tr><td>${m.a}</td>${cats.map(c => { const v = m.cats[c]; const top = v && Math.max(...M.map(x => x.cats[c] || 0)) === v; return `<td class="${top ? "hi" : ""}">${v ? val(v) : "–"}</td>`; }).join("")}<td><b>${tot(m)}</b></td></tr>`; }).join("")
+    + `</table></div><div class="mut small">Amounts in RM. Yellow: highest in the column. Other categories show on each member's card.</div><h3>Budgets</h3>`
+    + r.filter(m => Object.keys(m.budgets).length).map(m => `<div class="card" style="padding:10px 12px;margin:6px 0"><b>${m.a}</b>${budgetBars(m)}</div>`).join("");
+}
+function groupC() {
+  const r = ranked();
+  return controls() + r.map((m, i) => `<div class="card"><div class="row" style="margin:0 0 6px"><span class="av">${m.a[0]}</span><span style="flex:1"><b>${i + 1}. ${m.a}</b>${m.me ? " <span class='mut small'>(you)</span>" : ""}<br><span class="small ${m.upd.includes("days") ? "warn" : "mut"}">Last updated ${m.upd}</span></span><b>${rm(tot(m))}</b></div>`
+    + Object.entries(m.cats).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([c, v]) => `<div class="row small" style="margin:2px 0"><span class="mut">${c}</span><span>${rm(val(v))}</span></div>`).join("")
+    + (Object.keys(m.budgets).length ? budgetBars(m) : "") + `</div>`).join("");
+}
+function worst(m) {
+  let w = null;
+  for (const [cat, lim] of Object.entries(m.budgets)) { const limit = period === "Month" ? lim : wk(lim); const pct = spentFor(m, cat) / limit * 100; if (!w || pct > w.pct) w = { cat, pct }; }
+  return w;
+}
+const short = c => c === "Total" ? "budget" : c.split(" ")[0];
+function statusChip(m) {
+  const w = worst(m);
+  if (!w) return `<span class="st none">No budgets set</span>`;
+  if (w.pct > 100) return `<span class="st over">▲ Over ${short(w.cat)}</span>`;
+  if (w.pct >= 80) return `<span class="st near">! Near ${short(w.cat)} limit</span>`;
+  return `<span class="st ok">✓ On budget</span>`;
+}
+function ring(m) {
+  const w = worst(m), pct = w ? Math.min(w.pct, 100) : 0, col = !w ? "#3a4256" : w.pct > 100 ? "var(--err)" : w.pct >= 80 ? "var(--warn)" : "var(--ok)";
+  return `<span class="ring" style="background:conic-gradient(${col} ${pct}%, #3a4256 0)" aria-hidden="true"><span class="av">${m.a[0]}</span></span>`;
+}
+// The app's own default category colors (DefaultCategories.kt); a person's own categories are grey.
+const COL = { "food & dining": "#E53935", transport: "#1E88E5", shopping: "#8E24AA", bills: "#FB8C00", entertainment: "#43A047", health: "#00ACC1" };
+const col = (c, i) => COL[c.toLowerCase()] || ["#8a93a8", "#6b7389", "#a3abbd"][i % 3];
+let help = false;
+function groupD() {
+  const r = ranked(), me = M.find(m => m.me), place = r.indexOf(me) + 1, days = period === "Month" ? 18 : 3;
+  const ord = n => n + (["st", "nd", "rd"][n - 1] || "th");
+  return `<div class="d"><div><div class="bar2"><span class="seg"><span class="${period === "Week" ? "on" : ""}" onclick="setP('Week')">Week</span><span class="${period === "Month" ? "on" : ""}" onclick="setP('Month')">Month</span></span></div><div class="upd">Updated just now. Pull down to refresh.</div></div>`
+    + `<div class="hero"><div class="lab">You spent ${period === "Month" ? "in November" : "this week"}</div><div class="big">${rm(tot(me))}</div><div class="place"><b>${ord(place)} of ${r.length}</b> in Uni friends. Resets in ${days} days.</div><div class="bud">${budgetBars(me).replace("margin:8px 0 0", "margin:0")}</div></div>`
+    + `<div><div class="sechead"><h2>Members</h2><button class="ib" aria-label="How to read this list" onclick="event.stopPropagation();help=!help;render()">ⓘ</button></div>`
+    + (help ? `<div class="help">Members are listed by total spending. A higher total is not a win. The ring shows how close each member is to their nearest budget limit: green on budget, yellow from 80%, red over.</div>` : "")
+    + `<div class="list">` + r.map((m, i) => {
+        const cats = Object.entries(m.cats).sort((x, y) => y[1] - x[1]), t = tot(m), ex = open === m.a;
+        return `<div class="lr ${m.me ? "me" : ""} ${ex ? "open" : ""}" onclick="toggle('${m.a}')" role="button" aria-expanded="${ex}"><div class="top1"><span class="rk">${i + 1}</span>${ring(m)}<span class="nm"><b>${m.a}${m.me ? " (you)" : ""}</b><br>${statusChip(m)}</span><span class="amt">${rm(t)}</span><span class="chev">⌄</span></div>`
+          + `<div class="stack">${cats.map(([c, v], j) => `<i style="flex:${val(v)};background:${col(c, j)}"></i>`).join("")}</div>`
+          + (m.upd.includes("days") ? `<div class="stale">Updated ${m.upd}</div>` : "")
+          + (ex ? `<div class="det">${cats.map(([c, v], j) => `<div class="c"><span class="dot" style="background:${col(c, j)}"></span><span>${c}</span><span>${rm(val(v))}</span></div>`).join("")}${Object.keys(m.budgets).length ? budgetBars(m) : ""}</div>` : "")
+          + `</div>`; }).join("") + `</div></div>`
+    + `<div class="codecard"><div><div class="mut small">Group code</div><b style="letter-spacing:2px;font-size:17px">GRP-7KQ2</b></div><button>Share code</button></div></div>`;
+}
+function toggle(a) { open = open === a ? "" : a; render(); }
+function render() {
+  const ph = document.getElementById("phone");
+  const reqs = 2;
+  if (screen === "list") ph.innerHTML = head("Groups", "+ New") + `<div class="scroll">
+    <div class="card"><div class="row" style="margin:0"><b>Uni friends</b><span class="badge">${reqs}</span></div><div class="mut small">4 members · you are the owner · you rank 2nd this month</div></div>
+    <div class="card"><div class="row" style="margin:0"><b>Bali trip</b></div><div class="mut small">6 members · Rp view · you rank 4th this week</div></div>
+    <button class="btn fill">Join a group</button><div class="mut small" style="margin-top:8px">You can be in up to 5 groups. Each group has up to 10 members.</div></div>`;
+  else if (screen === "group") ph.innerHTML = head("Uni friends", variant === "D" ? "" : "Share code") + `<div class="scroll">${variant === "A" ? groupA() : variant === "B" ? groupB() : variant === "C" ? groupC() : groupD()}
+    <div class="row" style="margin-top:16px"><a class="act" style="color:var(--pri)">Join requests (2)</a><a style="color:var(--pri)">What others see about me</a></div></div>`;
+  else if (screen === "member") { const m = M[0]; ph.innerHTML = head(m.a) + `<div class="scroll">${controls()}
+    <div class="card"><div class="row" style="margin:0"><span class="mut">Total</span><b style="font-size:22px">${rm(tot(m))}</b></div><div class="mut small">Last updated ${m.upd}</div></div>
+    <h3>Categories <span class="mut small">(their own names)</span></h3>${Object.entries(m.cats).sort((x, y) => y[1] - x[1]).map(([c, v]) => `<div class="row"><span>${c}</span><span>${rm(val(v))}</span></div>`).join("")}
+    <h3>Budgets</h3>${budgetBars(m)}
+    <div class="mut small note" style="margin-top:16px">Single payments, merchants, times and notes are never shared.</div></div>`; }
+  else if (screen === "me") { const m = M[1]; ph.innerHTML = head("What others see about me") + `<div class="scroll">
+    <div class="mut">This is exactly what the 3 other members of <b>Uni friends</b> see about you.</div>${controls()}
+    <div class="card"><div class="row" style="margin:0"><span class="mut">Total</span><b style="font-size:22px">${rm(tot(m))}</b></div><div class="mut small">Sent ${m.upd}</div></div>
+    ${Object.entries(m.cats).map(([c, v]) => `<div class="row"><span>${c}</span><span>${rm(val(v))}</span></div>`).join("")}
+    <h3>Budgets</h3>${budgetBars(m)}
+    <div class="card small"><b>Never shared:</b> single payments, merchants, times, notes, money in.</div>
+    <button class="btn">Leave group</button></div>`; }
+  else if (screen === "requests") ph.innerHTML = head("Join requests") + `<div class="scroll">
+    <div class="mut small">Only you (the group owner) see this. Requests expire after 7 days.</div>
+    ${[["Raj", "2 hours ago"], ["Siti", "yesterday"]].map(([a, t]) => `<div class="card"><div class="row" style="margin:0"><span class="av">${a[0]}</span><span style="flex:1"><b>${a}</b><br><span class="mut small">Asked ${t} with the group code</span></span></div><div class="row"><button class="btn" style="margin:0">Decline</button><button class="btn fill" style="margin:0">Approve</button></div></div>`).join("")}
+    <h3>Group code</h3><div class="card row"><b style="font-size:20px;letter-spacing:2px">GRP-7KQ2</b><span style="color:var(--pri)">Share</span></div>
+    <button class="btn">Make a new code</button><div class="mut small" style="margin-top:6px">A new code stops the old one. Members stay in the group.</div></div>`;
+  else ph.innerHTML = head("Groups") + `<div class="scroll" style="text-align:center;padding-top:120px">
+    <div style="font-size:40px">⦸</div><h1>Online features are off</h1><div class="mut">Koban makes no network calls. Your groups do not load, and they show your last totals with “last updated”.</div>
+    <button class="btn fill">Turn on online features</button></div>`;
+  document.getElementById("state").textContent = JSON.stringify({ variant: variant + " · " + VARIANTS[variant], screen, period, members: ranked().map(m => m.a + " " + tot(m)) }, null, 1);
+  const sw = document.getElementById("sw");
+  sw.innerHTML = `<b>Layout</b>` + Object.entries(VARIANTS).map(([k, v]) => `<button class="${k === variant ? "on" : ""}" onclick="go('${k}',screen)">${k} · ${v}</button>`).join("")
+    + `<b>Screen</b>` + Object.entries(SCREENS).map(([k, v]) => `<button class="${k === screen ? "on" : ""}" onclick="go(variant,'${k}')">${v}</button>`).join("");
+}
+function go(v, s) { variant = v; screen = s; history.replaceState(null, "", `?variant=${v}&screen=${s}`); render(); }
+function setP(x) { period = x; render(); }
+render();
+</script>
+</body>
+</html>
