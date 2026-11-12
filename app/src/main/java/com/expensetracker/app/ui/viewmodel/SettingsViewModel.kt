@@ -180,6 +180,13 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    val onlineFeatures: StateFlow<Boolean> = settingsRepository.onlineFeatures
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setOnlineFeatures(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setOnlineFeatures(on) }
+    }
+
     fun removeOnlineAccess() {
         viewModelScope.launch { settingsRepository.setDeviceToken("") }
     }

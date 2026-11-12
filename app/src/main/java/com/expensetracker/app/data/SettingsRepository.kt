@@ -30,6 +30,8 @@ class SettingsRepository @Inject constructor(
     private val geminiPrefillKey = booleanPreferencesKey("gemini_prefill_enabled")
     private val geminiApiKeyKey = stringPreferencesKey("gemini_api_key")
     private val deviceTokenKey = stringPreferencesKey("device_token")
+    private val groupSessionKey = stringPreferencesKey("group_session")
+    private val onlineFeaturesKey = booleanPreferencesKey("online_features")
 
     val allowlistedPackages: Flow<Set<String>> = context.dataStore.data.map { prefs ->
         prefs[allowlistKey] ?: emptySet()
@@ -57,6 +59,22 @@ class SettingsRepository @Inject constructor(
     /** Given by Koban's server for a good invite code. Blank means no online access. Never log it. */
     val deviceToken: Flow<String> = context.secretsDataStore.data.map { prefs ->
         prefs[deviceTokenKey].orEmpty()
+    }
+
+    /** The Supabase session for groups (JSON). Blank means signed out. Never log it. */
+    val groupSession: Flow<String> = context.secretsDataStore.data.map { it[groupSessionKey].orEmpty() }
+
+    suspend fun setGroupSession(json: String) {
+        context.secretsDataStore.edit { prefs ->
+            if (json.isBlank()) prefs.remove(groupSessionKey) else prefs[groupSessionKey] = json
+        }
+    }
+
+    /** The online features switch. On by default; off means Koban makes no network calls. */
+    val onlineFeatures: Flow<Boolean> = context.dataStore.data.map { it[onlineFeaturesKey] ?: true }
+
+    suspend fun setOnlineFeatures(on: Boolean) {
+        context.dataStore.edit { it[onlineFeaturesKey] = on }
     }
 
     suspend fun setDeviceToken(token: String) {

@@ -1,6 +1,7 @@
 package com.expensetracker.app.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -243,6 +244,31 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+
+            item {
+                val online by viewModel.onlineFeatures.collectAsStateWithLifecycle()
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = online,
+                            role = Role.Switch,
+                            onValueChange = viewModel::setOnlineFeatures
+                        ),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "Online features", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = if (online) "On: groups and reading receipts with Claude can use the internet."
+                            else "Off: Koban makes no network calls. Groups and reading receipts with Claude stop.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = online, onCheckedChange = null)
                 }
             }
 

@@ -6,8 +6,10 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
+import com.expensetracker.app.data.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -37,7 +39,8 @@ sealed interface Registration {
 @Singleton
 class ReceiptCloudClient @Inject constructor(
     @ApplicationContext private val context: Context,
-    baseClient: OkHttpClient
+    baseClient: OkHttpClient,
+    private val settings: SettingsRepository
 ) {
     // Claude 60 s -> Edge Function 70 s -> app 90 s.
     private val client = baseClient.newBuilder()
@@ -47,6 +50,7 @@ class ReceiptCloudClient @Inject constructor(
         .build()
 
     suspend fun register(inviteCode: String): Registration = withContext(Dispatchers.IO) {
+        if (!settings.onlineFeatures.first()) return@withContext Registration.Failed(ONLINE_OFF)
         val body = JSONObject().put("inviteCode", inviteCode.trim().uppercase()).toString()
             .toRequestBody("application/json".toMediaType())
         try {
@@ -65,6 +69,7 @@ class ReceiptCloudClient @Inject constructor(
     }
 
     suspend fun read(imageUri: Uri, deviceToken: String): CloudRead = withContext(Dispatchers.IO) {
+        if (!settings.onlineFeatures.first()) return@withContext CloudRead.Failed(ONLINE_OFF)
         val photo = try {
             shrink(imageUri)
         } catch (e: Exception) {
@@ -141,6 +146,7 @@ class ReceiptCloudClient @Inject constructor(
         private const val BASE = "https://ydrlxhqdalomlkqkdjyb.supabase.co/functions/v1/"
         private const val MAX_SIDE = 1600
         private const val NOT_REACHABLE = "Claude was not reachable."
+        private const val ONLINE_OFF = "Turn on online features in Settings to read with Claude."
         private const val COULD_NOT_READ = "Claude could not read this receipt. This used 1 of today's reads."
 
         /** The 200 reply as a read. Accepted when items and charges add up to the printed total exactly. */

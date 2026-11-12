@@ -57,7 +57,7 @@ class GeminiClient @Inject constructor(
         parse: (String) -> T?
     ): T? {
         val apiKey = settingsRepository.geminiApiKey.first()
-        if (apiKey.isBlank()) return null
+        if (apiKey.isBlank() || !settingsRepository.onlineFeatures.first()) return null
 
         val client = if (callTimeoutSeconds == DEFAULT_CALL_TIMEOUT_SECONDS) {
             httpClient
