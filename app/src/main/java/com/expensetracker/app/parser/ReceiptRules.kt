@@ -18,16 +18,8 @@ data class ReceiptDraft(
     val printedTotal: BigDecimal?
 )
 
-/** One recognized text line with its box in image pixels. */
-/** [angle] is ML Kit's line rotation in degrees; negative means the right end sits higher. */
-data class OcrLine(
-    val text: String,
-    val left: Int,
-    val top: Int,
-    val right: Int,
-    val bottom: Int,
-    val angle: Float = 0f
-)
+/** One recognized text line with its box in image pixels. `angle` is ML Kit's line rotation in degrees (0 if unknown). */
+data class OcrLine(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int, val angle: Float = 0f)
 
 /** `calculated` holds display phrases for charges the rules computed, e.g. "10% service charge". */
 data class ReceiptRead(val draft: ReceiptDraft, val accepted: Boolean, val calculated: List<String>)
@@ -53,7 +45,9 @@ object ReceiptRules {
     private val QTY_X = Regex("""(\d+(?:\.\d+)?)\s*[xX@*]\s*(?:RM\s*)?(\d+\.\d{2})""")
     private val LEAD_QTY = Regex("""^(\d{1,2})\s+([A-Za-z].*)$""")
     private val LEAD_NUMBER_COLUMNS = Regex("""^(\d{1,2})\s+\d+\.\d{2}\s*$""")
-    private val TRAILING_NUMBERS = Regex("""(\s+$AMOUNT|\s+\d+(?:\.\d+)?)+\s*$""", I)
+    /** A unit price after an item name, "(26.00/ea)"; OCR may read the "(" as "{" or the "." as a space. */
+    private val UNIT_PRICE = Regex("""\s*[({]\s*\d+[.,\s]?\d{0,2}\s*/\s*e\s*a\s*\)?\s*$""", I)
+    private val TRAILING_NUMBERS =Regex("""(\s+$AMOUNT|\s+\d+(?:\.\d+)?)+\s*$""", I)
 
     private fun kw(vararg words: String) =
         Regex("(?<![A-Z])(?:" + words.joinToString("|") + ")(?![A-Z])", I)
@@ -103,16 +97,27 @@ object ReceiptRules {
         return if (neg) v.negate() else v
     }
 
+    /**
+     * Undo a tilted photo: move each line's vertical center by -x * tan(median angle of the wide lines).
+     * On a tilted receipt the right-hand price column sits higher or lower than its names. Short lines often
+     * report 0 degrees, so only lines wider than 300 px vote. No usable angle: the same list is returned.
+     */
+    internal fun straighten(lines: List<OcrLine>): List<OcrLine> {
+        val angles = lines.filter { it.right - it.left > 300 && it.angle != 0f }.map { it.angle }.sorted()
+        if (angles.isEmpty()) return lines
+        val k = Math.tan(Math.toRadians(angles[angles.size / 2].toDouble()))
+        return lines.map {
+            val shift = (-(it.left + it.right) / 2.0 * k).toInt()
+            it.copy(top = it.top + shift, bottom = it.bottom + shift)
+        }
+    }
+
     /** Join lines whose vertical centers sit inside one row band, left to right, one space between parts. */
     internal fun rows(lines: List<OcrLine>): List<String> {
-        // A tilted photo lifts one end of every row, so a price on the far right can leave its item's row.
-        // Undo the tilt before banding: shift each line's center by the receipt's slope at its x.
-        val slope = Math.tan(Math.toRadians(skew(lines)))
-        fun center(l: OcrLine) = (l.top + l.bottom) / 2.0 - (l.left + l.right) / 2.0 * slope
         class Band(val cy: Double, val h: Int, val parts: MutableList<Pair<Int, String>>)
         val bands = mutableListOf<Band>()
-        for (l in lines.sortedBy(::center)) {
-            val cy = center(l)
+        for (l in lines.sortedBy { (it.top + it.bottom) / 2.0 }) {
+            val cy = (l.top + l.bottom) / 2.0
             val h = maxOf(1, l.bottom - l.top)
             val band = bands.firstOrNull { Math.abs(it.cy - cy) < 0.5 * minOf(h, it.h) }
             if (band != null) band.parts += l.left to l.text else bands += Band(cy, h, mutableListOf(l.left to l.text))
@@ -120,12 +125,6 @@ object ReceiptRules {
         return bands.map { b ->
             b.parts.sortedWith(compareBy({ it.first }, { it.second })).joinToString(" ") { it.second }.trim()
         }
-    }
-
-    /** The receipt's tilt: the median angle of long lines. A short line, such as a lone price, often reports 0. */
-    private fun skew(lines: List<OcrLine>): Double {
-        val angles = lines.filter { it.right - it.left >= 4 * (it.bottom - it.top) }.map { it.angle.toDouble() }.sorted()
-        return if (angles.isEmpty()) 0.0 else angles[angles.size / 2]
     }
 
     /** Repair OCR damage on amounts at the end of a row: "14 00", "79, 60", "-0. 03", "1O.50". */
@@ -251,7 +250,7 @@ object ReceiptRules {
                     qty = q.groupValues[1].toBigDecimal().toInt().takeIf { it != 0 } ?: 1
                     name = row.substring(0, q.range.first).trim()
                 }
-                name = TRAILING_NUMBERS.replace(" $name", "").trim()
+                name = TRAILING_NUMBERS.replace(" $name", "").trim().replace(UNIT_PRICE, "")
                 val lq = LEAD_QTY.matchEntire(name)
                 if (lq != null && q == null) {
                     qty = lq.groupValues[1].toInt().takeIf { it != 0 } ?: 1
@@ -314,9 +313,19 @@ object ReceiptRules {
         return out
     }
 
-    /** Null when the lines hold no item and no printed total. */
+    /**
+     * Null when the lines hold no item and no printed total. The lines are read as they are first; the
+     * straightened read is used only when it adds up and the plain read does not. ML Kit also reports small
+     * angles on a curled but level receipt, so straightening an accepted read can only make it worse.
+     */
     fun read(lines: List<OcrLine>, now: Long = System.currentTimeMillis()): ReceiptRead? {
-        val rows = rows(lines)
+        val plain = readRows(rows(lines), now)
+        if (plain?.accepted == true) return plain
+        val straight = straighten(lines).takeIf { it !== lines }?.let { readRows(rows(it), now) }
+        return if (straight?.accepted == true) straight else plain
+    }
+
+    private fun readRows(rows: List<String>, now: Long): ReceiptRead? {
         val p = parse(rows)
         val total = p.totals.lastOrNull()
         val printed = total ?: p.subtotal
