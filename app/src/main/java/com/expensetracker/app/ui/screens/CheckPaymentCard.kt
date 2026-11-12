@@ -106,7 +106,6 @@ internal fun CheckPaymentCard(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Tag("${card.appName} · ${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(payment.notificationPostTime))}")
                 if (payment.format == CaptureFormat.UNKNOWN) Tag("Unknown format", money.review)
-                if (payment.likelyPromotion) Tag("Likely promotion", money.review)
             }
             Column(
                 modifier = Modifier

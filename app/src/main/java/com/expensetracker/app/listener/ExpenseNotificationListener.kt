@@ -3,14 +3,10 @@ package com.expensetracker.app.listener
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import com.expensetracker.app.data.MerchantCategoryRepository
 import com.expensetracker.app.data.PendingPaymentRepository
 import com.expensetracker.app.data.SettingsRepository
 import com.expensetracker.app.di.NotificationListenerEntryPoint
 import com.expensetracker.app.parser.AmountFormatter
-import com.expensetracker.app.parser.GeminiClient
-import com.expensetracker.app.parser.LlmParseResult
-import com.expensetracker.app.parser.MerchantNormalizer
 import com.expensetracker.app.parser.PaymentRules
 import com.expensetracker.app.parser.RuleMatch
 import dagger.hilt.android.EntryPointAccessors
@@ -31,12 +27,6 @@ class ExpenseNotificationListener : NotificationListenerService() {
 
     @Volatile
     private var settingsRepository: SettingsRepository? = null
-
-    @Volatile
-    private var geminiClient: GeminiClient? = null
-
-    @Volatile
-    private var merchantCategoryRepository: MerchantCategoryRepository? = null
 
     @Volatile
     private var listenerConnected = false
@@ -250,7 +240,6 @@ class ExpenseNotificationListener : NotificationListenerService() {
                             "${parsed.merchant ?: "Unknown"} · RM ${AmountFormatter.formatDisplay(parsed.amount)}"
                         RecentNotificationsStore.update(captureId, NotificationDisposition.WAITING, summary)
                         NotificationAccessHelper.logDebug("Waiting for check: $summary")
-                        prefillWithGemini(id, parseText)
                     } else {
                         RecentNotificationsStore.update(
                             captureId,
@@ -267,28 +256,6 @@ class ExpenseNotificationListener : NotificationListenerService() {
                 e.message ?: "Save failed"
             )
             NotificationAccessHelper.logDebug("Failed to save notification: ${e.message}")
-        }
-    }
-
-    /** Optional enrich step. Any failure leaves the regex values as they are. */
-    private suspend fun prefillWithGemini(id: String, text: String) {
-        try {
-            val gemini = geminiClient ?: return
-            val memory = merchantCategoryRepository ?: return
-            if (!settingsRepository!!.geminiPrefillEnabled.first() || !gemini.isConfigured()) return
-            when (val result = gemini.parsePaymentNotification(text)) {
-                is LlmParseResult.Success -> {
-                    val merchant = MerchantNormalizer.clean(result.expense.merchant)
-                    pendingPaymentRepository!!.enrich(
-                        id, merchant, memory.categoryIdForMerchant(merchant), false
-                    )
-                }
-                is LlmParseResult.NotTransaction ->
-                    pendingPaymentRepository!!.enrich(id, null, null, true)
-                LlmParseResult.Failed -> Unit
-            }
-        } catch (e: Exception) {
-            NotificationAccessHelper.logDebug("Gemini pre-fill skipped: ${e.javaClass.simpleName}")
         }
     }
 
@@ -330,18 +297,14 @@ class ExpenseNotificationListener : NotificationListenerService() {
 
     private fun ensureRepositories(): Boolean {
         if (pendingPaymentRepository != null &&
-            settingsRepository != null &&
-            geminiClient != null &&
-            merchantCategoryRepository != null
+            settingsRepository != null
         ) {
             return true
         }
 
         synchronized(initLock) {
             if (pendingPaymentRepository != null &&
-                settingsRepository != null &&
-                geminiClient != null &&
-                merchantCategoryRepository != null
+                settingsRepository != null
             ) {
                 return true
             }
@@ -352,8 +315,6 @@ class ExpenseNotificationListener : NotificationListenerService() {
                 )
                 pendingPaymentRepository = entryPoint.pendingPaymentRepository()
                 settingsRepository = entryPoint.settingsRepository()
-                geminiClient = entryPoint.geminiClient()
-                merchantCategoryRepository = entryPoint.merchantCategoryRepository()
                 true
             } catch (e: Exception) {
                 NotificationAccessHelper.logDebug("Failed to init repositories: ${e.message}")

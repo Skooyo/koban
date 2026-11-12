@@ -17,7 +17,7 @@ import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
-/** Holds the Gemini key and the device token. Excluded from backup in res/xml/backup_rules.xml and data_extraction_rules.xml. */
+/** Holds the device token. Excluded from backup in res/xml/backup_rules.xml and data_extraction_rules.xml. */
 private val Context.secretsDataStore: DataStore<Preferences> by preferencesDataStore(name = "secrets")
 
 @Singleton
@@ -27,8 +27,6 @@ class SettingsRepository @Inject constructor(
     private val allowlistKey = stringSetPreferencesKey("payment_app_allowlist")
     private val chosenKey = booleanPreferencesKey("payment_apps_chosen")
     private val darkModeKey = booleanPreferencesKey("dark_mode")
-    private val geminiPrefillKey = booleanPreferencesKey("gemini_prefill_enabled")
-    private val geminiApiKeyKey = stringPreferencesKey("gemini_api_key")
     private val deviceTokenKey = stringPreferencesKey("device_token")
     private val groupSessionKey = stringPreferencesKey("group_session")
     private val onlineFeaturesKey = booleanPreferencesKey("online_features")
@@ -44,16 +42,6 @@ class SettingsRepository @Inject constructor(
 
     val darkModeEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[darkModeKey] ?: true
-    }
-
-    /** Off by default. When on and a key exists, Gemini pre-fills waiting payments. */
-    val geminiPrefillEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[geminiPrefillKey] ?: false
-    }
-
-    /** The user's own key. Defaults to the build-time key from .env. Never log it. */
-    val geminiApiKey: Flow<String> = context.secretsDataStore.data.map { prefs ->
-        prefs[geminiApiKeyKey] ?: BuildConfig.GEMINI_API_KEY
     }
 
     /** Given by Koban's server for a good invite code. Blank means no online access. Never log it. */
@@ -86,18 +74,6 @@ class SettingsRepository @Inject constructor(
     suspend fun setDarkMode(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[darkModeKey] = enabled
-        }
-    }
-
-    suspend fun setGeminiPrefillEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[geminiPrefillKey] = enabled
-        }
-    }
-
-    suspend fun setGeminiApiKey(key: String) {
-        context.secretsDataStore.edit { prefs ->
-            prefs[geminiApiKeyKey] = key.trim()
         }
     }
 

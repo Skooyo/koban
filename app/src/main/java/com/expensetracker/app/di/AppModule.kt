@@ -14,13 +14,13 @@ import com.expensetracker.app.data.MIGRATION_7_8
 import com.expensetracker.app.data.MIGRATION_8_9
 import com.expensetracker.app.data.MIGRATION_9_10
 import com.expensetracker.app.data.MIGRATION_10_11
-import com.expensetracker.app.parser.GeminiClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
@@ -56,5 +56,11 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient = GeminiClient.createDefaultHttpClient()
+    fun provideOkHttpClient(): OkHttpClient =
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(18, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .callTimeout(20, TimeUnit.SECONDS)
+            .build()
 }

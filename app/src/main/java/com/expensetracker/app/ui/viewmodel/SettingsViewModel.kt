@@ -36,8 +36,6 @@ data class SettingsUiState(
     val regexTestInput: String = "",
     val regexTestResult: String? = null,
     val reconnectMessage: String? = null,
-    val geminiPrefillEnabled: Boolean = false,
-    val geminiApiKey: String = "",
     val onlineAccess: Boolean = false,
     val inviteBusy: Boolean = false,
     val inviteMessage: String? = null
@@ -78,11 +76,9 @@ class SettingsViewModel @Inject constructor(
             FormSettingsSlice(categories, input, result, reconnect)
         },
         kotlinx.coroutines.flow.combine(
-            settingsRepository.geminiPrefillEnabled,
-            settingsRepository.geminiApiKey,
             settingsRepository.deviceToken,
             invite
-        ) { enabled, key, token, inviteState -> OnlineSettingsSlice(enabled, key, token.isNotBlank(), inviteState) }
+        ) { token, inviteState -> OnlineSettingsSlice(token.isNotBlank(), inviteState) }
     ) { listener, form, online ->
         SettingsUiState(
             isAccessGranted = listener.isAccessGranted,
@@ -99,8 +95,6 @@ class SettingsViewModel @Inject constructor(
             regexTestInput = form.input,
             regexTestResult = form.result,
             reconnectMessage = form.reconnectMessage,
-            geminiPrefillEnabled = online.geminiPrefillEnabled,
-            geminiApiKey = online.geminiApiKey,
             onlineAccess = online.onlineAccess,
             inviteBusy = online.invite.first,
             inviteMessage = online.invite.second
@@ -151,18 +145,6 @@ class SettingsViewModel @Inject constructor(
 
     fun openNotificationSettings() {
         NotificationAccessHelper.openNotificationAccessSettings(context)
-    }
-
-    fun setGeminiPrefillEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.setGeminiPrefillEnabled(enabled)
-        }
-    }
-
-    fun saveGeminiApiKey(key: String) {
-        viewModelScope.launch {
-            settingsRepository.setGeminiApiKey(key)
-        }
     }
 
     /** Trades the invite code for a device token. Only the token is stored, never the code. */
@@ -231,8 +213,6 @@ private data class ListenerSettingsSlice(
 )
 
 private data class OnlineSettingsSlice(
-    val geminiPrefillEnabled: Boolean,
-    val geminiApiKey: String,
     val onlineAccess: Boolean,
     /** Busy flag and the last register error. */
     val invite: Pair<Boolean, String?>

@@ -12,7 +12,7 @@ Android app that tracks spending by reading bank and wallet payment notification
 
 Koban listens to payment alerts from the banking and e-wallet apps you pick. Regex rules read the amount, merchant and direction, and the payment waits on a swipe screen: swipe right to save it, swipe left to drop it. Nothing counts in your totals until you say yes. You get day / week / month spending with categories, bill splits from a receipt photo, and a list of who owes you — without typing every purchase by hand.
 
-It is built for Malaysian Ringgit notifications (`RM` / `MYR`). Maybank and Touch 'n Go have exact rules; other apps use a generic rule. The default build makes no network call to read a notification. Receipt photos are read on the phone with ML Kit, offline. [Google AI Studio](https://aistudio.google.com/) Gemini is optional: it only pre-fills cards.
+It is built for Malaysian Ringgit notifications (`RM` / `MYR`). Maybank and Touch 'n Go have exact rules; other apps use a generic rule. The default build makes no network call to read a notification. Receipt photos are read on the phone with ML Kit, offline.
 
 ```text
 Bank / wallet notification (apps you picked)
@@ -25,7 +25,6 @@ Regex rules: exact per-app rule ──► generic RM/MYR rule ──► no amoun
         │
         ▼
 Waiting payment (on device, not in any total)
-        │   └─ optional: Gemini pre-fills merchant / category, tags "Likely promotion"
         ▼
 Swipe screen: right = save, left = drop, 4 s Undo
         ▼
@@ -58,7 +57,6 @@ Each spending category takes the color of a ringgit note (RM10 red, RM1 blue, RM
 - **Automatic capture** — reads payment notifications via Android’s `NotificationListenerService`, from the payment apps you pick
 - **Regex rules** — exact rules for Maybank and Touch 'n Go; any other text with an `RM` / `MYR` amount becomes a card marked **Unknown format**. Works offline, no API key
 - **Swipe to confirm** — every captured payment waits on a card. Swipe right (or ✓) to save, left (or ✕) to drop, with a 4-second **Undo**. Edit amount, merchant, category, date or direction on the card first
-- **Optional Gemini pre-fill** — off by default; with your own key, Gemini (3.1 / 3.5 Flash Lite, with rate-limit failover) fills merchant and category and tags **Likely promotion**. It never saves anything by itself
 - **Duplicate protection** — skips the same payment when it arrives from multiple apps or twice within a short window; a dropped payment does not come back
 - **Spending views** — day / week / month totals with a category donut, money received, and an All view
 - **Bill splits** — read a receipt photo on the phone (ML Kit Document Scanner and on-device text recognition, offline, no key), tap who had what; only your share counts as spending
@@ -85,37 +83,6 @@ Each spending category takes the color of a ringgit note (RM10 red, RM1 blue, RM
 
 > [!TIP]
 > After a real transfer or Scan & Pay, open Koban. The swipe screen opens by itself, and Home shows "1 payment to check". **Settings → Notification log** shows the notification as **Waiting for check**. Use **Settings → Test parse** to try a notification text without a payment.
-
-### Optional: Google AI Studio (Gemini)
-
-Gemini is off by default. With a key it pre-fills merchant and category on waiting cards and tags likely promotions. Without a key, capture works the same, and receipt scanning still works because it runs on the phone.
-
-Turn it on in **Settings → Gemini (optional)**: switch on **Use Gemini to pre-fill** and paste your key into **Gemini API key**. The key is stored in app-private storage that is excluded from Android backup.
-
-Defaults cycle between [`gemini-3.1-flash-lite`](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite) and [`gemini-3.5-flash-lite`](https://deepmind.google/models/gemini/flash-lite/) when one hits a rate limit.
-
-For your own build, you can also put a default key in `.env`:
-
-1. Copy the example env file:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env`:
-
-   ```env
-   GEMINI_API_KEY=your-google-ai-studio-key
-   GEMINI_MODEL_PRIMARY=gemini-3.1-flash-lite
-   GEMINI_MODEL_SECONDARY=gemini-3.5-flash-lite
-   ```
-
-3. Rebuild the app so Gradle injects the key into `BuildConfig`. It becomes the default value of the key field; the switch still starts off.
-
-> [!IMPORTANT]
-> Never commit `.env` or built APKs. The API key is compiled into the debug APK via `BuildConfig` and can be extracted from a distributed binary. Fine for personal builds; use a backend proxy before any public release.
-
-Get a key at [Google AI Studio](https://aistudio.google.com/apikey).
 
 ## Build
 
@@ -151,13 +118,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | DI | Hilt |
 | Storage | Room (expenses, categories), DataStore (settings) |
 | Listener | `NotificationListenerService` + foreground keep-alive |
-| Parsing | Regex rules (`PaymentRules`, `NotificationParser`); ML Kit Document Scanner and text recognition plus a rule engine (`ReceiptRules`) for receipts; optional Gemini via OkHttp for notification pre-fill |
+| Parsing | Regex rules (`PaymentRules`, `NotificationParser`); ML Kit Document Scanner and text recognition plus a rule engine (`ReceiptRules`) for receipts |
 | Min SDK | 26 · Target / Compile SDK 35 |
 
 Key packages under `app/src/main/java/com/expensetracker/app/`:
 
 - `listener/` — notification capture, reconnect, OEM battery helpers
-- `parser/` — regex rules, Gemini client, receipt reader, amount formatting, dedup keys
+- `parser/` — regex rules, receipt reader, amount formatting, dedup keys
 - `data/` — Room entities, DAOs, repositories
 - `ui/` — screens, view models, components
 
@@ -165,7 +132,7 @@ Key packages under `app/src/main/java/com/expensetracker/app/`:
 
 - Expense data stays **on device** in a local Room database.
 - Notification text is read on device by regex. The default build sends nothing to a server.
-- With **Use Gemini to pre-fill** on, the text of each waiting payment is sent to Google AI Studio (Gemini). Receipt photos never leave the phone: ML Kit reads them on the device.
+- Receipt photos never leave the phone: ML Kit reads them on the device.
 - `.env` is gitignored. Do not publish APKs that contain a personal API key.
 
 ## Troubleshooting
@@ -175,7 +142,7 @@ Key packages under `app/src/main/java/com/expensetracker/app/`:
 | Nothing is tracked | Confirm notification access is enabled; check that **Settings → Payment apps** is not empty; check **Notification log** |
 | Listener dies when app is closed | Disable battery restrictions; enable autostart (Xiaomi); keep the persistent tracking notification |
 | Duplicate expenses | Update to the latest build; dismiss old duplicates manually — new ones should be blocked within ±5 minutes for the same amount |
-| Promos show on the swipe screen | Swipe them left. With Gemini on, they get a **Likely promotion** tag |
+| Promos show on the swipe screen | Swipe them left |
 | Xiaomi reconnect fails | Prefer soft reconnect / checklist in Settings; avoid repeatedly toggling notification access |
 
 > [!NOTE]
@@ -185,9 +152,6 @@ Key packages under `app/src/main/java/com/expensetracker/app/`:
 
 **Does the app need to stay open?**  
 It should keep listening in the background via the notification listener and keep-alive service, but OEM battery policies can still stop it. Use the Settings checklist on Xiaomi devices.
-
-**Will it work without Gemini / Google AI Studio?**  
-Yes. Capture is regex only and needs no key. Without a key you lose only the pre-fill. Receipts are read on the phone.
 
 **Why confirm every payment?**  
 Automatic saving let promotions through and put dates into merchant names. A swipe takes a second, and nothing wrong reaches your totals.

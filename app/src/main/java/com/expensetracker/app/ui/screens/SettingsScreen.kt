@@ -312,59 +312,6 @@ fun SettingsScreen(
             }
 
             item {
-                var keyInput by remember(uiState.geminiApiKey) { mutableStateOf(uiState.geminiApiKey) }
-                val hasKey = uiState.geminiApiKey.isNotBlank()
-                Text(
-                    text = "Gemini (optional)",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Uses your own Google AI Studio key, kept on this phone only. " +
-                        "When on, each waiting payment is sent to Google to clean the merchant name.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Use Gemini to pre-fill",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Switch(
-                        checked = uiState.geminiPrefillEnabled && hasKey,
-                        onCheckedChange = viewModel::setGeminiPrefillEnabled,
-                        enabled = hasKey
-                    )
-                }
-                OutlinedTextField(
-                    value = keyInput,
-                    onValueChange = { keyInput = it },
-                    label = { Text("Gemini API key") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    singleLine = true,
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password
-                    )
-                )
-                Button(
-                    onClick = { viewModel.saveGeminiApiKey(keyInput) },
-                    enabled = keyInput.trim() != uiState.geminiApiKey,
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    Text("Save")
-                }
-            }
-
-            item {
                 Text(
                     text = "Parser test tool",
                     style = MaterialTheme.typography.titleMedium

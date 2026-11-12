@@ -28,14 +28,7 @@ fun escapeBuildConfig(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 
 val rootEnv = loadDotEnv(rootProject.file(".env"))
-val geminiApiKey = rootEnv["GEMINI_API_KEY"]
-    ?.takeIf { it.isNotBlank() }
-    ?: rootEnv["GOOGLE_AI_API_KEY"].orEmpty()
 val supabaseKey = rootEnv["SUPABASE_KEY"].orEmpty()
-val geminiModelPrimary = rootEnv["GEMINI_MODEL_PRIMARY"]?.takeIf { it.isNotBlank() }
-    ?: "gemini-3.1-flash-lite"
-val geminiModelSecondary = rootEnv["GEMINI_MODEL_SECONDARY"]?.takeIf { it.isNotBlank() }
-    ?: "gemini-3.5-flash-lite"
 
 android {
     namespace = "com.expensetracker.app"
@@ -50,21 +43,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField(
-            "String",
-            "GEMINI_API_KEY",
-            "\"${escapeBuildConfig(geminiApiKey)}\""
-        )
-        buildConfigField(
-            "String",
-            "GEMINI_MODEL_PRIMARY",
-            "\"${escapeBuildConfig(geminiModelPrimary)}\""
-        )
-        buildConfigField(
-            "String",
-            "GEMINI_MODEL_SECONDARY",
-            "\"${escapeBuildConfig(geminiModelSecondary)}\""
-        )
         // Koban's Supabase project. The publishable key is public by design; row-level security protects the data.
         buildConfigField("String", "SUPABASE_URL", "\"https://ydrlxhqdalomlkqkdjyb.supabase.co\"")
         buildConfigField("String", "SUPABASE_KEY", "\"${escapeBuildConfig(supabaseKey)}\"")
