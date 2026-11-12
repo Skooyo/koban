@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -27,6 +29,11 @@ fun loadDotEnv(file: java.io.File): Map<String, String> {
 fun escapeBuildConfig(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 
+val releaseSigning = Properties().apply {
+    val f = file("${System.getProperty("user.home")}/.koban/release-signing.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 val rootEnv = loadDotEnv(rootProject.file(".env"))
 val supabaseKey = rootEnv["SUPABASE_KEY"].orEmpty()
 
@@ -34,12 +41,24 @@ android {
     namespace = "com.expensetracker.app"
     compileSdk = 35
 
+    signingConfigs {
+        if (!releaseSigning.isEmpty) {
+            create("release") {
+                storeFile = file(releaseSigning.getProperty("storeFile"))
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias")
+                keyPassword = releaseSigning.getProperty("keyPassword")
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "io.github.skooyo.koban"
         minSdk = 26
         targetSdk = 35
+        // Release steps: docs/RELEASING.md. Add 1 to versionCode for every APK you send.
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -54,6 +73,7 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
