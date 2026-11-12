@@ -74,6 +74,8 @@ android {
         }
         release {
             signingConfig = signingConfigs.findByName("release")
+            // One-time data import from com.expensetracker.app only (docs/superpowers/plans/2026-11-12-friends-beta-release.md, Task 8). Never send this build to friends.
+            isDebuggable = providers.gradleProperty("kobanImport").isPresent
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
