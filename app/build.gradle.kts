@@ -31,6 +31,7 @@ val rootEnv = loadDotEnv(rootProject.file(".env"))
 val geminiApiKey = rootEnv["GEMINI_API_KEY"]
     ?.takeIf { it.isNotBlank() }
     ?: rootEnv["GOOGLE_AI_API_KEY"].orEmpty()
+val supabaseKey = rootEnv["SUPABASE_KEY"].orEmpty()
 val geminiModelPrimary = rootEnv["GEMINI_MODEL_PRIMARY"]?.takeIf { it.isNotBlank() }
     ?: "gemini-3.1-flash-lite"
 val geminiModelSecondary = rootEnv["GEMINI_MODEL_SECONDARY"]?.takeIf { it.isNotBlank() }
@@ -64,6 +65,10 @@ android {
             "GEMINI_MODEL_SECONDARY",
             "\"${escapeBuildConfig(geminiModelSecondary)}\""
         )
+        // Koban's Supabase project. The publishable key is public by design; row-level security protects the data.
+        buildConfigField("String", "SUPABASE_URL", "\"https://ydrlxhqdalomlkqkdjyb.supabase.co\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"${escapeBuildConfig(supabaseKey)}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"221621530092-1n4jia2b9v4ctjue56d1gilej11q9l8h.apps.googleusercontent.com\"")
     }
 
     buildTypes {
@@ -126,6 +131,9 @@ dependencies {
     implementation(libs.org.json)
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.document.scanner)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play)
+    implementation(libs.googleid)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

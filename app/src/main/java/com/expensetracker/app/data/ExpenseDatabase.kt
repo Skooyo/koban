@@ -18,7 +18,7 @@ import androidx.room.TypeConverters
         PendingPaymentEntity::class,
         DroppedNotificationEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 @TypeConverters(

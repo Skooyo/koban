@@ -11,6 +11,8 @@ object Routes {
     const val PAYMENT_APPS = "settings/payment_apps"
 
     const val PEOPLE = "people"
+    const val GROUPS = "groups"
+    const val GROUP = "groups/{groupId}"
     const val PERSON = "people/{personId}"
     const val SPLIT_NEW = "split/new?expenseId={expenseId}"
     const val SPLIT_EDIT = "split/edit/{billId}"
@@ -22,6 +24,8 @@ object Routes {
 
     fun splitNew(expenseId: String?): String =
         if (expenseId == null) "split/new" else "split/new?expenseId=${Uri.encode(expenseId)}"
+
+    fun group(id: String): String = "groups/${Uri.encode(id)}"
 
     fun person(id: String): String = "people/${Uri.encode(id)}"
 

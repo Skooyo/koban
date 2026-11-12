@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.expensetracker.app.groups.GroupRepository
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 /** What the payment page shows. [amountText] is the raw number-pad text, as [AmountInput] keeps it. */
@@ -28,7 +30,9 @@ data class PaymentForm(
     val categoryId: String?,
     val postTime: Long,
     val merchant: String,
-    val notes: String
+    val notes: String,
+    /** True: the payment stays out of the shared totals that group members see. */
+    val privateToGroups: Boolean = false
 )
 
 sealed interface PaymentEvent {
@@ -41,8 +45,13 @@ sealed interface PaymentEvent {
 class PaymentViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val expenseRepository: ExpenseRepository,
-    categoryRepository: CategoryRepository
+    categoryRepository: CategoryRepository,
+    groupRepository: GroupRepository
 ) : ViewModel() {
+    /** The "Not in groups" switch shows only to a person in a group. */
+    val inGroups: StateFlow<Boolean> = groupRepository.state.map { it.groups.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), groupRepository.state.value.groups.isNotEmpty())
+
 
     private val expenseId: String? = savedStateHandle["expenseId"]
     val isEditing: Boolean = expenseId != null
@@ -82,7 +91,8 @@ class PaymentViewModel @Inject constructor(
                     categoryId = expense.categoryId,
                     postTime = expense.notificationPostTime,
                     merchant = expense.merchant.orEmpty(),
-                    notes = expense.notes.orEmpty()
+                    notes = expense.notes.orEmpty(),
+                    privateToGroups = expense.privateToGroups
                 )
             }
         }
@@ -97,6 +107,7 @@ class PaymentViewModel @Inject constructor(
     fun setDate(time: Long) = edit { it.copy(postTime = time) }
     fun setMerchant(s: String) = edit { it.copy(merchant = s) }
     fun setNotes(s: String) = edit { it.copy(notes = s) }
+    fun setPrivateToGroups(on: Boolean) = edit { it.copy(privateToGroups = on) }
 
     fun save() {
         val message = when {
@@ -132,9 +143,9 @@ class PaymentViewModel @Inject constructor(
         val notes = f.notes.ifBlank { null }
         viewModelScope.launch {
             if (expenseId == null) {
-                expenseRepository.addManualExpense(amount, merchant, f.postTime, f.categoryId, notes, f.type)
+                expenseRepository.addManualExpense(amount, merchant, f.postTime, f.categoryId, notes, f.type, f.privateToGroups)
             } else {
-                expenseRepository.updateExpense(expenseId, amount, merchant, f.postTime, f.categoryId, notes, f.type)
+                expenseRepository.updateExpense(expenseId, amount, merchant, f.postTime, f.categoryId, notes, f.type, f.privateToGroups)
             }
             _events.send(after)
         }

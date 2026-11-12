@@ -26,7 +26,9 @@ data class ExpenseEntity(
     val notes: String? = null,
     val transactionType: TransactionType = TransactionType.WITHDRAW,
     /** What this payment cost me after a split. Null means the full [amount]. */
-    val countedAmount: BigDecimal? = null
+    val countedAmount: BigDecimal? = null,
+    /** A private payment: counts on this phone, never in a group's shared totals. */
+    val privateToGroups: Boolean = false
 )
 
 val ExpenseEntity.effectiveAmount: BigDecimal get() = countedAmount ?: amount

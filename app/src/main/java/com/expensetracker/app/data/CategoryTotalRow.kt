@@ -15,3 +15,8 @@ data class CategoryBreakdown(
     val total: BigDecimal,
     val fraction: Float
 )
+
+data class GroupTotalRow(
+    @ColumnInfo(name = "category") val category: String,
+    @ColumnInfo(name = "total") val total: BigDecimal
+)

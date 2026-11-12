@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.data.PendingPaymentRepository
 import com.expensetracker.app.data.PeopleRepository
 import com.expensetracker.app.data.SettingsRepository
+import com.expensetracker.app.groups.GroupRepository
 import com.expensetracker.app.listener.NotificationAccessHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,8 +23,14 @@ class AppViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
     peopleRepository: PeopleRepository,
-    private val pendingPaymentRepository: PendingPaymentRepository
+    private val pendingPaymentRepository: PendingPaymentRepository,
+    groupRepository: GroupRepository
 ) : ViewModel() {
+    init {
+        // Sends shared totals at app start and after payment changes.
+        groupRepository.start()
+    }
+
     val darkModeEnabled: StateFlow<Boolean> = settingsRepository.darkModeEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 

@@ -3,6 +3,7 @@ package com.expensetracker.app.ui
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.Badge
@@ -40,6 +41,8 @@ import androidx.navigation.navArgument
 import com.expensetracker.app.ui.navigation.Routes
 import com.expensetracker.app.ui.screens.ActivityScreen
 import com.expensetracker.app.ui.screens.CheckPaymentsScreen
+import com.expensetracker.app.ui.screens.GroupScreen
+import com.expensetracker.app.ui.screens.GroupsScreen
 import com.expensetracker.app.ui.screens.HomeScreen
 import com.expensetracker.app.ui.screens.NotificationDebugScreen
 import com.expensetracker.app.ui.screens.PaymentAppsScreen
@@ -56,10 +59,11 @@ private data class BottomNavItem(val route: String, val label: String, val icon:
 private val bottomNavItems = listOf(
     BottomNavItem(Routes.HOME, "Home", Icons.Default.Home),
     BottomNavItem(Routes.ACTIVITY, "Activity", Icons.AutoMirrored.Filled.ReceiptLong),
-    BottomNavItem(Routes.PEOPLE, "People", Icons.Default.People)
+    BottomNavItem(Routes.PEOPLE, "People", Icons.Default.People),
+    BottomNavItem(Routes.GROUPS, "Groups", Icons.Default.Groups)
 )
 
-private val topLevelRoutes = setOf(Routes.HOME, Routes.ACTIVITY, Routes.PEOPLE)
+private val topLevelRoutes = setOf(Routes.HOME, Routes.ACTIVITY, Routes.PEOPLE, Routes.GROUPS)
 
 /** Key under which the payment page hands its closing message to the screen below it. */
 private const val PAYMENT_MESSAGE = "paymentMessage"
@@ -176,6 +180,15 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier, appViewModel: AppViewMo
                     onOpenSplit = { id -> navController.navigate(Routes.splitEdit(id)) },
                     onSplitBill = { navController.navigate(Routes.splitNew(null)) }
                 )
+            }
+            composable(Routes.GROUPS) {
+                GroupsScreen(onOpenGroup = { id -> navController.navigate(Routes.group(id)) { launchSingleTop = true } })
+            }
+            composable(
+                route = Routes.GROUP,
+                arguments = listOf(navArgument("groupId") { type = NavType.StringType })
+            ) { entry ->
+                GroupScreen(onBack = { if (navController.currentBackStackEntry == entry) navController.popBackStack() })
             }
             composable(
                 route = Routes.PERSON,

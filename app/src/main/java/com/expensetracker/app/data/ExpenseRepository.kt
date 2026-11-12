@@ -208,7 +208,8 @@ class ExpenseRepository @Inject constructor(
         notificationPostTime: Long,
         categoryId: String?,
         notes: String?,
-        transactionType: TransactionType
+        transactionType: TransactionType,
+        privateToGroups: Boolean = false
     ) {
         val existing = expenseDao.getById(id) ?: return
         merchantCategoryRepository.saveMapping(merchant, categoryId)
@@ -226,6 +227,7 @@ class ExpenseRepository @Inject constructor(
                 categoryId = categoryId,
                 notes = notes?.trim()?.ifBlank { null },
                 transactionType = transactionType,
+                privateToGroups = privateToGroups,
                 status = ExpenseStatus.EDITED
             )
         )
@@ -243,7 +245,8 @@ class ExpenseRepository @Inject constructor(
         notificationPostTime: Long,
         categoryId: String?,
         notes: String?,
-        transactionType: TransactionType
+        transactionType: TransactionType,
+        privateToGroups: Boolean = false
     ) {
         merchantCategoryRepository.saveMapping(merchant, categoryId)
         if (categoryId != null) {
@@ -267,7 +270,8 @@ class ExpenseRepository @Inject constructor(
             notificationKey = null,
             categoryId = categoryId,
             notes = notes?.trim()?.ifBlank { null },
-            transactionType = transactionType
+            transactionType = transactionType,
+            privateToGroups = privateToGroups
         )
         expenseDao.insert(entity)
         if (transactionType == TransactionType.RECEIVE) {

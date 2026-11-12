@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -50,6 +51,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -151,6 +153,7 @@ private fun PaymentContent(
     val padVisible = padRequested && !shopFocused && !noteFocused
     val valid = AmountInput.toAmount(form.amountText) != null
     val saving by viewModel.saving.collectAsStateWithLifecycle()
+    val inGroups by viewModel.inGroups.collectAsStateWithLifecycle()
     // Back or Done hides the keyboard but leaves focus in Shop/Note; drop it so the number pad returns.
     val imeVisible = WindowInsets.isImeVisible
     var wasImeVisible by remember { mutableStateOf(false) }
@@ -234,6 +237,15 @@ private fun PaymentContent(
                 },
                 singleLine = false
             )
+            if (inGroups && form.type == TransactionType.WITHDRAW) {
+                PaymentCard(
+                    label = "Not in groups",
+                    value = if (form.privateToGroups) "Group members do not see this payment" else "Counts in your group totals",
+                    onClick = { viewModel.setPrivateToGroups(!form.privateToGroups) },
+                    icon = { CardIcon(Icons.Default.Groups) },
+                    trailing = { Switch(checked = form.privateToGroups, onCheckedChange = null) }
+                )
+            }
             if (form.categoryId != null && form.categoryId != loadedCategoryId && form.merchant.isNotBlank()) {
                 Text(
                     text = "A new category also applies to past payments from this shop",

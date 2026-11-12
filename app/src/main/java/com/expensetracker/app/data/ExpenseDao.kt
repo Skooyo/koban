@@ -72,6 +72,22 @@ interface ExpenseDao {
     )
     fun observeTotalsByCategory(start: Long, end: Long): Flow<List<CategoryTotalRow>>
 
+    /** Shared totals for groups: money out, not dismissed, not private, one account, by category name. */
+    @Query(
+        """
+        SELECT COALESCE(c.name, :uncategorized) AS category, SUM(COALESCE(e.countedAmount, e.amount)) AS total
+        FROM expenses e LEFT JOIN categories c ON c.id = e.categoryId
+        WHERE e.status != 'DISMISSED' AND e.transactionType != 'RECEIVE' AND e.privateToGroups = 0
+        AND e.currency = :currency AND e.notificationPostTime >= :start AND e.notificationPostTime < :end
+        GROUP BY category
+        HAVING total > 0
+        """
+    )
+    suspend fun groupTotals(start: Long, end: Long, currency: String, uncategorized: String): List<GroupTotalRow>
+
+    @Query("UPDATE expenses SET privateToGroups = :value WHERE id = :id")
+    suspend fun setPrivateToGroups(id: String, value: Boolean)
+
     @Query(
         """
         SELECT COALESCE(SUM(

@@ -13,6 +13,7 @@ import com.expensetracker.app.data.MIGRATION_6_7
 import com.expensetracker.app.data.MIGRATION_7_8
 import com.expensetracker.app.data.MIGRATION_8_9
 import com.expensetracker.app.data.MIGRATION_9_10
+import com.expensetracker.app.data.MIGRATION_10_11
 import com.expensetracker.app.parser.GeminiClient
 import dagger.Module
 import dagger.Provides
@@ -34,7 +35,7 @@ object AppModule {
             ExpenseDatabase::class.java,
             "expense_tracker.db"
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
             .build()
     }
 
