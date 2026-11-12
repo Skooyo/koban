@@ -91,17 +91,6 @@ interface PendingPaymentDao {
         windowEnd: Long
     ): PendingPaymentEntity?
 
-    /** Owner edits win: an edited card keeps its values. */
-    @Query(
-        """
-        UPDATE pending_payments SET merchant = COALESCE(:merchant, merchant),
-        categoryId = COALESCE(:categoryId, categoryId),
-        likelyPromotion = :likelyPromotion
-        WHERE id = :id AND edited = 0
-        """
-    )
-    suspend fun enrich(id: String, merchant: String?, categoryId: String?, likelyPromotion: Boolean)
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDropped(marker: DroppedNotificationEntity)
 

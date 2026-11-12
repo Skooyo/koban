@@ -179,13 +179,6 @@ class PendingPaymentRepository @Inject constructor(
         )
     }
 
-    /** Gemini suggestions. Ignored for a card the owner already edited. */
-    suspend fun enrich(id: String, merchant: String?, categoryId: String?, likelyPromotion: Boolean) {
-        // A held card is already swiped; the commit must save only what the owner saw.
-        if (id in hidden.value) return
-        dao.enrich(id, merchant, categoryId, likelyPromotion)
-    }
-
     /** Holds a swipe for the Undo window, then commits it. An earlier hold commits at once. */
     fun hold(id: String, save: Boolean) {
         synchronized(holdLock) {
