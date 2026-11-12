@@ -110,6 +110,8 @@ Install over USB:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+To release a new version, follow [docs/RELEASING.md](docs/RELEASING.md).
+
 ## Architecture
 
 | Area | Stack |
