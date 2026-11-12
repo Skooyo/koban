@@ -247,6 +247,45 @@ fun SettingsScreen(
             }
 
             item {
+                var codeInput by remember { mutableStateOf("") }
+                Text(text = "Invite code", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = if (uiState.onlineAccess) "Online access: on. Receipts are read by Claude on Koban's server."
+                    else "Enter an invite code from Koban's owner to read receipts with Claude. " +
+                        "Everything else works without one.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (uiState.onlineAccess) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = viewModel::removeOnlineAccess,
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text("Remove online access") }
+                } else {
+                    OutlinedTextField(
+                        value = codeInput,
+                        onValueChange = { codeInput = it.uppercase() },
+                        label = { Text("XXXX-XXXX") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        singleLine = true,
+                        isError = uiState.inviteMessage != null,
+                        supportingText = uiState.inviteMessage?.let { { Text(it) } },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters,
+                            autoCorrectEnabled = false
+                        )
+                    )
+                    Button(
+                        onClick = { viewModel.enterInviteCode(codeInput) },
+                        enabled = codeInput.isNotBlank() && !uiState.inviteBusy,
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text(if (uiState.inviteBusy) "Checking…" else "Use code") }
+                }
+            }
+
+            item {
                 var keyInput by remember(uiState.geminiApiKey) { mutableStateOf(uiState.geminiApiKey) }
                 val hasKey = uiState.geminiApiKey.isNotBlank()
                 Text(

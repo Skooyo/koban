@@ -29,6 +29,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -109,10 +110,10 @@ fun SplitEditorScreen(
             .padding(padding)
         when {
             state.loading -> Centered(content) { CircularProgressIndicator() }
-            state.step == SplitStep.Photo -> PhotoStep(content, viewModel)
+            state.step == SplitStep.Photo -> PhotoStep(content, state.onlineAccess, viewModel)
             state.step == SplitStep.Reading -> Centered(content) {
                 CircularProgressIndicator()
-                Text("Reading receipt…", style = MaterialTheme.typography.bodyLarge)
+                Text("Reading the receipt…", style = MaterialTheme.typography.bodyLarge)
             }
             state.step == SplitStep.Items -> ItemsStep(content, state, viewModel)
             state.step == SplitStep.People -> PeopleStep(content, state, recent, viewModel)
@@ -164,7 +165,7 @@ internal fun Centered(modifier: Modifier, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun PhotoStep(modifier: Modifier, vm: SplitEditorViewModel) {
+private fun PhotoStep(modifier: Modifier, online: Boolean, vm: SplitEditorViewModel) {
     var pending by rememberSaveable { mutableStateOf<Uri?>(null) }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         val uri = pending
@@ -209,7 +210,8 @@ private fun PhotoStep(modifier: Modifier, vm: SplitEditorViewModel) {
     ) {
         Text("Start with the receipt", style = MaterialTheme.typography.headlineMedium)
         Text(
-            "The photo is read once and then deleted. It is not kept.",
+            if (online) "With online access, the photo is sent to Koban's server to be read, then deleted."
+            else "The photo is read once and then deleted. It is not kept.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -230,6 +232,10 @@ private fun PhotoStep(modifier: Modifier, vm: SplitEditorViewModel) {
 private fun ItemsStep(modifier: Modifier, state: SplitEditorState, vm: SplitEditorViewModel) {
     val total = SplitEditorViewModel.totalOf(state)
     val diff = SplitEditorViewModel.difference(state)
+    var fixOpen by rememberSaveable { mutableStateOf(false) }
+    if (fixOpen && (diff != null || state.readingAgain)) {
+        FixSheet(diff, state, vm, onClose = { fixOpen = false })
+    }
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
@@ -237,6 +243,25 @@ private fun ItemsStep(modifier: Modifier, state: SplitEditorState, vm: SplitEdit
     ) {
         item {
             Text("Items", style = MaterialTheme.typography.headlineMedium)
+            state.readSource?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            if (diff != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Differs from the receipt total by RM ${AmountFormatter.formatDisplay(diff.abs())}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { fixOpen = true }) { Text("Fix") }
+                }
+            }
             state.message?.let {
                 Text(
                     it,
@@ -303,19 +328,48 @@ private fun ItemsStep(modifier: Modifier, state: SplitEditorState, vm: SplitEdit
                 }
             }
         }
-        if (diff != null) {
-            item {
-                Text(
-                    "The items and charges differ from the receipt total by RM ${AmountFormatter.formatDisplay(diff.abs())}.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
-                OutlinedButton(
-                    onClick = vm::addRoundingDifference,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                ) { Text("Add RM ${AmountFormatter.formatDisplay(diff)} as rounding") }
+    }
+}
+
+/** Layout C from docs/prototypes/claude-fallback-prototype.html. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FixSheet(diff: java.math.BigDecimal?, state: SplitEditorState, vm: SplitEditorViewModel, onClose: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onClose) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (state.readingAgain) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator()
+                    Text("Reading with Claude… about 10 seconds", style = MaterialTheme.typography.bodyLarge)
+                }
+                return@Column
+            }
+            if (diff == null) return@Column
+            Text(
+                "Differs from the receipt total by RM ${AmountFormatter.formatDisplay(diff.abs())}",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Button(
+                onClick = { vm.addRoundingDifference(); onClose() },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Add RM ${AmountFormatter.formatDisplay(diff)} as rounding") }
+            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Edit by hand") }
+            if (state.canReadAgain) {
+                OutlinedButton(onClick = vm::readAgainWithClaude, modifier = Modifier.fillMaxWidth()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Read again with Claude")
+                        Text(
+                            "Sends the photo to Koban's server" +
+                                (state.readsLeft?.let { " · $it reads left today" } ?: ""),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             }
         }
     }
