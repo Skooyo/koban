@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -30,6 +31,7 @@ class SettingsRepository @Inject constructor(
     private val deviceTokenKey = stringPreferencesKey("device_token")
     private val groupSessionKey = stringPreferencesKey("group_session")
     private val onlineFeaturesKey = booleanPreferencesKey("online_features")
+    private val lastUpdateCheckKey = longPreferencesKey("last_update_check")
 
     val allowlistedPackages: Flow<Set<String>> = context.dataStore.data.map { prefs ->
         prefs[allowlistKey] ?: emptySet()
@@ -63,6 +65,13 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setOnlineFeatures(on: Boolean) {
         context.dataStore.edit { it[onlineFeaturesKey] = on }
+    }
+
+    /** When Koban last asked GitHub for a new release (epoch ms). 0 means never. */
+    val lastUpdateCheck: Flow<Long> = context.dataStore.data.map { it[lastUpdateCheckKey] ?: 0L }
+
+    suspend fun setLastUpdateCheck(ms: Long) {
+        context.dataStore.edit { it[lastUpdateCheckKey] = ms }
     }
 
     suspend fun setDeviceToken(token: String) {
