@@ -65,42 +65,36 @@ Use Git Bash, from the repository folder. Set `JAVA_HOME` to your JDK 17 for eac
    ```
 
    Do this step before step 8. If the tag is not on GitHub, `gh release create` makes a new tag on the tip of `main`, which can be the wrong code.
-8. Create the GitHub release with the APK. Write the notes in Simplified Technical English. The "Update available" dialog shows the first 500 characters of the notes. The dialog shows the tag without the `v` as the version name.
-
-   ```bash
-   gh release create v<versionName> koban-<versionCode>.apk --verify-tag --title "Koban <versionName>" --notes "<what changed, in STE>"
-   ```
-
-   To test the release before friends get it, add `--draft`. See section 4.
-9. Install the update on your own phone first. Open Koban, go to Settings, tap "Check for updates", then tap "Update". Settings shows "App version". Make sure it shows the new `versionName`.
-10. Delete the local copy `koban-<versionCode>.apk`. Do not commit it.
-
-## 4. Roll out
-
-A published release is live at once. Each friend's Koban checks GitHub once a day and shows "Update available". The check runs only when "Online features" is on.
-
-1. Use the new version on your own phone for 1 day before friends get it. To do this, create the release as a draft. The latest-release API that Koban reads skips drafts and prereleases.
+8. Create the GitHub release as a draft, with the APK. Friends cannot get a draft. Write the notes in Simplified Technical English. The "Update available" dialog shows the first 500 characters of the notes. The dialog shows the tag without the `v` as the version name.
 
    ```bash
    gh release create v<versionName> koban-<versionCode>.apk --verify-tag --draft --title "Koban <versionName>" --notes "<what changed, in STE>"
    ```
 
-2. Install the APK on your phone by USB.
+9. Install the APK on your own phone by USB. The latest-release API that Koban reads skips drafts, so "Check for updates" cannot see a draft.
 
    ```bash
    adb install -r koban-<versionCode>.apk
    ```
 
-3. After 1 day without problems, publish the draft.
+10. Use the new version on your phone for 1 day. Open Settings and make sure "App version" shows the new `versionName`. If you find a problem, do not publish. Fix it and start again at step 1.
+11. Publish the draft. Friends get the update at their next daily check. See section 4.
 
-   ```bash
-   gh release edit v<versionName> --draft=false
-   ```
+    ```bash
+    gh release edit v<versionName> --draft=false
+    ```
 
-4. Tell friends what to expect:
-   - The update is optional. A friend can tap "Later".
-   - On the first update, Android asks the friend to allow "Install unknown apps" for Koban. Koban opens that settings page. The friend turns on the switch, goes back and taps "Update" again.
-   - Android closes Koban after the update and does not open it again. The friend opens Koban again.
+12. Delete the local copy `koban-<versionCode>.apk`. Do not commit it.
+
+## 4. Roll out
+
+After you publish, the release is live. These things then occur:
+
+1. Each friend's Koban checks GitHub once a day and shows "Update available". The check runs only when "Online features" is on.
+2. The update is optional. A friend can tap "Later".
+3. On the first update, Android asks the friend to allow "Install unknown apps" for Koban. Koban opens that settings page. The friend turns on the switch, goes back and taps "Update" again.
+4. Android closes Koban after the update and does not open it again. The friend opens Koban again.
+5. To stop a bad release, mark it as a prerelease. Koban then stops offering it. See section 5.
 
 ## 5. Something is broken after a release
 
@@ -133,14 +127,18 @@ Old app versions stay in use for days, because updates are optional. The Supabas
 
 Each friend needs one invite code and a first install by USB. Updates after the first install come through the app.
 
-1. Get the service key for the Supabase project. `<ref>` is the project ref in `~/.koban/supabase-project.txt`.
+1. Make one invite code for the friend. Open the SQL editor of the Supabase project in the Supabase dashboard. Run the query below and copy the code that it returns.
 
-   ```bash
-   npx supabase projects api-keys --project-ref <ref> --reveal -o json
+   ```sql
+   select public.new_invite('<friend name>');
    ```
 
-   Use the key once, then delete it from the terminal and the clipboard. Never paste the key in a chat, a file or git.
-2. Make one invite code for the friend. Send a POST request to `/rest/v1/rpc/new_invite` on the project API. Give the JSON body `{"p_friend_name": "<name>"}`. Put the service key in the `apikey` header and in the `Authorization: Bearer` header. The answer is the invite code.
+2. Download the APK of the latest release.
+
+   ```bash
+   gh release download v<versionName> --pattern "koban-<versionCode>.apk"
+   ```
+
 3. Install Koban on the friend's phone by USB. Do not send the APK in a browser or a chat app: Play Protect can block an APK that asks for notification access when it comes from there (ticket #27).
    1. On the friend's phone, turn on Developer options and USB debugging.
    2. On a Xiaomi phone, also turn on "Install via USB".
