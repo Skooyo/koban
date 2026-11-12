@@ -49,13 +49,19 @@ Use Git Bash, from the repository folder. Set `JAVA_HOME` to your JDK 17 for eac
    ```
 
 5. Compare the line `Signer #1 certificate SHA-1 digest` with the `io.github.skooyo.koban` line in `~/.koban/oauth-sha1.txt`. `apksigner` shows lowercase hex without colons. The file shows uppercase hex with colons. The 40 hex digits must be the same. If they are not the same, stop: the APK has the wrong key.
-6. Copy the APK to the name that the updater looks for. The updater reads the asset named `koban-<versionCode>.apk` and ignores other names. It also checks that the APK inside has this `versionCode`.
+6. Check that the APK is not debuggable. The command must print `0`. If it prints `1`, stop: the build is debuggable. Never publish it.
+
+   ```bash
+   D:/Android/build-tools/34.0.0/aapt2.exe dump badging app/build/outputs/apk/release/app-release.apk | grep -c application-debuggable
+   ```
+
+7. Copy the APK to the name that the updater looks for. The updater reads the asset named `koban-<versionCode>.apk` and ignores other names. It also checks that the APK inside has this `versionCode`.
 
    ```bash
    cp app/build/outputs/apk/release/app-release.apk koban-<versionCode>.apk
    ```
 
-7. Commit the version change. Tag the commit and push the tag.
+8. Commit the version change. Tag the commit and push the tag.
 
    ```bash
    git add app/build.gradle.kts
@@ -64,27 +70,27 @@ Use Git Bash, from the repository folder. Set `JAVA_HOME` to your JDK 17 for eac
    git push origin v<versionName>
    ```
 
-   Do this step before step 8. If the tag is not on GitHub, `gh release create` makes a new tag on the tip of `main`, which can be the wrong code.
-8. Create the GitHub release as a draft, with the APK. Friends cannot get a draft. Write the notes in Simplified Technical English. The "Update available" dialog shows the first 500 characters of the notes. The dialog shows the tag without the `v` as the version name.
+   Do this step before step 9. If the tag is not on GitHub, `gh release create` makes a new tag on the tip of `main`, which can be the wrong code.
+9. Create the GitHub release as a draft, with the APK. Friends cannot get a draft. Write the notes in Simplified Technical English. The "Update available" dialog shows the first 500 characters of the notes. The dialog shows the tag without the `v` as the version name.
 
    ```bash
    gh release create v<versionName> koban-<versionCode>.apk --verify-tag --draft --title "Koban <versionName>" --notes "<what changed, in STE>"
    ```
 
-9. Install the APK on your own phone by USB. The latest-release API that Koban reads skips drafts, so "Check for updates" cannot see a draft.
+10. Install the APK on your own phone by USB. The latest-release API that Koban reads skips drafts, so "Check for updates" cannot see a draft.
 
    ```bash
    adb install -r koban-<versionCode>.apk
    ```
 
-10. Use the new version on your phone for 1 day. Open Settings and make sure "App version" shows the new `versionName`. If you find a problem, do not publish. Fix it and start again at step 1.
-11. Publish the draft. Friends get the update at their next daily check. See section 4.
+11. Use the new version on your phone for 1 day. Open Settings and make sure "App version" shows the new `versionName`. If you find a problem, do not publish. Fix it and start again at step 1.
+12. Publish the draft. Friends get the update at their next daily check. See section 4.
 
     ```bash
     gh release edit v<versionName> --draft=false
     ```
 
-12. Delete the local copy `koban-<versionCode>.apk`. Do not commit it.
+13. Delete the local copy `koban-<versionCode>.apk`. Do not commit it.
 
 ## 4. Roll out
 
@@ -92,7 +98,7 @@ After you publish, the release is live. These things then occur:
 
 1. Each friend's Koban checks GitHub once a day and shows "Update available". The check runs only when "Online features" is on.
 2. The update is optional. A friend can tap "Later".
-3. On the first update, Android asks the friend to allow "Install unknown apps" for Koban. Koban opens that settings page. The friend turns on the switch, goes back and taps "Update" again.
+3. On the first update, Android asks the friend to allow "Install unknown apps" for Koban. Koban opens that settings page. The friend turns on the switch and goes back to Koban. If Koban shows the "Allow Koban to install apps, then tap Update again." message, the friend taps OK, then Update. If Android closed Koban, the friend opens Koban again and "Update available" shows.
 4. Android closes Koban after the update and does not open it again. The friend opens Koban again.
 5. To stop a bad release, mark it as a prerelease. Koban then stops offering it. See section 5.
 
@@ -126,6 +132,8 @@ Old app versions stay in use for days, because updates are optional. The Supabas
 ## 7. Add a friend
 
 Each friend needs one invite code and a first install by USB. Updates after the first install come through the app.
+
+Add friends only after one update (for example 0.1.0 to 0.1.1) installed on your own phone through Check for updates. If the updater in the first friend build is broken, every friend needs a USB reinstall.
 
 1. Make one invite code for the friend. Open the SQL editor of the Supabase project in the Supabase dashboard. Run the query below and copy the code that it returns.
 

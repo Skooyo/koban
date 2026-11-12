@@ -12,6 +12,7 @@ import android.util.Log
 import com.expensetracker.app.BuildConfig
 import com.expensetracker.app.data.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,13 +62,13 @@ class UpdateRepository @Inject constructor(
         val now = System.currentTimeMillis()
         if (busy) return
         if (!UpdateSchedule.shouldCheck(settings.onlineFeatures.first(), settings.lastUpdateCheck.first(), now, manual)) return
-        // Only these two headers: no app version, no account ID.
-        val request = Request.Builder()
-            .url(RELEASES_URL)
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "Koban-Android")
-            .build()
         val next = try {
+            // Only these two headers: no app version, no account ID.
+            val request = Request.Builder()
+                .url(RELEASES_URL)
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "Koban-Android")
+                .build()
             withContext(Dispatchers.IO) {
                 client.newCall(request).execute().use { response ->
                     // Any answer counts, so a 403 or 404 waits a day.
@@ -81,7 +82,10 @@ class UpdateRepository @Inject constructor(
                     }
                 }
             }
-        } catch (e: IOException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Update check failed", e)
             failedCheck(manual)
         }
         if (!busy) _state.value = next
@@ -95,6 +99,8 @@ class UpdateRepository @Inject constructor(
         val available = _state.value as? UpdateState.Available ?: return
         val update = available.update
         if (!context.packageManager.canRequestPackageInstalls()) {
+            // If Android stops the app after the grant, the next start checks again.
+            settings.setLastUpdateCheck(0L)
             try {
                 context.startActivity(
                     Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + BuildConfig.APPLICATION_ID))
@@ -129,9 +135,11 @@ class UpdateRepository @Inject constructor(
                     file.delete()
                 }
             }
-        } catch (e: IOException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             Log.w(TAG, "Update failed", e)
-            _state.value = UpdateState.Failed("Update failed. Try again later.")
+            _state.value = UpdateState.Failed("Update failed. Try again later.", retry = update)
         } finally {
             // A cancelled caller must not leave the state stuck on Downloading.
             if (_state.value == UpdateState.Downloading) _state.value = UpdateState.Idle
@@ -166,8 +174,8 @@ class UpdateRepository @Inject constructor(
             params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
         }
         val sessionId = installer.createSession(params)
-        installer.openSession(sessionId).use { session ->
-            try {
+        try {
+            installer.openSession(sessionId).use { session ->
                 session.openWrite("koban.apk", 0, file.length()).use { out ->
                     file.inputStream().use { it.copyTo(out) }
                     session.fsync(out)
@@ -182,10 +190,11 @@ class UpdateRepository @Inject constructor(
                     flags
                 )
                 session.commit(pending.intentSender)
-            } catch (e: IOException) {
-                session.abandon()
-                throw e
             }
+        } catch (e: Exception) {
+            // Abandon by ID: this also covers a failed openSession.
+            installer.abandonSession(sessionId)
+            throw e
         }
     }
 
@@ -211,7 +220,7 @@ class UpdateRepository @Inject constructor(
             PackageInstaller.STATUS_SUCCESS -> _state.value = UpdateState.Idle
             else -> {
                 Log.w(TAG, "Install failed: status $status, $message")
-                _state.value = UpdateState.Failed("Update failed. Try again later.")
+                _state.value = UpdateState.Failed("Update failed. Try again later.", retry = inProgress)
             }
         }
     }
