@@ -34,7 +34,8 @@ sealed interface UpdateState {
     data class Available(val update: AvailableUpdate) : UpdateState
     data object Downloading : UpdateState
     data object Installing : UpdateState
-    data class Failed(val message: String) : UpdateState
+    /** With [retry] set, "OK" goes back to [Available] for that update. */
+    data class Failed(val message: String, val retry: AvailableUpdate? = null) : UpdateState
 }
 
 @Singleton
@@ -50,6 +51,9 @@ class UpdateRepository @Inject constructor(
     private val downloadClient by lazy {
         client.newBuilder().callTimeout(0, SECONDS).readTimeout(60, SECONDS).build()
     }
+
+    /** The update of the last download, so "Close" on Installing can go back to Available. */
+    @Volatile private var inProgress: AvailableUpdate? = null
 
     private val busy get() = _state.value.let { it is UpdateState.Downloading || it is UpdateState.Installing }
 
@@ -99,11 +103,12 @@ class UpdateRepository @Inject constructor(
             } catch (e: ActivityNotFoundException) {
                 Log.w(TAG, "No screen for install permission", e)
             }
-            _state.value = UpdateState.Failed("Allow Koban to install apps, then tap Update again.")
+            _state.value = UpdateState.Failed("Allow Koban to install apps, then tap Update again.", retry = update)
             return
         }
         // Atomic, so two quick taps start one download only.
         if (!_state.compareAndSet(available, UpdateState.Downloading)) return
+        inProgress = update
         if (!settings.onlineFeatures.first()) {
             _state.value = UpdateState.Idle
             return
@@ -156,7 +161,11 @@ class UpdateRepository @Inject constructor(
 
     private fun install(file: File) {
         val installer = context.packageManager.packageInstaller
-        val sessionId = installer.createSession(PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL))
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+        }
+        val sessionId = installer.createSession(params)
         installer.openSession(sessionId).use { session ->
             try {
                 session.openWrite("koban.apk", 0, file.length()).use { out ->
@@ -180,8 +189,17 @@ class UpdateRepository @Inject constructor(
         }
     }
 
+    /**
+     * Closes the dialog. Available: Idle. Installing: back to Available, because the confirm
+     * screen can fail to open or be left with Home, and then no status arrives.
+     * Failed with a retry: back to Available. Other Failed: Idle.
+     */
     fun later() {
-        _state.value = UpdateState.Idle
+        _state.value = when (val s = _state.value) {
+            UpdateState.Installing -> inProgress?.let { UpdateState.Available(it) } ?: UpdateState.Idle
+            is UpdateState.Failed -> s.retry?.let { UpdateState.Available(it) } ?: UpdateState.Idle
+            else -> UpdateState.Idle
+        }
     }
 
     /** Called by [UpdateInstallReceiver] with the installer's status. */

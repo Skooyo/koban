@@ -49,9 +49,9 @@ fun UpdateDialog(state: UpdateState, onUpdate: () -> Unit, onDismiss: () -> Unit
             confirmButton = {}
         )
         UpdateState.Installing -> AlertDialog(
-            onDismissRequest = {},
+            onDismissRequest = onDismiss,
             text = { Text("Installing…") },
-            confirmButton = {}
+            confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
         )
         is UpdateState.Failed -> AlertDialog(
             onDismissRequest = onDismiss,
