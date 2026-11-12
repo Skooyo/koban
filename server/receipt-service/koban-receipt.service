@@ -1,0 +1,26 @@
+[Unit]
+Description=Koban receipt reader (claude -p, photo in, JSON out)
+After=network.target
+
+[Service]
+User=koban-receipt
+EnvironmentFile=/etc/koban-receipt.env
+ExecStart=/usr/bin/python3 /srv/koban-receipt/server.py
+Restart=on-failure
+
+# Prompt-injection guard: a printed instruction on a photo must not reach other files on this server.
+InaccessiblePaths=/srv/data
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/koban-receipt
+PrivateTmp=yes
+NoNewPrivileges=true
+
+# Same limits as the text endpoint: one claude -p uses about 206 MB.
+MemoryHigh=300M
+MemoryMax=400M
+MemorySwapMax=512M
+OOMScoreAdjust=1000
+
+[Install]
+WantedBy=multi-user.target
