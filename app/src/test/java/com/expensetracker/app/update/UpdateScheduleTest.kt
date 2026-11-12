@@ -12,4 +12,6 @@ class UpdateScheduleTest {
     @Test fun auto_waitsOneDay() = assertFalse(UpdateSchedule.shouldCheck(true, 100_000_000, 100_000_000 + 86_399_999, false))
 
     @Test fun auto_afterOneDay() = assertTrue(UpdateSchedule.shouldCheck(true, 100_000_000, 100_000_000 + 86_400_000, false))
+
+    @Test fun clockSetBack_checks() = assertTrue(UpdateSchedule.shouldCheck(true, 200_000_000, 100_000_000, false))
 }
