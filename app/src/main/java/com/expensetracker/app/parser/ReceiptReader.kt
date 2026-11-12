@@ -30,6 +30,10 @@ class ReceiptReader @Inject constructor(
             }
             val lines = text.textBlocks.flatMap { it.lines }.mapNotNull { line ->
                 val box = line.boundingBox ?: return@mapNotNull null
+                // Debug only: raw OCR lines for the pairing investigation (adb logcat -s KobanOcr)
+                if (com.expensetracker.app.BuildConfig.DEBUG) android.util.Log.d(
+                    "KobanOcr", "${box.left},${box.top},${box.right},${box.bottom},${line.angle}\t${line.text}"
+                )
                 OcrLine(line.text, box.left, box.top, box.right, box.bottom, line.angle)
             }
             ReceiptRules.read(lines)
