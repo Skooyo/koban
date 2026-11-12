@@ -54,6 +54,7 @@ import com.expensetracker.app.parser.AmountFormatter
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
+import com.expensetracker.app.ui.components.DiscardChangesDialog
 import com.expensetracker.app.ui.components.MoneyAmount
 import com.expensetracker.app.ui.viewmodel.ItemRow
 import com.expensetracker.app.ui.viewmodel.SplitEditorState
@@ -77,6 +78,15 @@ fun SplitEditorScreen(
         if (!viewModel.back()) onBack()
     }
     BackHandler { goBack() }
+    if (state.confirmDiscard) {
+        DiscardChangesDialog(
+            onDiscard = {
+                viewModel.discardEdits()
+                onBack()
+            },
+            onKeepEditing = viewModel::keepEditing
+        )
+    }
 
     Scaffold(
         modifier = modifier,

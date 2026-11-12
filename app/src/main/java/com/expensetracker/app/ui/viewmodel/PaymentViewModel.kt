@@ -61,6 +61,9 @@ class PaymentViewModel @Inject constructor(
         private set
 
     private val _form = MutableStateFlow<PaymentForm?>(null)
+    /** The form as the page first showed it; [hasChanges] compares against it. */
+    private var initialForm: PaymentForm? = null
+    val hasChanges: Boolean get() = _form.value != initialForm
     /** Null while an edited payment loads. */
     val form: StateFlow<PaymentForm?> = _form.asStateFlow()
 
@@ -76,7 +79,10 @@ class PaymentViewModel @Inject constructor(
 
     init {
         if (expenseId == null) {
-            _form.value = PaymentForm("", TransactionType.WITHDRAW, null, System.currentTimeMillis(), "", "")
+            PaymentForm("", TransactionType.WITHDRAW, null, System.currentTimeMillis(), "", "").also {
+                initialForm = it
+                _form.value = it
+            }
         } else {
             viewModelScope.launch {
                 val expense = expenseRepository.getById(expenseId)
@@ -85,7 +91,7 @@ class PaymentViewModel @Inject constructor(
                     return@launch
                 }
                 loadedCategoryId = expense.categoryId
-                _form.value = PaymentForm(
+                val loaded = PaymentForm(
                     amountText = AmountInput.fromAmount(expense.amount),
                     type = expense.transactionType,
                     categoryId = expense.categoryId,
@@ -94,6 +100,8 @@ class PaymentViewModel @Inject constructor(
                     notes = expense.notes.orEmpty(),
                     privateToGroups = expense.privateToGroups
                 )
+                initialForm = loaded
+                _form.value = loaded
             }
         }
     }

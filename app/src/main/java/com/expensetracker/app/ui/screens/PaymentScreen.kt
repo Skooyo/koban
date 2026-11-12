@@ -1,5 +1,6 @@
 package com.expensetracker.app.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -93,6 +94,7 @@ import com.expensetracker.app.data.CategoryEntity
 import com.expensetracker.app.data.DefaultCategories
 import com.expensetracker.app.data.TransactionType
 import com.expensetracker.app.ui.components.AmountInput
+import com.expensetracker.app.ui.components.DiscardChangesDialog
 import com.expensetracker.app.ui.components.PastDatePickerDialog
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.theme.categoryColor
@@ -154,6 +156,11 @@ private fun PaymentContent(
     val valid = AmountInput.toAmount(form.amountText) != null
     val saving by viewModel.saving.collectAsStateWithLifecycle()
     val inGroups by viewModel.inGroups.collectAsStateWithLifecycle()
+    // `form` is a parameter, so each edit runs this check again.
+    val hasChanges = viewModel.hasChanges
+    var confirmingDiscard by remember { mutableStateOf(false) }
+    // A save sets `saving` first, so a save never asks.
+    BackHandler(enabled = hasChanges && !saving) { confirmingDiscard = true }
     // Back or Done hides the keyboard but leaves focus in Shop/Note; drop it so the number pad returns.
     val imeVisible = WindowInsets.isImeVisible
     var wasImeVisible by remember { mutableStateOf(false) }
@@ -173,7 +180,11 @@ private fun PaymentContent(
             .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
             .padding(horizontal = 16.dp)
     ) {
-        TopRow(type = form.type, onClose = { if (!saving) onClose() }, onType = viewModel::setType)
+        TopRow(type = form.type, onClose = {
+            if (!saving) {
+                if (hasChanges) confirmingDiscard = true else onClose()
+            }
+        }, onType = viewModel::setType)
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -305,6 +316,15 @@ private fun PaymentContent(
             selectedId = form.categoryId,
             onPick = viewModel::setCategory,
             onDismiss = { pickingCategory = false }
+        )
+    }
+    if (confirmingDiscard) {
+        DiscardChangesDialog(
+            onDiscard = {
+                confirmingDiscard = false
+                onClose()
+            },
+            onKeepEditing = { confirmingDiscard = false }
         )
     }
     if (confirmingDelete) {
