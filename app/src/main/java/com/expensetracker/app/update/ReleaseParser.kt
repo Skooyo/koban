@@ -29,7 +29,7 @@ object ReleaseParser {
                 versionName = root.getString("tag_name").removePrefix("v"),
                 apkUrl = asset.getString("browser_download_url"),
                 apkSize = asset.getLong("size"),
-                notes = root.optString("body", "").take(500)
+                notes = (if (root.isNull("body")) "" else root.getString("body")).take(500)
             )
         }
     } catch (e: Exception) {
