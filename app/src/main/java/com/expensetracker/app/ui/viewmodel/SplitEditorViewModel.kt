@@ -16,13 +16,19 @@ import com.expensetracker.app.data.SplitItemInput
 import com.expensetracker.app.data.SplitMath
 import com.expensetracker.app.data.SplitPersonEntity
 import com.expensetracker.app.data.SplitRepository
+import com.expensetracker.app.data.SettingsRepository
 import com.expensetracker.app.parser.AmountFormatter
+import com.expensetracker.app.parser.CloudRead
+import com.expensetracker.app.parser.ReceiptCloudClient
 import com.expensetracker.app.parser.ReceiptRead
 import com.expensetracker.app.parser.ReceiptReader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -71,6 +77,14 @@ data class SplitEditorState(
     val message: String? = null,
     /** Informational line from the receipt reader (not an error). */
     val readNote: String? = null,
+    /** Who read the receipt: "✓ Read by Claude · …" or why Claude could not run. */
+    val readSource: String? = null,
+    /** A device token is stored. */
+    val onlineAccess: Boolean = false,
+    /** "Read again with Claude" is possible: the photo is still kept and Claude did not run for it. */
+    val canReadAgain: Boolean = false,
+    val readsLeft: Int? = null,
+    val readingAgain: Boolean = false,
     val error: String? = null,
     val saving: Boolean = false,
     val finished: Boolean = false
@@ -85,7 +99,9 @@ class SplitEditorViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val splitRepository: SplitRepository,
     private val expenseDao: ExpenseDao,
-    private val receiptReader: ReceiptReader
+    private val receiptReader: ReceiptReader,
+    private val receiptCloudClient: ReceiptCloudClient,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val editBillId: String? = savedStateHandle["billId"]
@@ -99,8 +115,16 @@ class SplitEditorViewModel @Inject constructor(
 
     private var nextKey = 0L
     private var readJob: Job? = null
+    /** The photo of the current read. Kept until the Items step closes, for "Read again with Claude". */
+    private var photo: Uri? = null
+    private var claudeRan = false
 
     init {
+        viewModelScope.launch {
+            settingsRepository.deviceToken.collect { token ->
+                _state.update { it.copy(onlineAccess = token.isNotBlank(), canReadAgain = canReadAgain(token.isNotBlank())) }
+            }
+        }
         if (editBillId != null) {
             _state.update { it.copy(loading = true) }
             viewModelScope.launch { loadExisting(editBillId) }
@@ -180,54 +204,90 @@ class SplitEditorViewModel @Inject constructor(
         }
     }
 
-    /** Reads the receipt, then deletes the cached photo it read. Photos are not kept. */
+    private fun canReadAgain(online: Boolean) = online && photo != null && !claudeRan
+
+    /** Deletes the kept photo. Called when the Items step closes and when the screen goes away. */
+    private fun dropPhoto() {
+        photo?.let(::deleteReadFile)
+        photo = null
+        _state.update { it.copy(canReadAgain = false) }
+    }
+
+    override fun onCleared() = dropPhoto()
+
+    /** Claude (with online access) and the phone rules read at the same time; [choose] picks the read. */
     fun readReceipt(uri: Uri) {
-        _state.update { it.copy(step = SplitStep.Reading, message = null, readNote = null) }
         readJob?.cancel()
+        dropPhoto()
+        photo = uri
+        claudeRan = false
+        _state.update { it.copy(step = SplitStep.Reading, message = null, readNote = null, readSource = null) }
         readJob = viewModelScope.launch {
-            val read = try {
-                receiptReader.read(uri)
-            } finally {
-                deleteReadFile(uri)
+            val token = settingsRepository.deviceToken.first()
+            val (rules, cloud) = coroutineScope {
+                val cloud = if (token.isBlank()) null else async { receiptCloudClient.read(uri, token) }
+                val rules = async { receiptReader.read(uri) }
+                rules.await() to cloud?.await()
             }
-            if (read == null) {
-                _state.update {
-                    it.copy(
-                        step = SplitStep.Items,
-                        items = emptyList(),
-                        printedTotal = null,
-                        serviceCharge = "",
-                        tax = "",
-                        discount = "",
-                        rounding = "",
-                        merchant = "",
-                        readNote = null,
-                        message = "Couldn't read this receipt. Add the items by hand."
-                    )
+            claudeRan = cloud is CloudRead.Ok || (cloud as? CloudRead.Failed)?.usedRead == true
+            if ((cloud as? CloudRead.Failed)?.tokenRevoked == true) settingsRepository.setDeviceToken("")
+            val (read, source) = choose(rules, cloud)
+            showRead(read, source, (cloud as? CloudRead.Ok)?.readsLeft)
+        }
+    }
+
+    /** From the mismatch sheet: sends the kept photo to Claude and replaces the items with its read. */
+    fun readAgainWithClaude() {
+        val uri = photo ?: return
+        if (_state.value.readingAgain) return
+        _state.update { it.copy(readingAgain = true) }
+        viewModelScope.launch {
+            val token = settingsRepository.deviceToken.first()
+            val cloud = if (token.isBlank()) CloudRead.Failed("Enter an invite code in Settings first.")
+            else receiptCloudClient.read(uri, token)
+            _state.update { it.copy(readingAgain = false) }
+            when (cloud) {
+                is CloudRead.Ok -> {
+                    claudeRan = true
+                    showRead(cloud.read, claudeLine(cloud.readsLeft), cloud.readsLeft)
                 }
-                return@launch
+                is CloudRead.Failed -> {
+                    if (cloud.usedRead) claudeRan = true
+                    if (cloud.tokenRevoked) settingsRepository.setDeviceToken("")
+                    _state.update { it.copy(readSource = cloud.why, canReadAgain = canReadAgain(it.onlineAccess)) }
+                }
             }
-            val draft = read.draft
-            _state.update {
-                it.copy(
-                    step = SplitStep.Items,
-                    merchant = draft.merchant.orEmpty(),
-                    billTime = draft.dateMillis ?: it.billTime,
-                    printedTotal = draft.printedTotal,
-                    items = draft.items.map { item ->
-                        ItemRow(
-                            nextKey++, item.name, item.quantity.toString(),
-                            AmountFormatter.formatDisplay(item.price)
-                        )
-                    },
-                    serviceCharge = chargeText(draft.serviceCharge),
-                    tax = chargeText(draft.tax),
-                    discount = chargeText(draft.discount),
-                    rounding = chargeText(draft.rounding),
-                    readNote = readNote(read),
-                    message = if (draft.printedTotal == null) "No total found on the receipt. Check the items." else null
-                )
-            }
+        }
+    }
+
+    private fun showRead(read: ReceiptRead?, source: String?, readsLeft: Int?) {
+        val draft = read?.draft
+        _state.update {
+            it.copy(
+                step = SplitStep.Items,
+                merchant = draft?.merchant.orEmpty(),
+                billTime = draft?.dateMillis ?: it.billTime,
+                printedTotal = draft?.printedTotal,
+                items = draft?.items.orEmpty().map { item ->
+                    ItemRow(
+                        nextKey++, item.name, item.quantity.toString(),
+                        AmountFormatter.formatDisplay(item.price)
+                    )
+                },
+                serviceCharge = draft?.let { d -> chargeText(d.serviceCharge) }.orEmpty(),
+                tax = draft?.let { d -> chargeText(d.tax) }.orEmpty(),
+                discount = draft?.let { d -> chargeText(d.discount) }.orEmpty(),
+                rounding = draft?.let { d -> chargeText(d.rounding) }.orEmpty(),
+                readNote = read?.let(::readNote),
+                readSource = source,
+                readsLeft = readsLeft ?: it.readsLeft,
+                canReadAgain = canReadAgain(it.onlineAccess),
+                message = when {
+                    draft == null -> "Couldn't read this receipt. Add the items by hand."
+                    draft.printedTotal == null -> "No total found on the receipt. Check the items."
+                    else -> null
+                }
+            )
         }
     }
 
@@ -356,7 +416,7 @@ class SplitEditorViewModel @Inject constructor(
     fun next() {
         val s = _state.value
         val target = when (s.step) {
-            SplitStep.Items -> SplitStep.People
+            SplitStep.Items -> SplitStep.People.also { dropPhoto() }
             SplitStep.People -> SplitStep.Assign
             SplitStep.Assign -> SplitStep.Link
             SplitStep.Link -> SplitStep.Summary
@@ -373,9 +433,13 @@ class SplitEditorViewModel @Inject constructor(
             SplitStep.Photo -> return false
             SplitStep.Reading -> {
                 readJob?.cancel()
+                dropPhoto()
                 SplitStep.Photo
             }
-            SplitStep.Items -> if (s.billId != null) return false else SplitStep.Photo
+            SplitStep.Items -> {
+                dropPhoto()
+                if (s.billId != null) return false else SplitStep.Photo
+            }
             SplitStep.People -> SplitStep.Items
             SplitStep.Assign -> SplitStep.People
             SplitStep.Link -> if (s.locked) SplitStep.Summary else SplitStep.Assign
@@ -426,6 +490,23 @@ class SplitEditorViewModel @Inject constructor(
     // ---- Derived values (pure, used by the screen) ----
 
     companion object {
+        private fun claudeLine(readsLeft: Int?) =
+            "✓ Read by Claude" + (readsLeft?.let { " · $it reads left today" } ?: "")
+
+        /**
+         * Claude's read if it adds up; else the rules' read if it adds up; else Claude's read.
+         * Without Claude: the rules' read, with a line saying why Claude did not run.
+         */
+        fun choose(rules: ReceiptRead?, cloud: CloudRead?): Pair<ReceiptRead?, String?> = when (cloud) {
+            null -> rules to null
+            is CloudRead.Failed -> rules to "Read on the phone. ${cloud.why}"
+            is CloudRead.Ok -> when {
+                cloud.read.accepted -> cloud.read to claudeLine(cloud.readsLeft)
+                rules?.accepted == true -> rules to "Read on the phone: Claude's read did not match the receipt total."
+                else -> cloud.read to claudeLine(cloud.readsLeft)
+            }
+        }
+
         /** The scanner's file:// JPEG is ours to delete only when it sits inside the app cache. */
         fun isCacheFile(scheme: String?, path: String?, cacheDir: File): Boolean {
             if (scheme != "file" || path == null) return false

@@ -12,6 +12,8 @@ import com.expensetracker.app.listener.ReconnectResult
 import com.expensetracker.app.listener.RecentNotificationsStore
 import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.PaymentRules
+import com.expensetracker.app.parser.ReceiptCloudClient
+import com.expensetracker.app.parser.Registration
 import com.expensetracker.app.parser.RuleMatch
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -35,20 +37,25 @@ data class SettingsUiState(
     val regexTestResult: String? = null,
     val reconnectMessage: String? = null,
     val geminiPrefillEnabled: Boolean = false,
-    val geminiApiKey: String = ""
+    val geminiApiKey: String = "",
+    val onlineAccess: Boolean = false,
+    val inviteBusy: Boolean = false,
+    val inviteMessage: String? = null
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val receiptCloudClient: ReceiptCloudClient
 ) : ViewModel() {
 
     private val accessGranted = MutableStateFlow(false)
     private val regexInput = MutableStateFlow("")
     private val regexResult = MutableStateFlow<String?>(null)
     private val reconnectMessage = MutableStateFlow<String?>(null)
+    private val invite = MutableStateFlow(false to null as String?)
 
     val uiState: StateFlow<SettingsUiState> = kotlinx.coroutines.flow.combine(
         kotlinx.coroutines.flow.combine(
@@ -72,9 +79,11 @@ class SettingsViewModel @Inject constructor(
         },
         kotlinx.coroutines.flow.combine(
             settingsRepository.geminiPrefillEnabled,
-            settingsRepository.geminiApiKey
-        ) { enabled, key -> enabled to key }
-    ) { listener, form, gemini ->
+            settingsRepository.geminiApiKey,
+            settingsRepository.deviceToken,
+            invite
+        ) { enabled, key, token, inviteState -> OnlineSettingsSlice(enabled, key, token.isNotBlank(), inviteState) }
+    ) { listener, form, online ->
         SettingsUiState(
             isAccessGranted = listener.isAccessGranted,
             isBatteryOptimizationIgnored = NotificationAccessHelper.isBatteryOptimizationIgnored(context),
@@ -90,8 +99,11 @@ class SettingsViewModel @Inject constructor(
             regexTestInput = form.input,
             regexTestResult = form.result,
             reconnectMessage = form.reconnectMessage,
-            geminiPrefillEnabled = gemini.first,
-            geminiApiKey = gemini.second
+            geminiPrefillEnabled = online.geminiPrefillEnabled,
+            geminiApiKey = online.geminiApiKey,
+            onlineAccess = online.onlineAccess,
+            inviteBusy = online.invite.first,
+            inviteMessage = online.invite.second
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -153,6 +165,25 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** Trades the invite code for a device token. Only the token is stored, never the code. */
+    fun enterInviteCode(code: String) {
+        if (invite.value.first) return
+        invite.value = true to null
+        viewModelScope.launch {
+            when (val r = receiptCloudClient.register(code)) {
+                is Registration.Ok -> {
+                    settingsRepository.setDeviceToken(r.deviceToken)
+                    invite.value = false to null
+                }
+                is Registration.Failed -> invite.value = false to r.message
+            }
+        }
+    }
+
+    fun removeOnlineAccess() {
+        viewModelScope.launch { settingsRepository.setDeviceToken("") }
+    }
+
     fun updateRegexTestInput(input: String) {
         regexInput.value = input
     }
@@ -190,6 +221,14 @@ private data class ListenerSettingsSlice(
     val isAccessGranted: Boolean,
     val allowlistedPackages: Set<String>,
     val capturedNotificationCount: Int
+)
+
+private data class OnlineSettingsSlice(
+    val geminiPrefillEnabled: Boolean,
+    val geminiApiKey: String,
+    val onlineAccess: Boolean,
+    /** Busy flag and the last register error. */
+    val invite: Pair<Boolean, String?>
 )
 
 private data class FormSettingsSlice(

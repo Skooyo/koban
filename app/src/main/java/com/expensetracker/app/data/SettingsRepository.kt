@@ -17,7 +17,7 @@ import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
-/** Holds the Gemini key. Excluded from backup in res/xml/backup_rules.xml and data_extraction_rules.xml. */
+/** Holds the Gemini key and the device token. Excluded from backup in res/xml/backup_rules.xml and data_extraction_rules.xml. */
 private val Context.secretsDataStore: DataStore<Preferences> by preferencesDataStore(name = "secrets")
 
 @Singleton
@@ -29,6 +29,7 @@ class SettingsRepository @Inject constructor(
     private val darkModeKey = booleanPreferencesKey("dark_mode")
     private val geminiPrefillKey = booleanPreferencesKey("gemini_prefill_enabled")
     private val geminiApiKeyKey = stringPreferencesKey("gemini_api_key")
+    private val deviceTokenKey = stringPreferencesKey("device_token")
 
     val allowlistedPackages: Flow<Set<String>> = context.dataStore.data.map { prefs ->
         prefs[allowlistKey] ?: emptySet()
@@ -51,6 +52,17 @@ class SettingsRepository @Inject constructor(
     /** The user's own key. Defaults to the build-time key from .env. Never log it. */
     val geminiApiKey: Flow<String> = context.secretsDataStore.data.map { prefs ->
         prefs[geminiApiKeyKey] ?: BuildConfig.GEMINI_API_KEY
+    }
+
+    /** Given by Koban's server for a good invite code. Blank means no online access. Never log it. */
+    val deviceToken: Flow<String> = context.secretsDataStore.data.map { prefs ->
+        prefs[deviceTokenKey].orEmpty()
+    }
+
+    suspend fun setDeviceToken(token: String) {
+        context.secretsDataStore.edit { prefs ->
+            if (token.isBlank()) prefs.remove(deviceTokenKey) else prefs[deviceTokenKey] = token
+        }
     }
 
     suspend fun setDarkMode(enabled: Boolean) {
