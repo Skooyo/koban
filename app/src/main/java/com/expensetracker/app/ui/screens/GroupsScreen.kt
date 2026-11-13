@@ -6,6 +6,8 @@ import android.text.format.DateUtils
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -81,6 +83,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -165,7 +168,7 @@ private fun ConfirmDialog(title: String, body: String, confirm: String, onDismis
 @Composable
 private fun OnlineOffState(onTurnOn: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().padding(horizontal = Edge, vertical = 48.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Edge, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -183,7 +186,7 @@ private fun OnlineOffState(onTurnOn: () -> Unit) {
 
 @Composable
 private fun SignedOutState(busy: Boolean, onSignIn: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(horizontal = Edge, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Edge, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -497,7 +500,7 @@ private fun GroupBody(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "Members",
-                        Modifier.weight(1f).padding(start = 4.dp),
+                        Modifier.weight(1f).semantics { heading() }.padding(start = 4.dp),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -562,7 +565,7 @@ private fun MemberRow(
         Modifier
             .fillMaxWidth()
             .animateContentSize()
-            .clickable(role = Role.Button, onClick = onToggle)
+            .clickable(role = Role.Button, onClickLabel = if (expanded) "Hide categories" else "Show categories", onClick = onToggle)
             .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -604,7 +607,7 @@ private fun MemberRow(
                 }
             }
             if (isMe) Text(
-                "This is what the other members see about you. Never shared: single payments, merchants, times, notes and money in.",
+                "This is what the other members see about you. Never shared: single payments, shops, times, notes and money in.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
