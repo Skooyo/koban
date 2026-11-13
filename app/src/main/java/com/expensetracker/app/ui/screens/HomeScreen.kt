@@ -233,7 +233,7 @@ private fun SpentTodayCard(summary: PeriodSummary, onOpen: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .clickable(onClickLabel = "Open transactions", onClick = onOpen)
+            .clickable(onClickLabel = "Open Activity", onClick = onOpen)
             .padding(20.dp)
     ) {
         Text("Spent today", style = MaterialTheme.typography.bodyMedium, color = muted)

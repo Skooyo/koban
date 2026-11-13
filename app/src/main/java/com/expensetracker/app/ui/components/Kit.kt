@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -35,6 +36,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -135,7 +137,23 @@ fun MoneyText(
     style: TextStyle = MaterialTheme.typography.titleMedium,
     color: Color = Color.Unspecified
 ) {
-    Text(text, modifier, color = color, style = style.copy(fontFeatureSettings = "tnum"))
+    val tnum = style.copy(fontFeatureSettings = "tnum")
+    if (style.fontSize.value <= 40f) {
+        Text(text, modifier, color = color, style = tnum, maxLines = 1, softWrap = false)
+        return
+    }
+    // Compose 1.7 has no autoSize: a big amount steps down the display sizes until it fits the width.
+    BoxWithConstraints(modifier) {
+        val measurer = rememberTextMeasurer()
+        val t = MaterialTheme.typography
+        val steps = listOf(tnum) + listOf(t.displayMedium, t.displaySmall, t.headlineLarge)
+            .filter { it.fontSize < style.fontSize }
+            .map { it.copy(color = style.color, fontFeatureSettings = "tnum") }
+        val fitted = steps.firstOrNull {
+            measurer.measure(text, it, maxLines = 1, softWrap = false).size.width <= constraints.maxWidth
+        } ?: steps.last()
+        Text(text, color = color, style = fitted, maxLines = 1, softWrap = false)
+    }
 }
 
 @Composable
