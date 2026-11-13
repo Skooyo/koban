@@ -104,7 +104,7 @@ void main() {
 
   test('normalized name treats a non-breaking space like a space', () {
     expect(
-      PeopleMath.normalizedName('Ali Bin'),
+      PeopleMath.normalizedName('Ali\u00a0Bin'),
       PeopleMath.normalizedName('Ali Bin'),
     );
   });

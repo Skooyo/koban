@@ -44,4 +44,12 @@ void main() {
     }
     expect(() => CaptureFormat.fromDbName(''), throwsArgumentError);
   });
+
+  test('debt status names equal the Kotlin constants', () {
+    expect(DebtStatus.values.map((e) => e.dbName), ['OPEN', 'PAID']);
+    for (final e in DebtStatus.values) {
+      expect(DebtStatus.fromDbName(e.dbName), e);
+    }
+    expect(() => DebtStatus.fromDbName('open'), throwsArgumentError);
+  });
 }
