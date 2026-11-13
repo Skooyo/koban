@@ -1,3 +1,4 @@
+import 'package:koban/data/database.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 /// The row count of each table in the test fixture (31 rows).
@@ -27,3 +28,10 @@ List<Object?> distinct(Database db, String table, String column) => [
           'SELECT DISTINCT $column AS v FROM $table ORDER BY v'))
         row['v'],
     ];
+
+/// Count the rows of every table in [fixtureCounts] in a Drift database.
+Future<Map<String, int>> rowCountsOf(KobanDatabase db) async => {
+      for (final table in fixtureCounts.keys)
+        table: (await db.customSelect('SELECT COUNT(*) AS c FROM $table').getSingle())
+            .read<int>('c'),
+    };
