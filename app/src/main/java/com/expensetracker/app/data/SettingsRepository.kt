@@ -27,6 +27,7 @@ class SettingsRepository @Inject constructor(
 ) {
     private val allowlistKey = stringSetPreferencesKey("payment_app_allowlist")
     private val chosenKey = booleanPreferencesKey("payment_apps_chosen")
+    private val onboardingDoneKey = booleanPreferencesKey("onboarding_done")
     private val darkModeKey = booleanPreferencesKey("dark_mode")
     private val deviceTokenKey = stringPreferencesKey("device_token")
     private val groupSessionKey = stringPreferencesKey("group_session")
@@ -40,6 +41,13 @@ class SettingsRepository @Inject constructor(
     /** Unset means: chosen if an older version already stored a real list, else not yet. */
     val paymentAppsChosen: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[chosenKey] ?: !prefs[allowlistKey].isNullOrEmpty()
+    }
+
+    /** True once the user finished or skipped onboarding. */
+    val onboardingDone: Flow<Boolean> = context.dataStore.data.map { it[onboardingDoneKey] ?: false }
+
+    suspend fun setOnboardingDone() {
+        context.dataStore.edit { it[onboardingDoneKey] = true }
     }
 
     val darkModeEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->

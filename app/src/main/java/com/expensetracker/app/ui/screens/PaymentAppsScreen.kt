@@ -44,6 +44,7 @@ import com.expensetracker.app.ui.viewmodel.PaymentAppsViewModel
 fun PaymentAppsScreen(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    onBack: () -> Unit = onClose,
     viewModel: PaymentAppsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -57,7 +58,7 @@ fun PaymentAppsScreen(
                 windowInsets = WindowInsets(0),
                 title = { Text("Payment apps") },
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }

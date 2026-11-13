@@ -1,5 +1,6 @@
 package com.expensetracker.app.listener
 
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -136,11 +137,15 @@ object NotificationAccessHelper {
     }
 
     fun openNotificationAccessSettings(context: Context) {
-        context.startActivity(
-            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
+        try {
+            context.startActivity(
+                Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            )
+        } catch (_: ActivityNotFoundException) {
+            // No such settings page on this phone.
+        }
     }
 
     fun openBatteryOptimizationSettings(context: Context) {

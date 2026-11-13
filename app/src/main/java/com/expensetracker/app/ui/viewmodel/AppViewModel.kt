@@ -59,6 +59,13 @@ class AppViewModel @Inject constructor(
     suspend fun paymentAppsDue(): Boolean =
         NotificationAccessHelper.isNotificationAccessGranted(context) && !settingsRepository.paymentAppsChosen.first()
 
+    /** True for a new user who has not finished onboarding. */
+    suspend fun onboardingDue(): Boolean = OnboardingRules.shouldShow(
+        settingsRepository.onboardingDone.first(),
+        NotificationAccessHelper.isNotificationAccessGranted(context),
+        settingsRepository.paymentAppsChosen.first()
+    )
+
     /** True after a stop for a rotation, so the next start does not open the swipe screen again. */
     private var skipNextStart = false
 
