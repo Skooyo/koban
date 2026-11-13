@@ -1,0 +1,137 @@
+import 'package:decimal/decimal.dart';
+import '../rules/types.dart';
+import 'converters.dart';
+
+CREATE TABLE expenses (
+    id TEXT NOT NULL PRIMARY KEY,
+    amount TEXT NOT NULL MAPPED BY `const MoneyConverter()`,
+    currency TEXT NOT NULL,
+    merchant TEXT,
+    rawNotificationText TEXT NOT NULL,
+    sourcePackage TEXT NOT NULL,
+    notificationPostTime INTEGER NOT NULL,
+    createdAt INTEGER NOT NULL,
+    dedupKey TEXT NOT NULL,
+    status TEXT NOT NULL MAPPED BY `const ExpenseStatusConverter()`,
+    confidence TEXT NOT NULL MAPPED BY `const ParseConfidenceConverter()`,
+    notificationKey TEXT,
+    categoryId TEXT,
+    notes TEXT,
+    transactionType TEXT NOT NULL MAPPED BY `const TransactionTypeConverter()`,
+    countedAmount TEXT MAPPED BY `const MoneyConverter()`,
+    privateToGroups INTEGER NOT NULL MAPPED BY `const BoolConverter()`
+);
+
+CREATE TABLE categories (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    colorHex TEXT NOT NULL,
+    isDefault INTEGER NOT NULL MAPPED BY `const BoolConverter()`
+);
+
+CREATE TABLE merchant_category_map (
+    merchantKey TEXT NOT NULL PRIMARY KEY,
+    displayName TEXT NOT NULL,
+    categoryId TEXT NOT NULL,
+    updatedAt INTEGER NOT NULL
+);
+
+CREATE TABLE pending_payments (
+    id TEXT NOT NULL PRIMARY KEY,
+    amount TEXT NOT NULL MAPPED BY `const MoneyConverter()`,
+    currency TEXT NOT NULL,
+    merchant TEXT,
+    transactionType TEXT NOT NULL MAPPED BY `const TransactionTypeConverter()`,
+    sourcePackage TEXT NOT NULL,
+    rawNotificationText TEXT NOT NULL,
+    notificationPostTime INTEGER NOT NULL,
+    notificationKey TEXT,
+    dedupKey TEXT NOT NULL,
+    format TEXT NOT NULL MAPPED BY `const CaptureFormatConverter()`,
+    categoryId TEXT,
+    likelyPromotion INTEGER NOT NULL MAPPED BY `const BoolConverter()`,
+    createdAt INTEGER NOT NULL,
+    edited INTEGER NOT NULL MAPPED BY `const BoolConverter()`,
+    directionUnclear INTEGER NOT NULL DEFAULT 0 MAPPED BY `const BoolConverter()`
+);
+
+CREATE TABLE dropped_notifications (
+    dedupKey TEXT NOT NULL PRIMARY KEY,
+    notificationKey TEXT,
+    droppedAt INTEGER NOT NULL
+);
+
+CREATE TABLE split_bills (
+    id TEXT NOT NULL PRIMARY KEY,
+    merchant TEXT,
+    billTime INTEGER NOT NULL,
+    currency TEXT NOT NULL,
+    printedTotal TEXT MAPPED BY `const MoneyConverter()`,
+    serviceCharge TEXT NOT NULL MAPPED BY `const MoneyConverter()`,
+    tax TEXT NOT NULL MAPPED BY `const MoneyConverter()`,
+    discount TEXT NOT NULL MAPPED BY `const MoneyConverter()`,
+    rounding TEXT NOT NULL MAPPED BY `const MoneyConverter()`,
+    linkedExpenseId TEXT,
+    createdAt INTEGER NOT NULL,
+    manual INTEGER NOT NULL DEFAULT 0 MAPPED BY `const BoolConverter()`
+);
+
+CREATE TABLE split_items (
+    id TEXT NOT NULL PRIMARY KEY,
+    billId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    price TEXT NOT NULL MAPPED BY `const MoneyConverter()`,
+    position INTEGER NOT NULL
+);
+
+CREATE TABLE split_people (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    lastUsedAt INTEGER NOT NULL,
+    qrPath TEXT,
+    archived INTEGER NOT NULL DEFAULT 0 MAPPED BY `const BoolConverter()`,
+    suggestedSettleExpenseId TEXT
+);
+
+CREATE TABLE split_item_shares (
+    itemId TEXT NOT NULL,
+    personId TEXT NOT NULL,
+    PRIMARY KEY (itemId, personId)
+);
+
+CREATE TABLE split_debts (
+    id TEXT NOT NULL PRIMARY KEY,
+    billId TEXT NOT NULL,
+    personId TEXT NOT NULL,
+    amount TEXT NOT NULL MAPPED BY `const MoneyConverter()`,
+    status TEXT NOT NULL MAPPED BY `const DebtStatusConverter()`,
+    repaymentExpenseId TEXT,
+    suggestedRepaymentExpenseId TEXT,
+    paidAt INTEGER
+);
+
+CREATE TABLE owed_items (
+    id TEXT NOT NULL PRIMARY KEY,
+    personId TEXT NOT NULL,
+    description TEXT NOT NULL,
+    amount TEXT NOT NULL MAPPED BY `const MoneyConverter()`,
+    itemDate INTEGER NOT NULL,
+    createdAt INTEGER NOT NULL,
+    status TEXT NOT NULL MAPPED BY `const DebtStatusConverter()`,
+    paidAt INTEGER
+);
+
+CREATE UNIQUE INDEX index_expenses_dedupKey ON expenses (dedupKey);
+
+CREATE INDEX index_owed_items_personId ON owed_items (personId);
+
+CREATE INDEX index_pending_payments_notificationKey ON pending_payments (notificationKey);
+
+CREATE INDEX index_split_debts_billId ON split_debts (billId);
+
+CREATE INDEX index_split_debts_personId ON split_debts (personId);
+
+CREATE INDEX index_split_item_shares_personId ON split_item_shares (personId);
+
+CREATE INDEX index_split_items_billId ON split_items (billId);

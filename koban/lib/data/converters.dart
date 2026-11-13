@@ -71,3 +71,14 @@ class DebtStatusConverter extends TypeConverter<DebtStatus, String> {
   @override
   String toSql(DebtStatus value) => value.dbName;
 }
+
+/// Stores a bool as INTEGER 0 or 1, the same as Room.
+class BoolConverter extends TypeConverter<bool, int> {
+  const BoolConverter();
+
+  @override
+  bool fromSql(int fromDb) => fromDb != 0;
+
+  @override
+  int toSql(bool value) => value ? 1 : 0;
+}
