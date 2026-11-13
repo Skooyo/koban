@@ -42,7 +42,7 @@ data class MoneyColors(
 )
 
 private val LightMoney = MoneyColors(
-    received = Color(0xFF188A4A),
+    received = Color(0xFF16804A),
     review = Color(0xFFA85A00),
     red = Color(0xFFE5483B),
     blue = Color(0xFF1F6FE0),
@@ -58,7 +58,7 @@ private val LightMoney = MoneyColors(
 )
 
 private val DarkMoney = MoneyColors(
-    received = Color(0xFF5EDB8F),
+    received = Color(0xFF6FD3A0),
     review = Color(0xFFF0B060),
     red = Color(0xFFFF6B5E),
     blue = Color(0xFF5B9BFF),
@@ -95,27 +95,27 @@ fun categoryColor(categoryId: String?): Color {
 private val LightColors = lightColorScheme(
     primary = Color(0xFF7A5D00),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFF2C94C),
-    onPrimaryContainer = Color(0xFF2A2106),
+    primaryContainer = Color(0xFFFBF1CF),
+    onPrimaryContainer = Color(0xFF7A5D00),
     secondary = Color(0xFF4A5A70),
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFDDE3EA),
     onSecondaryContainer = Color(0xFF1B2430),
     tertiary = Color(0xFFA85A00),
     error = Color(0xFFC8372A),
-    background = Color(0xFFF3F5F4),
-    onBackground = Color(0xFF1B2430),
-    surface = Color(0xFFF3F5F4),
-    onSurface = Color(0xFF1B2430),
+    background = Color(0xFFF6F7FA),
+    onBackground = Color(0xFF161D2B),
+    surface = Color(0xFFF6F7FA),
+    onSurface = Color(0xFF161D2B),
     surfaceVariant = Color(0xFFE2E7EA),
-    onSurfaceVariant = Color(0xFF586474),
+    onSurfaceVariant = Color(0xFF5A6478),
     surfaceContainerLowest = Color.White,
-    surfaceContainerLow = Color(0xFFEBEFF0),
-    surfaceContainer = Color(0xFFE6EAEC),
-    surfaceContainerHigh = Color(0xFFE0E5E8),
-    surfaceContainerHighest = Color(0xFFDAE0E4),
+    surfaceContainerLow = Color(0xFFF9FAFC),
+    surfaceContainer = Color(0xFFFFFFFF),
+    surfaceContainerHigh = Color(0xFFEEF1F6),
+    surfaceContainerHighest = Color(0xFFE6EAF1),
     outline = Color(0xFF8C97A5),
-    outlineVariant = Color(0xFFD3D9DF)
+    outlineVariant = Color(0xFFD9DEE8)
 )
 
 private val DarkColors = darkColorScheme(
@@ -128,23 +128,23 @@ private val DarkColors = darkColorScheme(
     secondaryContainer = Color(0xFF33415A),
     onSecondaryContainer = Color(0xFFE3EAF5),
     tertiary = Color(0xFFF0B060),
-    error = Color(0xFFFF8A80),
+    error = Color(0xFFFF7B6B),
     onError = Color(0xFF5C0E14),
     errorContainer = Color(0xFF7A1F2B),
     onErrorContainer = Color(0xFFFFE3E0),
-    background = Color(0xFF161D29),
-    onBackground = Color(0xFFEEF2F7),
-    surface = Color(0xFF161D29),
-    onSurface = Color(0xFFEEF2F7),
+    background = Color(0xFF141B2B),
+    onBackground = Color(0xFFEDF0F7),
+    surface = Color(0xFF141B2B),
+    onSurface = Color(0xFFEDF0F7),
     surfaceVariant = Color(0xFF263042),
-    onSurfaceVariant = Color(0xFFA3AEBD),
-    surfaceContainerLowest = Color(0xFF111722),
-    surfaceContainerLow = Color(0xFF1B2331),
-    surfaceContainer = Color(0xFF1F2836),
-    surfaceContainerHigh = Color(0xFF263042),
-    surfaceContainerHighest = Color(0xFF2D384B),
+    onSurfaceVariant = Color(0xFFA2ACC2),
+    surfaceContainerLowest = Color(0xFF10172A),
+    surfaceContainerLow = Color(0xFF18203A),
+    surfaceContainer = Color(0xFF1C2539),
+    surfaceContainerHigh = Color(0xFF243049),
+    surfaceContainerHighest = Color(0xFF2B3957),
     outline = Color(0xFF6B7788),
-    outlineVariant = Color(0xFF2C3747)
+    outlineVariant = Color(0xFF2F3B57)
 )
 
 // One variable font. Text sizes use the small optical size; display sizes use the large one.
