@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FilterList
@@ -390,17 +391,17 @@ private fun FilterOptionRow(dot: Color?, name: String, total: BigDecimal?, selec
     }
 }
 
-/** Gold "＋ Add" button with dark ink text, as the payment page's bottom button. */
+/** The one gold action of Home and Activity: add icon and "Add payment". */
 @Composable
 internal fun AddPaymentFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ExtendedFloatingActionButton(
         onClick = onClick,
         modifier = modifier,
-        containerColor = LocalMoneyColors.current.gold,
-        contentColor = Ink
-    ) {
-        Text("＋ Add", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    }
+        icon = { Icon(Icons.Default.Add, contentDescription = null) },
+        text = { Text("Add payment", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary
+    )
 }
 
 @Composable

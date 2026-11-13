@@ -2,25 +2,23 @@ package com.expensetracker.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,7 +34,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -46,17 +43,30 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.data.DefaultCategories
+import com.expensetracker.app.data.PeriodSummary
+import com.expensetracker.app.parser.AmountFormatter
+import com.expensetracker.app.ui.components.CategoryDot
 import com.expensetracker.app.ui.components.ExpenseListCard
+import com.expensetracker.app.ui.components.KobanRow
+import com.expensetracker.app.ui.components.LargeTopBar
+import com.expensetracker.app.ui.components.ListGroup
 import com.expensetracker.app.ui.components.ListenerStatusBanner
 import com.expensetracker.app.ui.components.Mon
 import com.expensetracker.app.ui.components.MonFace
+import com.expensetracker.app.ui.components.MoneyText
 import com.expensetracker.app.ui.components.NoteStrip
-import com.expensetracker.app.ui.components.PeriodHero
-import com.expensetracker.app.ui.components.PeriodTotalRow
-import com.expensetracker.app.ui.components.ReceivedNote
+import com.expensetracker.app.ui.components.SectionHeading
+import com.expensetracker.app.ui.components.TonalButton
 import com.expensetracker.app.ui.theme.LocalMoneyColors
+import com.expensetracker.app.ui.theme.categoryColor
 import com.expensetracker.app.ui.viewmodel.HomeViewModel
+import java.math.BigDecimal
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.launch
+
+private fun rm(amount: BigDecimal) = "${AmountFormatter.currencySymbol("MYR")} ${AmountFormatter.formatGrouped(amount)}"
 
 @Composable
 fun HomeScreen(
@@ -101,84 +111,101 @@ fun HomeScreen(
         onOpenActivity()
     }
 
-    val divider = MaterialTheme.colorScheme.outlineVariant
+    // The period start changes at midnight, so the date moves on with it.
+    val dateText = remember(uiState.today.periodStart) {
+        SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(Date())
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 112.dp)
-        ) {
-            item {
-                Row(
-                    modifier = Modifier.padding(bottom = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ListenerStatusBanner(
-                        isAccessGranted = uiState.isAccessGranted,
-                        onEnableClick = viewModel::openNotificationSettings,
-                        modifier = Modifier.weight(1f)
-                    )
+        Column(Modifier.fillMaxSize()) {
+            LargeTopBar(
+                title = "Today",
+                subtitle = dateText,
+                actions = {
                     IconButton(onClick = onOpenSettings, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 }
-            }
-
-            if (listensToNoApp) {
+            )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 112.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 item {
-                    NoAppsBanner(onClick = onChoosePaymentApps)
+                    ListenerStatusBanner(
+                        isAccessGranted = uiState.isAccessGranted,
+                        onEnableClick = viewModel::openNotificationSettings
+                    )
                 }
-            }
 
-            if (waitingCount > 0) {
-                item {
-                    WaitingBanner(count = waitingCount, onClick = onCheckPayments)
-                }
-            }
-
-            if (uiState.isAccessGranted && !uiState.hasAnyPayment && waitingCount == 0 && !listensToNoApp) {
-                item {
-                    FirstPaymentCard(onAddPayment = onAddPayment, onOpenSettings = onOpenSettings)
-                }
-            }
-
-            item {
-                PeriodHero(summary = uiState.today, onOpen = { openActivity(withWeek = true) })
-                HorizontalDivider(color = divider, modifier = Modifier.padding(top = 20.dp))
-            }
-
-            listOf(uiState.week to true, uiState.month to false).forEach { (summary, withWeek) ->
-                item {
-                    PeriodTotalRow(
-                        title = summary.title,
-                        subtitle = summary.subtitle,
-                        total = summary.total,
-                        onClick = { openActivity(withWeek) }
-                    ) {
-                        NoteStrip(breakdown = summary.breakdown, height = 6.dp)
-                        ReceivedNote(received = summary.received)
+                if (listensToNoApp) {
+                    item {
+                        ListGroup {
+                            item {
+                                KobanRow(
+                                    title = "Koban listens to no app. Choose your payment apps.",
+                                    showChevron = true,
+                                    onClick = onChoosePaymentApps
+                                )
+                            }
+                        }
                     }
-                    HorizontalDivider(color = divider)
                 }
-            }
 
-            if (uiState.week.recentExpenses.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Latest this week",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 28.dp, bottom = 4.dp)
-                    )
+                if (waitingCount > 0) {
+                    item {
+                        ListGroup {
+                            item {
+                                KobanRow(
+                                    title = if (waitingCount == 1) "1 payment to check" else "$waitingCount payments to check",
+                                    leading = {
+                                        Icon(
+                                            Icons.Default.Receipt,
+                                            contentDescription = null,
+                                            tint = LocalMoneyColors.current.goldText
+                                        )
+                                    },
+                                    showChevron = true,
+                                    onClick = onCheckPayments
+                                )
+                            }
+                        }
+                    }
                 }
-                items(uiState.week.recentExpenses, key = { it.id }) { expense ->
-                    ExpenseListCard(
-                        expense = expense,
-                        categoryName = expense.categoryId?.let { uiState.categoryNames[it] }
-                            ?: DefaultCategories.UNCATEGORIZED_NAME,
-                        compact = true,
-                        timePattern = "EEE HH:mm",
-                        onEdit = { onEditPayment(expense.id) }
-                    )
+
+                if (uiState.isAccessGranted && !uiState.hasAnyPayment && waitingCount == 0 && !listensToNoApp) {
+                    item {
+                        FirstPaymentCard(onAddPayment = onAddPayment, onOpenSettings = onOpenSettings)
+                    }
+                }
+
+                item {
+                    SpentTodayCard(summary = uiState.today, onOpen = { openActivity(withWeek = true) })
+                }
+
+                item {
+                    ListGroup {
+                        listOf(uiState.week to true, uiState.month to false).forEach { (summary, withWeek) ->
+                            item { PeriodRow(summary, onClick = { openActivity(withWeek) }) }
+                        }
+                    }
+                }
+
+                if (uiState.week.recentExpenses.isNotEmpty()) {
+                    item {
+                        SectionHeading("Latest this week", Modifier.padding(top = 12.dp))
+                    }
+                    items(uiState.week.recentExpenses, key = { it.id }) { expense ->
+                        ExpenseListCard(
+                            expense = expense,
+                            categoryName = expense.categoryId?.let { uiState.categoryNames[it] }
+                                ?: DefaultCategories.UNCATEGORIZED_NAME,
+                            compact = true,
+                            timePattern = "EEE HH:mm",
+                            onEdit = { onEditPayment(expense.id) }
+                        )
+                    }
                 }
             }
         }
@@ -197,68 +224,100 @@ fun HomeScreen(
     }
 }
 
-/** Shown when the user saved zero payment apps. Opens the picker. */
+/** Today's total, the money received, and the split by category. Tap opens the Activity tab. */
 @Composable
-private fun NoAppsBanner(onClick: () -> Unit) {
-    Row(
+private fun SpentTodayCard(summary: PeriodSummary, onOpen: () -> Unit) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
         modifier = Modifier
-            .padding(bottom = 16.dp)
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClickLabel = "Open transactions", onClick = onOpen)
+            .padding(20.dp)
     ) {
-        Text(
-            text = "Koban listens to no app. Choose your payment apps.",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
+        Text("Spent today", style = MaterialTheme.typography.bodyMedium, color = muted)
+        MoneyText(
+            rm(summary.total),
+            Modifier.padding(top = 8.dp),
+            style = MaterialTheme.typography.displayLarge,
+            color = MaterialTheme.colorScheme.onSurface
         )
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        if (summary.received > BigDecimal.ZERO) {
+            MoneyText(
+                "+ ${rm(summary.received)} received",
+                Modifier.padding(top = 4.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = LocalMoneyColors.current.received
+            )
+        }
+        if (summary.breakdown.isNotEmpty()) {
+            NoteStrip(summary.breakdown, Modifier.padding(top = 16.dp), height = 8.dp)
+            Column(Modifier.padding(top = 8.dp)) {
+                summary.breakdown.forEach { item ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CategoryDot(categoryColor(item.categoryId))
+                        Text(
+                            item.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp)
+                        )
+                        MoneyText(
+                            rm(item.total),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
-/** "3 payments to check", gold-tinted, above Today. Opens the swipe screen. */
+/** This week or this month: total on the right, money received under it. */
 @Composable
-private fun WaitingBanner(count: Int, onClick: () -> Unit) {
-    val money = LocalMoneyColors.current
-    Row(
-        modifier = Modifier
-            .padding(bottom = 16.dp)
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(money.gold.copy(alpha = 0.18f))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = if (count == 1) "1 payment to check" else "$count payments to check",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = money.goldText,
-            modifier = Modifier.weight(1f)
-        )
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = money.goldText
-        )
-    }
+private fun PeriodRow(summary: PeriodSummary, onClick: () -> Unit) {
+    KobanRow(
+        title = summary.title,
+        subtitle = summary.subtitle,
+        trailing = {
+            Column(horizontalAlignment = Alignment.End) {
+                MoneyText(
+                    rm(summary.total),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (summary.received > BigDecimal.ZERO) {
+                    MoneyText(
+                        "+ ${rm(summary.received)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalMoneyColors.current.received
+                    )
+                }
+            }
+        },
+        showChevron = true,
+        onClick = onClick
+    )
 }
 
 /** Empty Home after setup: Mon waits, plus one optional step for later. */
 @Composable
 private fun FirstPaymentCard(onAddPayment: () -> Unit, onOpenSettings: () -> Unit) {
-    Column(modifier = Modifier.padding(bottom = 24.dp)) {
+    Column {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -267,43 +326,27 @@ private fun FirstPaymentCard(onAddPayment: () -> Unit, onOpenSettings: () -> Uni
             Text(
                 text = "Waiting for your first payment",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = "Pay for anything. It shows up here.",
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             )
-            FilledTonalButton(onClick = onAddPayment, modifier = Modifier.fillMaxWidth()) {
-                Text("Add one by hand")
-            }
+            TonalButton("Add one by hand", onAddPayment, Modifier.fillMaxWidth())
         }
-        Text(
-            text = "Set up later",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .clickable(role = Role.Button, onClick = onOpenSettings)
-                .padding(horizontal = 4.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Online features", style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    "Read receipts, join groups",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        SectionHeading("Set up later", Modifier.padding(top = 24.dp))
+        ListGroup {
+            item {
+                KobanRow(
+                    title = "Online features",
+                    subtitle = "Read receipts, join groups",
+                    showChevron = true,
+                    onClick = onOpenSettings
                 )
             }
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
         }
     }
 }
