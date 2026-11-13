@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<!-- PROTOTYPE — throwaway. Question: what could Koban's screens look like after a redesign against
+     Nielsen's 10 usability heuristics and docs/ui-review-2026-11-12.md, with a mascot?
+     Fake data only. Font: the app's own Bricolage Grotesque from app/src/main/res/font. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koban redesign mockups</title>
+<style>
+@font-face { font-family: "Bricolage"; src: url("../../app/src/main/res/font/bricolage_grotesque.ttf") format("truetype"); font-weight: 200 800; }
+:root {
+  --night: #141B2B; --surf: #1C2539; --surf2: #243049; --line: #2F3B57;
+  --ink: #EDF0F7; --mut: #A2ACC2; --gold: #F2C94C; --gold-ink: #2A2106; --gold-soft: #3A3420;
+  --got: #6FD3A0; --err: #FF7B6B; --warn: #F2A94C;
+  --c-food: #F08A6C; --c-shop: #5AA9E6; --c-bills: #B7C45C; --c-move: #3FB8AF; --c-fun: #E5739A; --c-none: #8A94AA;
+  --r8: 8px; --r12: 12px; --r16: 16px; --r24: 24px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #0D121D; color: var(--ink); font: 15px/1.45 "Bricolage", system-ui, sans-serif; font-variation-settings: "opsz" 14; }
+.page { max-width: 1360px; margin: 0 auto; padding: 48px 32px 96px; }
+.intro { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: end; margin-bottom: 56px; }
+.intro h1 { font-size: 52px; line-height: 1.02; letter-spacing: -1.5px; margin: 0 0 16px; font-variation-settings: "opsz" 96; font-weight: 700; max-width: 14ch; }
+.intro p { color: var(--mut); max-width: 60ch; margin: 0 0 10px; }
+.tokens { background: var(--surf); border-radius: var(--r24); padding: 20px 24px; display: grid; gap: 14px; font-size: 13px; }
+.sw { display: flex; gap: 8px; flex-wrap: wrap; }
+.sw span { display: inline-flex; align-items: center; gap: 6px; color: var(--mut); }
+.sw i { width: 22px; height: 22px; border-radius: 6px; display: inline-block; border: 1px solid #ffffff18; }
+.tokens b { color: var(--ink); font-weight: 600; }
+.scale { display: flex; gap: 10px; align-items: end; }
+.scale u { text-decoration: none; display: inline-block; width: 34px; height: 34px; border: 1.5px solid var(--gold); }
+
+section.screen { display: grid; grid-template-columns: 360px 1fr; gap: 48px; align-items: start; padding: 40px 0; border-top: 1px solid #222B40; }
+section.screen.pair { grid-template-columns: 360px 360px 1fr; gap: 32px; }
+.notes h2 { font-size: 26px; letter-spacing: -.4px; margin: 6px 0 8px; font-variation-settings: "opsz" 60; }
+.notes > p { color: var(--mut); max-width: 58ch; margin: 0 0 16px; }
+.fix { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 62ch; }
+.fix li { background: var(--surf); border-radius: var(--r12); padding: 12px 14px; }
+.fix li em { font-style: normal; color: var(--gold); font-size: 12.5px; font-weight: 600; display: block; margin-bottom: 2px; }
+
+/* phone */
+.phone { width: 360px; height: 760px; background: var(--night); border-radius: 36px; border: 1px solid #2A3550; overflow: hidden; position: relative; display: flex; flex-direction: column; box-shadow: 0 30px 60px -30px #000c; }
+.sb { height: 30px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; font-size: 12px; color: var(--mut); }
+.app { flex: 1; overflow: hidden; padding: 4px 16px 0; display: flex; flex-direction: column; gap: 24px; position: relative; }
+.bar { display: flex; align-items: center; justify-content: space-between; min-height: 48px; }
+.bar h3 { margin: 0; font-size: 24px; letter-spacing: -.4px; font-variation-settings: "opsz" 60; font-weight: 650; }
+.bar .sub { font-size: 13px; color: var(--mut); }
+.ib { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: var(--mut); margin-right: -12px; }
+.ib svg, .ico { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nav { height: 72px; flex: none; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surf); border-top: 1px solid var(--line); }
+.nav a { display: grid; justify-items: center; align-content: center; gap: 2px; font-size: 11.5px; color: var(--mut); position: relative; }
+.nav a .pill { width: 56px; height: 28px; border-radius: 14px; display: grid; place-items: center; }
+.nav a.on { color: var(--ink); } .nav a.on .pill { background: var(--gold-soft); color: var(--gold); }
+.nav .badge { position: absolute; top: 8px; left: calc(50% + 6px); background: var(--gold); color: var(--gold-ink); font-size: 10px; font-weight: 700; border-radius: 8px; padding: 0 5px; line-height: 16px; }
+.num { font-variant-numeric: tabular-nums; }
+.rm { font-size: .5em; color: var(--mut); font-weight: 600; margin-right: 3px; letter-spacing: 0; }
+.big { font-size: 48px; font-weight: 700; letter-spacing: -1.5px; line-height: 1; font-variation-settings: "opsz" 96; }
+.lab { font-size: 13px; color: var(--mut); }
+.list { background: var(--surf); border-radius: var(--r16); overflow: hidden; }
+.row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row .t { flex: 1; min-width: 0; } .row .t b { display: block; font-weight: 600; font-size: 15px; } .row .t small { color: var(--mut); font-size: 12.5px; }
+.row .a { font-weight: 650; font-size: 15px; }
+.chev { color: var(--mut); width: 18px; height: 18px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.h { font-size: 17px; font-weight: 650; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: baseline; }
+.h a { font-size: 13px; color: var(--gold); font-weight: 600; }
+.btn { min-height: 48px; border-radius: 24px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 20px; font-weight: 650; font-size: 15px; border: 1.5px solid var(--line); color: var(--ink); background: transparent; }
+.btn.fill { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+.btn.tonal { background: var(--gold-soft); color: var(--gold); border-color: transparent; }
+.btn.w { width: 100%; }
+.app > * { flex-shrink: 0; }
+.app.has-fab { padding-bottom: 80px; }
+.fab { position: absolute; right: 16px; bottom: 16px; box-shadow: 0 10px 24px -8px #000; }
+.status { display: flex; align-items: center; gap: 12px; background: var(--surf); border-radius: var(--r16); padding: 12px 12px 12px 8px; }
+.status .t { flex: 1; } .status b { display: block; font-size: 14.5px; } .status small { color: var(--mut); font-size: 12.5px; }
+.stack { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; }
+.seg { display: grid; grid-auto-flow: column; background: var(--surf); border-radius: 24px; padding: 4px; }
+.seg span { min-height: 40px; display: grid; place-items: center; border-radius: 20px; font-weight: 600; font-size: 14px; color: var(--mut); }
+.seg span.on { background: var(--surf2); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--gold); }
+.chip { min-height: 40px; padding: 6px 12px; border-radius: var(--r12); background: var(--surf); font-size: 12px; color: var(--mut); white-space: nowrap; }
+.chip b { display: block; color: var(--ink); font-size: 13.5px; }
+.chip.on { background: var(--gold-soft); color: var(--gold); box-shadow: inset 0 0 0 1.5px var(--gold); } .chip.on b { color: var(--gold); }
+.snack { position: absolute; left: 16px; right: 16px; bottom: 16px; background: #EDF0F7; color: #141B2B; border-radius: var(--r12); padding: 6px 6px 6px 16px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600; }
+.snack .btn { min-height: 44px; color: #6B4E00; border: 0; padding: 0 14px; }
+.say { font-size: 12.5px; color: var(--mut); font-style: italic; }
+.qr { background: #fff; border-radius: var(--r16); padding: 14px; box-shadow: 0 0 0 6px var(--gold), 0 0 0 12px #2B2A22; width: 196px; height: 196px; margin: 12px auto 4px; display: grid; place-items: center; }
+.dialog-scrim { position: absolute; inset: 0; background: #0009; display: grid; place-items: center; padding: 24px; }
+.mon-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+.mon-card { background: var(--surf); border-radius: var(--r24); padding: 20px 16px; text-align: center; }
+.mon-card b { display: block; margin-top: 10px; font-size: 15px; } .mon-card small { color: var(--mut); font-size: 12.5px; display: block; margin-top: 4px; }
+.mon-card .say { display: block; margin-top: 10px; }
+.keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.keys span { height: 52px; border-radius: var(--r12); background: var(--surf); display: grid; place-items: center; font-size: 22px; font-weight: 600; }
+.mascot-intro { display: grid; grid-template-columns: 280px 1fr; gap: 48px; align-items: center; margin-bottom: 32px; }
+@media (max-width: 1100px) { .intro, section.screen, section.screen.pair, .mascot-intro { grid-template-columns: 1fr; } .mon-row { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/></symbol>
+    <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.5" cy="9.5" r="2.5"/><path d="M15.5 14.2c2.6-.3 4.5 1.2 5 4"/></symbol>
+    <symbol id="i-group" viewBox="0 0 24 24"><circle cx="12" cy="7.5" r="2.7"/><circle cx="5.5" cy="10" r="2.2"/><circle cx="18.5" cy="10" r="2.2"/><path d="M7.5 19c.5-3 2.3-4.6 4.5-4.6s4 1.6 4.5 4.6M2.5 18c.3-2 1.4-3.2 3-3.4M21.5 18c-.3-2-1.4-3.2-3-3.4"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M6 18l1.6-1.6M16.4 7.6 18 6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5m6-6-6 6 6 6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-in" viewBox="0 0 24 24"><path d="M17 7 7 17M7 9v8h8"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></symbol>
+    <symbol id="i-split" viewBox="0 0 24 24"><path d="M5 4h14v16l-2.3-1.5L14.3 20 12 18.5 9.7 20l-2.4-1.5L5 20z"/><path d="M9 9h6M9 13h6"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-app" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-8A5.5 5.5 0 0 0 7 9.5 4.3 4.3 0 0 0 7 18z"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.5 5.5a4 4 0 0 0 4.9 4.9L20 11l-9 9-3.5-3.5 9-9z"/><path d="M14.5 5.5 13 4"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.01"/></symbol>
+    <symbol id="i-del" viewBox="0 0 24 24"><path d="M20 6H9l-5 6 5 6h11zM12 9.5l5 5M17 9.5l-5 5"/></symbol>
+  </defs>
+</svg>
+
+<div class="page">
+
+<header class="intro">
+  <div>
+    <h1>Koban, one system and one small coin.</h1>
+    <p>These are proposals, not finished screens. Each phone shows one main screen after the redesign, with fake data. Each note says which UI review problem it fixes and which of Nielsen's 10 usability heuristics it serves (H1 to H10).</p>
+    <p>Nothing here changes the app yet. Pick what you like, and I turn it into a plan.</p>
+  </div>
+  <div class="tokens" aria-label="Design system">
+    <div><b>Colors</b> (from the logo: navy and koban gold; red only for errors; no violet)</div>
+    <div class="sw">
+      <span><i style="background:#141B2B"></i>Night</span><span><i style="background:#1C2539"></i>Surface</span><span><i style="background:#F2C94C"></i>Gold</span><span><i style="background:#6FD3A0"></i>Received</span><span><i style="background:#FF7B6B"></i>Error</span>
+    </div>
+    <div class="sw">
+      <span><i style="background:var(--c-food)"></i>Food</span><span><i style="background:var(--c-shop)"></i>Shopping</span><span><i style="background:var(--c-bills)"></i>Bills</span><span><i style="background:var(--c-move)"></i>Transport</span><span><i style="background:var(--c-fun)"></i>Fun</span><span><i style="background:var(--c-none)"></i>Other</span>
+    </div>
+    <div><b>Type</b> Bricolage Grotesque only, the font the app already ships. Money in figures of equal width. 48 / 24 / 17 / 15 / 13.</div>
+    <div class="scale"><b>Corners</b>&nbsp;<u style="border-radius:8px"></u><u style="border-radius:12px"></u><u style="border-radius:16px"></u><u style="border-radius:24px"></u><span style="color:var(--mut)">8 chips · 12 fields · 16 lists · 24 hero and sheets</span></div>
+    <div><b>Space</b> 16 dp screen edge, 24 dp between blocks, 48 dp for every tap target. One filled gold button per screen.</div>
+  </div>
+</header>
+
+<!-- MASCOT -->
+<section class="screen" style="grid-template-columns:1fr;">
+  <div class="mascot-intro">
+    <div id="mon-hero"></div>
+    <div class="notes">
+      <h2>The mascot: Mon</h2>
+      <p>A koban is an old Japanese gold coin: a tall oval with hammer lines across it. That is already Koban's logo, so the mascot is the logo with a face. "Mon" was the small coin of the same era. It is a name proposal; change it if you like.</p>
+      <p>Mon has Dusk's character: half-closed eyes, a flat mouth, a dry voice. It is a flat vector, so it costs almost nothing to load. Dusk is a 3D model of about 7,000 triangles.</p>
+      <ul class="fix">
+        <li><em>Rule 1</em>Mon never stands next to a money figure and never replaces an instruction. The plain sentence comes first; Mon's line is extra.</li>
+        <li><em>Rule 2</em>One Mon per screen at most, and only in states: empty lists, tracking off, all checked, errors, first run.</li>
+        <li><em>Rule 3</em>A switch in Settings hides Mon. The plain sentences stay.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="mon-row" id="mon-faces"></div>
+</section>
+
+<!-- FIRST RUN -->
+<section class="screen">
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app" style="justify-content:center;gap:20px;padding-bottom:24px">
+      <div id="mon-first" style="display:flex;justify-content:center"></div>
+      <div>
+        <div class="bar" style="min-height:0"><h3 style="font-size:28px">Your spending, written down for you</h3></div>
+        <p style="color:var(--mut);margin:8px 0 0">Koban reads the payment notifications from your bank and e-wallet apps and makes a list. The list stays on this phone.</p>
+      </div>
+      <div class="list">
+        <div class="row"><span class="dot" style="background:var(--gold);width:24px;height:24px;display:grid;place-items:center;color:var(--gold-ink);font-size:13px;font-weight:700">1</span><div class="t"><b>Allow notification access</b><small>So Koban can see new payments</small></div></div>
+        <div class="row"><span class="dot" style="background:var(--surf2);width:24px;height:24px;display:grid;place-items:center;font-size:13px;font-weight:700">2</span><div class="t"><b>Pick your payment apps</b><small>Maybank, Touch 'n Go, and others</small></div></div>
+        <div class="row"><span class="dot" style="background:var(--surf2);width:24px;height:24px;display:grid;place-items:center;font-size:13px;font-weight:700">3</span><div class="t"><b>Check your first payment</b><small>Swipe right to save it</small></div></div>
+      </div>
+      <a class="btn fill w">Allow notification access</a>
+      <a class="btn w" style="border:0;color:var(--mut);min-height:44px">Not now. I add payments by hand.</a>
+    </div>
+  </div>
+  <div class="notes">
+    <h2>First run (new)</h2>
+    <p>Today a new person lands on Home with a red "Tracking is off" banner and no explanation of what tracking is.</p>
+    <ul class="fix">
+      <li><em>H10 Help and documentation · H2 Match the real world</em>One sentence says what Koban does, in the person's words: "reads the payment notifications". Three numbered steps, because they really are a sequence.</li>
+      <li><em>H3 User control and freedom</em>"Not now" is a real choice: Koban works by hand too. The person is never trapped on a permission screen.</li>
+      <li><em>H1 Visibility of system status</em>The step list shows how far setup is. Step 1 turns into a check mark when access is on.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- HOME -->
+<section class="screen">
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app has-fab">
+      <div class="bar"><div><h3>Today</h3><div class="sub">Fri, 13 Nov</div></div><a class="ib" aria-label="Settings"><svg><use href="#i-gear"/></svg></a></div>
+      <div class="status">
+        <div id="mon-sleep"></div>
+        <div class="t"><b>Tracking is off</b><small>New payments are not recorded.</small></div>
+        <a class="btn tonal" style="padding:0 16px">Turn on</a>
+      </div>
+      <div>
+        <div class="lab">Spent today</div>
+        <div class="big num"><span class="rm">RM</span>23.40</div>
+        <div class="stack" style="margin-top:14px"><i style="flex:14.9;background:var(--c-food)"></i><i style="flex:8.5;background:var(--c-move)"></i></div>
+        <div class="lab" style="margin-top:8px">Food RM 14.90 · Transport RM 8.50</div>
+      </div>
+      <div class="list">
+        <div class="row"><span class="dot" style="background:var(--gold)"></span><div class="t"><b>3 payments to check</b><small>From Maybank and Touch 'n Go</small></div><span class="h" style="margin:0"><a>Check</a></span></div>
+        <div class="row"><div class="t"><b>This week</b><small>Mon 9 – Sun 15 Nov</small></div><span class="a num">RM 186.20</span><svg class="chev ico"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="t"><b>This month</b><small>November</small></div><span class="a num">RM 642.75</span><svg class="chev ico"><use href="#i-chev"/></svg></div>
+      </div>
+      <a class="btn fill fab"><svg class="ico"><use href="#i-plus"/></svg>Add payment</a>
+    </div>
+    <nav class="nav"><a class="on"><span class="pill"><svg class="ico"><use href="#i-home"/></svg></span>Home</a><a><span class="pill"><svg class="ico"><use href="#i-list"/></svg></span>Activity</a><a><span class="pill"><svg class="ico"><use href="#i-people"/></svg></span>People<span class="badge">1</span></a><a><span class="pill"><svg class="ico"><use href="#i-group"/></svg></span>Groups</a></nav>
+  </div>
+  <div class="notes">
+    <h2>Home</h2>
+    <p>Today the top is a red alarm, gold means four things, and "+ Add" sits over the list.</p>
+    <ul class="fix">
+      <li><em>H1 Visibility of system status · review "do now" 5</em>"Tracking is off" becomes a calm status row with a sleeping Mon and one "Turn on" button. Red stays for real errors only.</li>
+      <li><em>H6 Recognition rather than recall</em>"3 payments to check" sits in the summary list, so the main job of the app is on the first screen and not only in a banner.</li>
+      <li><em>H4 Consistency · review "later": gold has 4 meanings</em>Gold now means one thing: "act here". Categories have their own colors, and gold is not one of them.</li>
+      <li><em>H8 Minimalist design</em>One list surface with dividers in place of three separate blocks. "Latest" moves to Activity, so the button never covers a row. "+ Add" becomes "Add payment", the one filled button.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- CHECK PAYMENTS -->
+<section class="screen pair">
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app">
+      <div class="bar"><a class="ib" style="margin:0 0 0 -12px" aria-label="Back"><svg><use href="#i-back"/></svg></a><h3 style="flex:1;margin-left:4px">Check payments</h3><span class="lab">1 of 3</span></div>
+      <div style="background:var(--surf);border-radius:var(--r24);padding:20px;display:grid;gap:16px">
+        <div class="lab">Maybank · today 12:40</div>
+        <div class="big num"><span class="rm">RM</span>14.90</div>
+        <div class="list" style="background:var(--surf2)">
+          <div class="row"><div class="t"><small>Shop</small><b>Mamak Corner</b></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+          <div class="row"><div class="t"><small>Category</small><b><span class="dot" style="background:var(--c-food);display:inline-block;margin-right:6px"></span>Food</b></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+          <div class="row"><div class="t"><small>Type</small><b>Spent</b></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+        </div>
+        <div class="lab">Tap a row to change it.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <a class="btn" style="white-space:nowrap;padding:0 12px"><svg class="ico"><use href="#i-x"/></svg>Not a payment</a>
+        <a class="btn fill"><svg class="ico"><use href="#i-check"/></svg>Save</a>
+      </div>
+      <div class="lab" style="text-align:center;margin-top:-12px">Or swipe: left for "Not a payment", right to save.</div>
+      <div class="snack">Saved Mamak Corner, RM 14.90 <a class="btn">Undo</a></div>
+    </div>
+  </div>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app" style="justify-content:center;text-align:center;gap:16px">
+      <div id="mon-done" style="display:flex;justify-content:center"></div>
+      <h3 style="margin:0;font-size:24px">All payments checked</h3>
+      <p style="margin:0;color:var(--mut)">3 saved, 0 skipped. New payments show up here.</p>
+      <p class="say" style="margin:0">"Nothing left. I will just sit here and shine."</p>
+      <a class="btn w" style="margin-top:8px">Back to Home</a>
+    </div>
+  </div>
+  <div class="notes">
+    <h2>Check payments</h2>
+    <p>Today the card only works by swiping, the Undo is plain text that is gone in 4 seconds, and the end of the queue is an empty screen.</p>
+    <ul class="fix">
+      <li><em>H3 User control and freedom · review "later"</em>Two real buttons next to the swipe. "Undo" is a button in a 10-second bar, and TalkBack can reach it.</li>
+      <li><em>H4 Consistency · review "do now" 4</em>One word per idea, app-wide: "Shop" (not "Merchant"), "Spent / Received" (not "Expense / Income"), "Not a payment" (not "Skipped").</li>
+      <li><em>H1 Visibility of system status</em>"1 of 3" shows the size of the queue. At the end, a done state says what happened: "3 saved, 0 skipped".</li>
+      <li><em>H6 Recognition rather than recall</em>Every field the person can fix is a row with a chevron. Today they must guess that a field is tappable.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ADD PAYMENT -->
+<section class="screen">
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app" style="gap:16px">
+      <div class="bar"><a class="ib" style="margin:0 0 0 -12px" aria-label="Close"><svg><use href="#i-x"/></svg></a><div class="seg" style="flex:1;margin-left:4px;grid-template-columns:1fr 1fr"><span class="on">Spent</span><span>Received</span></div></div>
+      <div style="text-align:center;padding:8px 0"><div class="big num" style="font-size:56px"><span class="rm">RM</span>12.50</div></div>
+      <div class="list">
+        <div class="row"><span class="dot" style="background:var(--c-food)"></span><div class="t"><small>Category</small><b>Food</b></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="t"><small>Shop</small><b style="color:var(--mut);font-weight:500">Optional</b></div></div>
+        <div class="row"><div class="t"><small>Date</small><b>Today</b></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+        <div class="row"><div class="t"><small>Note</small><b style="color:var(--mut);font-weight:500">Optional</b></div></div>
+      </div>
+      <div class="keys"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>.</span><span>0</span><span><svg class="ico"><use href="#i-del"/></svg></span></div>
+      <a class="btn fill w">Save payment</a>
+    </div>
+  </div>
+  <div class="notes">
+    <h2>Add payment</h2>
+    <p>Today the fields are four separate cards, and the warning that a new category applies to past payments sits far from Category.</p>
+    <ul class="fix">
+      <li><em>H8 Minimalist design · review "later"</em>All fields sit in one surface with dividers, as on the check card. The screen keeps one visual rhythm.</li>
+      <li><em>H5 Error prevention</em>"Save payment" stays grey until the amount is above 0. The category warning moves under Category, where the person makes the choice.</li>
+      <li><em>H3 User control · done in PR #41</em>X and Back with a typed amount ask "Discard changes?" first.</li>
+      <li><em>H4 Consistency</em>The button says what it does, and the toast repeats it: "Save payment" → "Payment saved".</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ACTIVITY -->
+<section class="screen">
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app">
+      <div class="bar"><a class="ib" style="margin:0 0 0 -12px"><svg><use href="#i-left"/></svg></a><h3 style="font-size:20px">November 2026</h3><a class="ib"><svg><use href="#i-chev"/></svg></a></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><div class="lab">Spent</div><div class="num" style="font-size:28px;font-weight:700"><span class="rm">RM</span>642.75</div></div>
+        <div><div class="lab">Received</div><div class="num" style="font-size:28px;font-weight:700;color:var(--got)"><span class="rm">RM</span>150.00</div></div>
+      </div>
+      <div style="display:flex;gap:8px;overflow:hidden;margin-right:-16px">
+        <span class="chip"><b class="num">RM 201.30</b>26 Oct – 1 Nov</span><span class="chip"><b class="num">RM 255.25</b>2 – 8 Nov</span><span class="chip on"><b class="num">RM 186.20</b>9 – 15 Nov · now</span>
+      </div>
+      <div style="display:grid;grid-template-columns:96px 1fr;gap:16px;align-items:center">
+        <svg viewBox="0 0 42 42" width="96" height="96"><circle cx="21" cy="21" r="15.9" fill="none" stroke="#243049" stroke-width="6"/>
+          <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--c-food)" stroke-width="6" stroke-dasharray="46 54" stroke-dashoffset="25"/>
+          <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--c-shop)" stroke-width="6" stroke-dasharray="27 73" stroke-dashoffset="-21"/>
+          <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--c-move)" stroke-width="6" stroke-dasharray="16 84" stroke-dashoffset="-48"/>
+          <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--c-bills)" stroke-width="6" stroke-dasharray="11 89" stroke-dashoffset="-64"/></svg>
+        <div style="display:grid;gap:6px;font-size:13.5px">
+          <div class="row" style="padding:0;min-height:0;border:0"><span class="dot" style="background:var(--c-food)"></span><span class="t">Food</span><span class="num">46%</span></div>
+          <div class="row" style="padding:0;min-height:0;border:0"><span class="dot" style="background:var(--c-shop)"></span><span class="t">Shopping</span><span class="num">27%</span></div>
+          <div class="row" style="padding:0;min-height:0;border:0"><span class="dot" style="background:var(--c-move)"></span><span class="t">Transport</span><span class="num">16%</span></div>
+          <div class="row" style="padding:0;min-height:0;border:0"><span class="dot" style="background:var(--c-bills)"></span><span class="t">Bills</span><span class="num">11%</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="h">Today <span class="lab num">RM 23.40</span></div>
+        <div class="list">
+          <div class="row"><span class="dot" style="background:var(--c-food)"></span><div class="t"><b>Mamak Corner</b><small>Food · 12:40</small></div><span class="a num">RM 14.90</span></div>
+          <div class="row"><span class="dot" style="background:var(--c-move)"></span><div class="t"><b>Grab</b><small>Transport · 08:15</small></div><span class="a num">RM 8.50</span></div>
+        </div>
+      </div>
+    </div>
+    <nav class="nav"><a><span class="pill"><svg class="ico"><use href="#i-home"/></svg></span>Home</a><a class="on"><span class="pill"><svg class="ico"><use href="#i-list"/></svg></span>Activity</a><a><span class="pill"><svg class="ico"><use href="#i-people"/></svg></span>People<span class="badge">1</span></a><a><span class="pill"><svg class="ico"><use href="#i-group"/></svg></span>Groups</a></nav>
+  </div>
+  <div class="notes">
+    <h2>Activity</h2>
+    <p>Today the selected week chip is hard to see, and "Received" money has no place at the top.</p>
+    <ul class="fix">
+      <li><em>H1 Visibility of system status · review "later"</em>The selected week has a gold outline and the word "now", not only a slightly lighter fill.</li>
+      <li><em>H2 Match the real world</em>Spent and Received side by side. Received is green, and the word says it too, so color is never the only signal.</li>
+      <li><em>H8 Minimalist design</em>The Month / All switch goes. The month name with arrows is the control, and "All" moves into Filter.</li>
+      <li><em>H4 Consistency</em>The donut legend shows percent. The rupiah amounts stay in the list below, so one number has one place.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- PEOPLE + PERSON -->
+<section class="screen pair">
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app has-fab">
+      <div class="bar"><h3>People</h3><a class="ib" aria-label="Search"><svg><use href="#i-search"/></svg></a></div>
+      <div>
+        <div class="h">Owes you <span class="lab num">RM 42.00</span></div>
+        <div class="list">
+          <div class="row"><svg class="ico" style="color:var(--got)"><use href="#i-in"/></svg><div class="t"><b>Aina</b><small>Owes you RM 30.00 · 2 items</small></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+          <div class="row"><svg class="ico" style="color:var(--got)"><use href="#i-in"/></svg><div class="t"><b>Wei Jie</b><small>Owes you RM 12.00 · 1 item</small></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+        </div>
+      </div>
+      <div>
+        <div class="h">You owe <span class="lab num">RM 18.50</span></div>
+        <div class="list">
+          <div class="row"><svg class="ico" style="color:var(--warn)"><use href="#i-out"/></svg><div class="t"><b>Priya</b><small>You owe RM 18.50 · 1 item</small></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+        </div>
+      </div>
+      <div class="list"><div class="row"><div class="t"><b>All paid</b><small>Hafiz, Mei Ling, Daniel and 2 more</small></div><svg class="chev ico"><use href="#i-chev"/></svg></div></div>
+      <a class="btn fill fab"><svg class="ico"><use href="#i-split"/></svg>Split a bill</a>
+    </div>
+    <nav class="nav"><a><span class="pill"><svg class="ico"><use href="#i-home"/></svg></span>Home</a><a><span class="pill"><svg class="ico"><use href="#i-list"/></svg></span>Activity</a><a class="on"><span class="pill"><svg class="ico"><use href="#i-people"/></svg></span>People</a><a><span class="pill"><svg class="ico"><use href="#i-group"/></svg></span>Groups</a></nav>
+  </div>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app" style="gap:20px">
+      <div class="bar"><a class="ib" style="margin:0 0 0 -12px" aria-label="Back"><svg><use href="#i-back"/></svg></a><h3 style="flex:1;margin-left:4px">Aina</h3></div>
+      <div class="qr"><svg viewBox="0 0 21 21" width="168" height="168" shape-rendering="crispEdges"><path fill="#141B2B" d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0zM2 2v3h3V2zM16 2v3h3V2zM2 16v3h3v-3zM9 1h1v2H9zM11 3h2v1h-2zM8 5h2v2H8zM12 6h1v3h-1zM9 9h3v1H9zM14 9h2v2h-2zM18 8h2v1h-2zM1 9h2v2H1zM4 10h2v1H4zM9 12h1v3H9zM11 11h3v1h-3zM15 13h3v2h-3zM19 12h1v3h-1zM11 15h2v2h-2zM14 17h1v3h-1zM16 18h4v1h-4zM9 17h1v3H9zM12 19h1v1h-1z"/></svg></div>
+      <a class="btn tonal w" style="margin-top:8px">Save QR to gallery</a>
+      <div>
+        <div class="h">Aina owes you <span class="num" style="color:var(--got);font-size:17px">RM 30.00</span></div>
+        <div class="list">
+          <div class="row"><div class="t"><b>Nasi lemak, Fri</b><small>From "Lunch at Mamak Corner"</small></div><span class="a num">RM 12.00</span><a class="btn" style="min-height:44px;padding:0 12px;font-size:13px">Mark paid</a></div>
+          <div class="row"><div class="t"><b>Movie ticket, Sat</b><small>Added by hand</small></div><span class="a num">RM 18.00</span><a class="btn" style="min-height:44px;padding:0 12px;font-size:13px">Mark paid</a></div>
+        </div>
+      </div>
+      <div class="snack">Marked "Nasi lemak" paid <a class="btn">Undo</a></div>
+    </div>
+  </div>
+  <div class="notes">
+    <h2>People and one person</h2>
+    <p>Today "who owes whom" is shown by color only, there are 5 button styles, and "Mark paid" has no undo.</p>
+    <ul class="fix">
+      <li><em>H1 Visibility · review "later": direction by color only</em>Each row says it in words, "Owes you" or "You owe", with an arrow icon. Color is the third signal, not the only one.</li>
+      <li><em>H5 Error prevention · H3 User control · review "do now" 2</em>"Mark paid" shows a 10-second Undo. The TalkBack label names the item: "Mark Nasi lemak paid".</li>
+      <li><em>H8 Minimalist design</em>Settled people fold into one "All paid" row. The list shows only open money.</li>
+      <li><em>H4 Consistency · review "do now" 3</em>One button set on the whole screen: filled for the main action, tonal for a second action, outline for row actions.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section class="screen">
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app" style="gap:14px">
+      <div class="bar"><a class="ib" style="margin:0 0 0 -12px" aria-label="Back"><svg><use href="#i-back"/></svg></a><h3 style="flex:1;margin-left:4px">Settings</h3></div>
+      <div><div class="h">Tracking</div>
+        <div class="list">
+          <div class="row"><svg class="ico" style="color:var(--err)"><use href="#i-bell"/></svg><div class="t"><b>Notification access</b><small style="color:var(--err)">Off: no new payments</small></div><a class="btn tonal" style="min-height:40px;padding:0 14px">Turn on</a></div>
+          <div class="row"><svg class="ico" style="color:var(--mut)"><use href="#i-app"/></svg><div class="t"><b>Payment apps</b><small>4 chosen</small></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+        </div></div>
+      <div><div class="h">Spending</div>
+        <div class="list">
+          <div class="row"><span class="dot" style="background:var(--c-food)"></span><div class="t"><b>Categories</b><small>7 categories</small></div><svg class="chev ico"><use href="#i-chev"/></svg></div>
+        </div></div>
+      <div><div class="h">Online</div>
+        <div class="list">
+          <div class="row"><svg class="ico" style="color:var(--mut)"><use href="#i-cloud"/></svg><div class="t"><b>Online features</b><small>On: groups, receipts, updates</small></div><span style="width:44px;height:26px;border-radius:13px;background:var(--gold);position:relative"><i style="position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;background:var(--gold-ink)"></i></span></div>
+          <div class="row"><svg class="ico" style="color:var(--mut)"><use href="#i-info"/></svg><div class="t"><b>App version 0.1.0</b><small>Checked today</small></div><span class="h" style="margin:0"><a>Check</a></span></div>
+        </div></div>
+      <div><div class="h">Appearance</div>
+        <div class="list"><div class="row"><svg class="ico" style="color:var(--mut)"><use href="#i-moon"/></svg><div class="t"><b>Dark mode</b></div><span style="width:44px;height:26px;border-radius:13px;background:var(--gold);position:relative"><i style="position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;background:var(--gold-ink)"></i></span></div><div class="row"><span style="width:22px;display:grid;place-items:center" id="mon-set"></span><div class="t"><b>Show Mon</b><small>In empty lists and messages</small></div><span style="width:44px;height:26px;border-radius:13px;background:var(--gold);position:relative"><i style="position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;background:var(--gold-ink)"></i></span></div></div></div>
+      <div class="list"><div class="row"><svg class="ico" style="color:var(--mut)"><use href="#i-wrench"/></svg><div class="t"><b>Troubleshooting</b><small>Notification log, reconnect, parser test</small></div><svg class="chev ico"><use href="#i-chev"/></svg></div></div>
+    </div>
+  </div>
+  <div class="notes">
+    <h2>Settings</h2>
+    <p>Today the developer tools come first, the tracking status shows in three places, and Settings is one long page.</p>
+    <ul class="fix">
+      <li><em>H8 Minimalist design · review "do now" 5</em>Sections in the order people need them: Tracking, Spending, Online, Appearance. Troubleshooting is one row at the end that opens its own page.</li>
+      <li><em>H1 Visibility of system status</em>Each status is one row with an icon, a word ("Off") and its fix ("Turn on"). Red marks only the thing that is broken.</li>
+      <li><em>H7 Flexibility and efficiency</em>Categories get their own page, with Undo after a delete (review "do now" 2), so the main Settings page stays short.</li>
+      <li><em>H4 Consistency · review "later"</em>The whole row toggles a switch, not only the switch itself. "Show Mon" lives here (mascot rule 3).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ERROR / EMPTY STATES -->
+<section class="screen pair">
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app" style="justify-content:center;text-align:center;gap:16px">
+      <div id="mon-worry" style="display:flex;justify-content:center"></div>
+      <h3 style="margin:0;font-size:22px">Koban could not read this receipt</h3>
+      <p style="margin:0;color:var(--mut)">The photo is too dark to read the prices. Take it again near a light, or type the items yourself.</p>
+      <a class="btn fill w" style="margin-top:8px">Take the photo again</a>
+      <a class="btn w">Type the items</a>
+    </div>
+  </div>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>5G</span></div>
+    <div class="app">
+      <div class="bar"><h3>People</h3><a class="ib"><svg><use href="#i-search"/></svg></a></div>
+      <div style="flex:1;display:grid;align-content:center;justify-items:center;text-align:center;gap:14px;padding-bottom:80px">
+        <div id="mon-empty"></div>
+        <h3 style="margin:0;font-size:20px">No people yet</h3>
+        <p style="margin:0;color:var(--mut);max-width:28ch">Split a bill, and the people in it show up here with what they owe you.</p>
+        <p class="say" style="margin:0">"I can hold a lot of debts. I am a coin."</p>
+      </div>
+      <a class="btn fill fab"><svg class="ico"><use href="#i-split"/></svg>Split a bill</a>
+    </div>
+    <nav class="nav"><a><span class="pill"><svg class="ico"><use href="#i-home"/></svg></span>Home</a><a><span class="pill"><svg class="ico"><use href="#i-list"/></svg></span>Activity</a><a class="on"><span class="pill"><svg class="ico"><use href="#i-people"/></svg></span>People</a><a><span class="pill"><svg class="ico"><use href="#i-group"/></svg></span>Groups</a></nav>
+  </div>
+  <div class="notes">
+    <h2>Errors and empty lists</h2>
+    <p>This is where Mon works. Every error and empty state follows one pattern: what happened, why, and the next step as a button.</p>
+    <ul class="fix">
+      <li><em>H9 Recognize, diagnose and recover from errors · review "later": Fix sheet hides a failed read</em>The message names the cause ("too dark") and gives two ways forward. It never says "Something went wrong".</li>
+      <li><em>H10 Help</em>An empty list explains how it fills up, and the button to fill it is right there.</li>
+      <li><em>Mascot rule 1</em>Mon's line is in grey italics under the plain sentence. A person who reads only the bold text still knows what to do.</li>
+    </ul>
+  </div>
+</section>
+
+</div>
+
+<script>
+// Mon: a tilted koban coin with Dusk-style eyes. face = idle | sleep | happy | worry | look
+function mon(face, size) {
+  const eyes = {
+    idle:  '<path d="M33 52h12M55 52h12"/><path d="M34.5 52q4.5 6 9 0M56.5 52q4.5 6 9 0"/>',
+    sleep: '<path d="M34 54q5 3.5 10 0M56 54q5 3.5 10 0"/>',
+    happy: '<path d="M34 55q5-7 10 0M56 55q5-7 10 0"/>',
+    worry: '<circle cx="39" cy="53" r="3.2" fill="#2A2106" stroke="none"/><circle cx="61" cy="53" r="3.2" fill="#2A2106" stroke="none"/><path d="M33 45.5l9 3M67 45.5l-9 3"/>',
+    look:  '<path d="M33 52h12M55 52h12"/><circle cx="43" cy="55" r="2.6" fill="#2A2106" stroke="none"/><circle cx="65" cy="55" r="2.6" fill="#2A2106" stroke="none"/>'
+  }[face];
+  const mouth = {
+    idle: '<path d="M46 68h8"/>', sleep: '<path d="M46.5 68.5q3.5-1.5 7 0"/>', happy: '<path d="M45 66q5 5 10 0"/>',
+    worry: '<path d="M44 69q2-2.5 4 0t4 0 4 0"/>', look: '<path d="M47 68h7"/>'
+  }[face];
+  const extra = face === 'sleep' ? '<text x="78" y="30" font-size="15" font-weight="700" fill="#A2ACC2" stroke="none" font-family="Bricolage">z</text>' : '';
+  return `<svg viewBox="0 0 100 110" width="${size}" height="${size * 1.1}" role="img" aria-label="Mon, ${face}">
+    <g transform="rotate(-12 50 58)">
+      <ellipse cx="50" cy="58" rx="34" ry="46" fill="#C99A22"/>
+      <ellipse cx="50" cy="56" rx="34" ry="46" fill="#F2C94C"/>
+      <ellipse cx="50" cy="56" rx="28" ry="39.5" fill="none" stroke="#D9AE35" stroke-width="2"/>
+      <g stroke="#E3B93E" stroke-width="1.6" stroke-linecap="round">
+        <path d="M29 30h42M25 37h50M24 79h52M27 86h46M32 93h36"/>
+      </g>
+      <ellipse cx="37" cy="31" rx="7" ry="11" fill="#FFF3C4" opacity=".55" transform="rotate(-20 37 31)"/>
+      <g fill="none" stroke="#2A2106" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${eyes}${mouth}</g>
+    </g>${extra}</svg>`;
+}
+const faces = [
+  ['idle', 'Mon, as usual', 'Home and lists', '"I am a coin. I watch money. That is the job."'],
+  ['sleep', 'Tracking is off', 'Status row, Settings', '"I cannot see your payments. Wake me up."'],
+  ['happy', 'All done', 'Queue empty, all paid', '"Nothing left. I will just sit here and shine."'],
+  ['worry', 'Something failed', 'Errors with a fix', '"That did not work. Here is what to try."'],
+  ['look', 'Working', 'Reading a receipt, syncing', '"Reading. Small print. Give me a second."']
+];
+document.getElementById('mon-faces').innerHTML = faces.map(([f, n, w, s]) =>
+  `<div class="mon-card">${mon(f, 96)}<b>${n}</b><small>${w}</small><span class="say">${s}</span></div>`).join('');
+document.getElementById('mon-hero').innerHTML = mon('idle', 240);
+document.getElementById('mon-first').innerHTML = mon('idle', 120);
+document.getElementById('mon-sleep').innerHTML = mon('sleep', 44);
+document.getElementById('mon-done').innerHTML = mon('happy', 128);
+document.getElementById('mon-worry').innerHTML = mon('worry', 112);
+document.getElementById('mon-empty').innerHTML = mon('idle', 104);
+document.getElementById('mon-set').innerHTML = mon('idle', 22);
+</script>
+</body>
+</html>
