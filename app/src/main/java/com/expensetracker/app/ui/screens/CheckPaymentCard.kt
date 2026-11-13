@@ -133,7 +133,8 @@ internal fun CheckPaymentCard(
             DirectionSegments(
                 selected = if (payment.directionUnclear) null else payment.transactionType,
                 onPick = onChooseDirection.takeIf { payment.directionUnclear },
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
+                onTapWhenFixed = onEdit
             )
             if (payment.directionUnclear) {
                 Text(
@@ -213,7 +214,7 @@ private fun SourceAvatar(appName: String) {
  * Spent / Received. [onPick] null makes it a plain display; [selected] null means neither is chosen yet.
  */
 @Composable
-private fun DirectionSegments(selected: TransactionType?, onPick: ((TransactionType) -> Unit)?, modifier: Modifier = Modifier) {
+private fun DirectionSegments(selected: TransactionType?, onPick: ((TransactionType) -> Unit)?, modifier: Modifier = Modifier, onTapWhenFixed: (() -> Unit)? = null) {
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf("Spent" to TransactionType.WITHDRAW, "Received" to TransactionType.RECEIVE).forEach { (label, type) ->
             val on = selected == type
@@ -223,7 +224,13 @@ private fun DirectionSegments(selected: TransactionType?, onPick: ((TransactionT
                     .heightIn(min = 48.dp)
                     .clip(CircleShape)
                     .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                    .then(if (onPick != null) Modifier.selectable(selected = on, role = Role.Tab) { onPick(type) } else Modifier),
+                    .then(
+                        when {
+                            onPick != null -> Modifier.selectable(selected = on, role = Role.RadioButton) { onPick(type) }
+                            onTapWhenFixed != null -> Modifier.clickable(onClickLabel = "Change payment", onClick = onTapWhenFixed)
+                            else -> Modifier
+                        }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

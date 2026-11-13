@@ -171,12 +171,14 @@ fun CheckPaymentsScreen(onClose: () -> Unit, viewModel: CheckPaymentsViewModel =
                     )
                 }
             }
-            Box(
+            // The card takes the height it needs (up to all of it); the hint sits right under it.
+            Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
             ) {
+            Box(Modifier.weight(1f, fill = top == null).fillMaxWidth()) {
                 if (top == null) {
                     // Shown while the Undo pill of the last card is open; the screen closes after it.
                     Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -262,8 +264,11 @@ fun CheckPaymentsScreen(onClose: () -> Unit, viewModel: CheckPaymentsViewModel =
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp)
                 )
+            }
+            }
+            if (top != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
