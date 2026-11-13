@@ -4,37 +4,28 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -48,18 +39,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.data.CategoryEntity
@@ -69,7 +58,11 @@ import com.expensetracker.app.data.TransactionType
 import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.CaptureFormat
 import com.expensetracker.app.ui.components.AmountInput
+import com.expensetracker.app.ui.components.CategoryDot
 import com.expensetracker.app.ui.components.DiscardChangesDialog
+import com.expensetracker.app.ui.components.KobanRow
+import com.expensetracker.app.ui.components.ListGroup
+import com.expensetracker.app.ui.components.MoneyText
 import com.expensetracker.app.ui.components.PastDatePickerDialog
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.theme.categoryColor
@@ -81,7 +74,6 @@ import java.util.Date
  * it is read in the draw phase, so a drag does not recompose the card. [onEdit] and [onChooseDirection]
  * are null on the cards under the top one.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun CheckPaymentCard(
     card: CheckCard,
@@ -94,91 +86,87 @@ internal fun CheckPaymentCard(
     val money = LocalMoneyColors.current
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val received = payment.transactionType == TransactionType.RECEIVE
+    val timeText = android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(payment.notificationPostTime))
     val editModifier = if (onEdit != null) Modifier.clickable(onClickLabel = "Change payment", onClick = onEdit) else Modifier
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Tag("${card.appName} · ${android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(Date(payment.notificationPostTime))}")
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SourceAvatar(card.appName)
+                Text(
+                    text = "${card.appName} · $timeText",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
                 if (payment.format == CaptureFormat.UNKNOWN) Tag("Unknown format", money.review)
             }
-            Column(
+            val amountText = "${AmountFormatter.currencySymbol(payment.currency)} ${AmountFormatter.formatGrouped(payment.amount)}"
+            MoneyText(
+                text = if (received) "+ $amountText" else amountText,
+                style = MaterialTheme.typography.displayMedium,
+                color = if (received) money.received else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
-                    .padding(top = 10.dp)
+                    .padding(horizontal = 16.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .then(editModifier)
                     .semantics(mergeDescendants = true) {}
-            ) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = AmountFormatter.currencySymbol(payment.currency),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = muted,
-                        modifier = Modifier.padding(end = 4.dp, bottom = 6.dp)
-                    )
-                    Text(
-                        text = AmountFormatter.formatGrouped(payment.amount),
-                        style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+            )
+            // Outside the clickable amount, so each choice is its own button for TalkBack.
+            DirectionSegments(
+                selected = if (payment.directionUnclear) null else payment.transactionType,
+                onPick = onChooseDirection.takeIf { payment.directionUnclear },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            if (payment.directionUnclear) {
                 Text(
-                    text = when {
-                        payment.directionUnclear -> "Spent or Received?"
-                        received -> "Received"
-                        else -> "Spent"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = when {
-                        payment.directionUnclear -> money.review
-                        received -> money.received
-                        else -> money.red
-                    }
+                    text = "Spent or Received?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = money.review,
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
-            if (payment.directionUnclear) {
-                // Outside the clickable amount block, so each choice is its own button for TalkBack.
-                Row(
-                    modifier = Modifier.padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { onChooseDirection?.invoke(TransactionType.WITHDRAW) },
-                        enabled = onChooseDirection != null
-                    ) { Text("Spent", color = money.red, fontWeight = FontWeight.Bold) }
-                    OutlinedButton(
-                        onClick = { onChooseDirection?.invoke(TransactionType.RECEIVE) },
-                        enabled = onChooseDirection != null
-                    ) { Text("Received", color = money.received, fontWeight = FontWeight.Bold) }
+            ListGroup {
+                item { KobanRow(payment.merchant ?: "Not set", subtitle = "Shop", showChevron = true, onClick = onEdit) }
+                item {
+                    KobanRow(
+                        card.categoryName,
+                        subtitle = "Category",
+                        leading = { CategoryDot(categoryColor(card.categoryId), 12.dp) },
+                        showChevron = true,
+                        onClick = onEdit
+                    )
+                }
+                item {
+                    KobanRow("${dateLabel(payment.notificationPostTime)}, $timeText", subtitle = "Date", showChevron = true, onClick = onEdit)
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            CardField("Merchant", payment.merchant ?: "Not set", editModifier)
-            CardField("Category", card.categoryName, editModifier)
-            CardField("Date", dateLabel(payment.notificationPostTime), editModifier)
-            val rawBar = MaterialTheme.colorScheme.outline
             Text(
                 text = "“${payment.rawNotificationText}”",
                 style = MaterialTheme.typography.bodyMedium,
                 color = muted,
                 modifier = Modifier
-                    .padding(top = 14.dp)
+                    .padding(horizontal = 16.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .drawBehind { drawRect(rawBar, size = Size(3.dp.toPx(), size.height)) }
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             )
         }
@@ -204,6 +192,51 @@ internal fun CheckPaymentCard(
     }
 }
 
+/** The app's initials in a circle, for example "MB" for Maybank MAE. */
+@Composable
+private fun SourceAvatar(appName: String) {
+    val words = appName.trim().split(' ').filter { it.isNotEmpty() }
+    val initials = (if (words.size >= 2) "${words[0].first()}${words[1].first()}" else appName.trim().take(2)).uppercase()
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clearAndSetSemantics {},
+        contentAlignment = Alignment.Center
+    ) {
+        Text(initials, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+/**
+ * Spent / Received. [onPick] null makes it a plain display; [selected] null means neither is chosen yet.
+ */
+@Composable
+private fun DirectionSegments(selected: TransactionType?, onPick: ((TransactionType) -> Unit)?, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("Spent" to TransactionType.WITHDRAW, "Received" to TransactionType.RECEIVE).forEach { (label, type) ->
+            val on = selected == type
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .clip(CircleShape)
+                    .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                    .then(if (onPick != null) Modifier.selectable(selected = on, role = Role.Tab) { onPick(type) } else Modifier),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun Tag(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
     Text(
@@ -215,42 +248,6 @@ private fun Tag(text: String, color: Color = MaterialTheme.colorScheme.onSurface
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .padding(horizontal = 10.dp, vertical = 4.dp)
     )
-}
-
-@Composable
-private fun CardField(label: String, value: String, editModifier: Modifier) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .then(editModifier)
-                .semantics(mergeDescendants = true) {}
-                .padding(vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.End,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                Icons.Default.Edit,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .padding(start = 6.dp)
-                    .size(16.dp)
-            )
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-    }
 }
 
 @Composable
@@ -320,28 +317,25 @@ internal fun EditPaymentSheet(
                 .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Change payment", style = MaterialTheme.typography.titleMedium)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(4.dp)
-            ) {
-                TypeSegment("Expense", type == TransactionType.WITHDRAW, MaterialTheme.colorScheme.inverseSurface) {
-                    type = TransactionType.WITHDRAW
+            Text("Change payment", style = MaterialTheme.typography.titleLarge)
+            DirectionSegments(
+                selected = type.takeIf { !payment.directionUnclear || typePicked },
+                onPick = {
+                    type = it
                     typePicked = true
                 }
-                TypeSegment("Income", type == TransactionType.RECEIVE, LocalMoneyColors.current.received) {
-                    type = TransactionType.RECEIVE
-                    typePicked = true
-                }
-            }
-            OutlinedTextField(
+            )
+            val fieldColors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                errorContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            )
+            TextField(
                 value = amountText,
                 onValueChange = { amountText = it },
-                label = { Text("Amount") },
-                prefix = { Text("${AmountFormatter.currencySymbol(payment.currency)} ") },
+                label = { Text("Amount (${AmountFormatter.currencySymbol(payment.currency)})") },
                 isError = amount == null,
                 supportingText = if (amount == null) {
                     { Text("Type an amount above 0") }
@@ -349,26 +343,35 @@ internal fun EditPaymentSheet(
                     null
                 },
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
                 textStyle = MaterialTheme.typography.bodyLarge,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
+            TextField(
                 value = merchant,
                 onValueChange = { merchant = it },
                 label = { Text("Shop") },
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
                 textStyle = MaterialTheme.typography.bodyLarge,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                 modifier = Modifier.fillMaxWidth()
             )
-            SheetRow(
-                label = "Category",
-                value = categories.find { it.id == categoryId }?.name ?: DefaultCategories.UNCATEGORIZED_NAME,
-                dotColor = categoryColor(categoryId),
-                onClick = { pickingCategory = true }
-            )
-            SheetRow(label = "Date", value = dateLabel(time), dotColor = null, onClick = { pickingDate = true })
+            ListGroup {
+                item {
+                    KobanRow(
+                        categories.find { it.id == categoryId }?.name ?: DefaultCategories.UNCATEGORIZED_NAME,
+                        subtitle = "Category",
+                        leading = { CategoryDot(categoryColor(categoryId), 12.dp) },
+                        showChevron = true,
+                        onClick = { pickingCategory = true }
+                    )
+                }
+                item { KobanRow(dateLabel(time), subtitle = "Date", showChevron = true, onClick = { pickingDate = true }) }
+            }
             Button(
                 onClick = {
                     val newAmount = amount ?: return@Button
@@ -390,8 +393,6 @@ internal fun EditPaymentSheet(
                     .fillMaxWidth()
                     .padding(bottom = 12.dp)
                     .height(56.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = LocalMoneyColors.current.gold, contentColor = Ink)
             ) {
                 Text("Save changes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
@@ -427,33 +428,5 @@ internal fun EditPaymentSheet(
                 pickingDate = false
             }
         )
-    }
-}
-
-@Composable
-private fun SheetRow(label: String, value: String, dotColor: Color?, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable(onClickLabel = "Change ${label.lowercase()}", onClick = onClick)
-            .semantics(mergeDescendants = true) {}
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.weight(1f))
-        if (dotColor != null) {
-            Box(
-                modifier = Modifier
-                    .padding(end = 8.dp)
-                    .size(14.dp)
-                    .clip(CircleShape)
-                    .background(dotColor)
-            )
-        }
-        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
     }
 }

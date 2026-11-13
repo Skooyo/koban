@@ -21,20 +21,25 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,7 +51,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -55,15 +59,18 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.expensetracker.app.ui.theme.LocalMoneyColors
+import com.expensetracker.app.ui.components.Mon
+import com.expensetracker.app.ui.components.MonFace
 import com.expensetracker.app.ui.viewmodel.CheckPaymentsViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -145,11 +152,17 @@ fun CheckPaymentsScreen(onClose: () -> Unit, viewModel: CheckPaymentsViewModel =
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 18.dp, end = 18.dp, top = 20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
+                    .padding(start = 8.dp, end = 20.dp, top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Check payments", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Text(
+                    "Check payments",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp).semantics { heading() }
+                )
                 if (top != null) {
                     Text(
                         text = "${handled + 1} of ${loaded.size + handled}",
@@ -162,15 +175,24 @@ fun CheckPaymentsScreen(onClose: () -> Unit, viewModel: CheckPaymentsViewModel =
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
             ) {
                 if (top == null) {
-                    Text(
-                        "All checked",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    // Shown while the Undo pill of the last card is open; the screen closes after it.
+                    Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Mon(MonFace.HAPPY, 120.dp)
+                        Text(
+                            "All checked",
+                            style = MaterialTheme.typography.headlineMedium,
+                            modifier = Modifier.padding(top = 16.dp)
+                        )
+                        Text(
+                            "Nothing left. I will just sit here and shine.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
                 }
                 // Drawn back to front, so the oldest card is on top.
                 loaded.take(STACK_DEPTH).asReversed().forEachIndexed { index, card ->
@@ -203,7 +225,7 @@ fun CheckPaymentsScreen(onClose: () -> Unit, viewModel: CheckPaymentsViewModel =
                             // The drag sits outside the layer, so the tilt does not skew the drag distance.
                             modifier = if (isTop) {
                                 Modifier
-                                    .fillMaxSize()
+                                    .fillMaxWidth()
                                     .draggable(
                                         state = dragState,
                                         orientation = Orientation.Horizontal,
@@ -228,36 +250,46 @@ fun CheckPaymentsScreen(onClose: () -> Unit, viewModel: CheckPaymentsViewModel =
                                     }
                                     .then(layer)
                             } else {
-                                Modifier.fillMaxSize().clearAndSetSemantics {}.then(layer)
+                                Modifier.fillMaxWidth().clearAndSetSemantics {}.then(layer)
                             }
                         )
                     }
                 }
             }
             if (top != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally)
-                ) {
-                    RoundButton(
-                        onClick = { decide(false) },
-                        container = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        content = LocalMoneyColors.current.red
-                    ) { Icon(Icons.Default.Close, contentDescription = "Not a payment", modifier = Modifier.size(30.dp)) }
-                    RoundButton(
-                        onClick = { decide(true) },
-                        container = LocalMoneyColors.current.gold,
-                        content = Ink
-                    ) { Icon(Icons.Default.Check, contentDescription = "Save", modifier = Modifier.size(30.dp)) }
-                }
                 Text(
-                    text = "Tap a field to fix it before you swipe",
+                    text = "Tap a field to fix it. Swipe right to save, left for Not a payment.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(top = 14.dp, bottom = 20.dp)
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { decide(false) },
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Not a payment", style = MaterialTheme.typography.labelLarge)
+                    }
+                    Button(
+                        onClick = { decide(true) },
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Save payment", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            } else {
+                Button(
+                    onClick = onClose,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 52.dp)
+                ) { Text("Back to Home", style = MaterialTheme.typography.labelLarge) }
             }
         }
 
@@ -267,7 +299,7 @@ fun CheckPaymentsScreen(onClose: () -> Unit, viewModel: CheckPaymentsViewModel =
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 150.dp)
+                .padding(bottom = 140.dp)
         ) {
             // Holds the last text while it fades out.
             val text = remember { arrayOf("") }
@@ -298,19 +330,6 @@ fun CheckPaymentsScreen(onClose: () -> Unit, viewModel: CheckPaymentsViewModel =
                 onDismiss = { editing = null }
             )
         }
-    }
-}
-
-@Composable
-private fun RoundButton(onClick: () -> Unit, container: Color, content: Color, icon: @Composable () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = container,
-        contentColor = content,
-        modifier = Modifier.size(64.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) { icon() }
     }
 }
 
