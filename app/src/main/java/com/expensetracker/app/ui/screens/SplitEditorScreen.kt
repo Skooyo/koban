@@ -8,7 +8,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,11 +29,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,7 +68,14 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import com.expensetracker.app.ui.components.DiscardChangesDialog
-import com.expensetracker.app.ui.components.MoneyAmount
+import com.expensetracker.app.ui.components.KobanRow
+import com.expensetracker.app.ui.components.ListGroup
+import com.expensetracker.app.ui.components.Mon
+import com.expensetracker.app.ui.components.MonFace
+import com.expensetracker.app.ui.components.MoneyText
+import com.expensetracker.app.ui.components.SectionHeading
+import com.expensetracker.app.ui.components.TonalButton
+import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.viewmodel.ItemRow
 import com.expensetracker.app.ui.viewmodel.SplitEditorState
 import com.expensetracker.app.ui.viewmodel.SplitEditorViewModel
@@ -109,39 +129,82 @@ fun SplitEditorScreen(
                         enabled = action.enabled && !state.saving,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 12.dp)
+                            .heightIn(min = 48.dp)
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) { Text(action.label) }
                 }
             }
         }
     ) { padding ->
-        val content = Modifier
-            .fillMaxSize()
-            .padding(padding)
-        when {
-            state.loading -> Centered(content) { CircularProgressIndicator() }
-            state.step == SplitStep.Photo -> PhotoStep(content, state.onlineAccess, viewModel)
-            state.step == SplitStep.Reading -> Centered(content) {
-                CircularProgressIndicator()
-                Text("Reading the receipt…", style = MaterialTheme.typography.bodyLarge)
-            }
-            state.step == SplitStep.Items -> ItemsStep(content, state, viewModel)
-            state.step == SplitStep.People -> PeopleStep(content, state, recent, viewModel)
-            state.step == SplitStep.Assign -> AssignStep(content, state, viewModel)
-            state.step == SplitStep.Link -> LinkStep(content, state, viewModel)
-            else -> SummaryStep(
-                content, state, viewModel,
-                onShare = { text ->
-                    val send = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_TEXT, text)
-                    }
-                    context.startActivity(Intent.createChooser(send, "Share summary"))
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (!state.loading) StepHeader(state.step)
+            val content = Modifier.fillMaxWidth().weight(1f)
+            when {
+                state.loading -> Centered(content) { CircularProgressIndicator() }
+                state.step == SplitStep.Photo -> PhotoStep(content, state.onlineAccess, viewModel)
+                state.step == SplitStep.Reading -> Centered(content) {
+                    CircularProgressIndicator()
+                    Text("Reading the receipt…", style = MaterialTheme.typography.bodyLarge)
                 }
-            )
+                state.step == SplitStep.Items -> ItemsStep(content, state, viewModel)
+                state.step == SplitStep.People -> PeopleStep(content, state, recent, viewModel)
+                state.step == SplitStep.Assign -> AssignStep(content, state, viewModel)
+                state.step == SplitStep.Link -> LinkStep(content, state, viewModel)
+                else -> SummaryStep(
+                    content, state, viewModel,
+                    onShare = { text ->
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        }
+                        context.startActivity(Intent.createChooser(send, "Share summary"))
+                    }
+                )
+            }
         }
     }
 }
+
+private val stepNames = listOf("Receipt", "Items", "People", "Who had what", "Payment", "Summary")
+
+/** Same look as the onboarding header (private there), with this flow's 6 steps. */
+@Composable
+private fun StepHeader(step: SplitStep) {
+    val number = when (step) {
+        SplitStep.Photo, SplitStep.Reading -> 1
+        SplitStep.Items -> 2
+        SplitStep.People -> 3
+        SplitStep.Assign -> 4
+        SplitStep.Link -> 5
+        SplitStep.Summary -> 6
+    }
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            repeat(stepNames.size) { index ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(4.dp)
+                        .background(
+                            if (index < number) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceContainerHigh
+                        )
+                )
+            }
+        }
+        Text(
+            "Step $number of ${stepNames.size} · ${stepNames[number - 1]}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** `RM 12.50`, grouped. */
+internal fun splitRm(amount: java.math.BigDecimal) = "RM ${AmountFormatter.formatGrouped(amount)}"
 
 private data class BottomAction(val label: String, val enabled: Boolean, val onClick: () -> Unit)
 
@@ -156,7 +219,7 @@ private fun bottomAction(state: SplitEditorState, vm: SplitEditorViewModel): Bot
                 SplitEditorViewModel.chargesOf(state) != null,
             vm::next
         )
-        SplitStep.People -> BottomAction("Next", true, vm::next)
+        SplitStep.People -> BottomAction("Next · ${state.people.size + 1} people", true, vm::next)
         SplitStep.Assign -> BottomAction("Next", SplitEditorViewModel.unassigned(state).isEmpty(), vm::next)
         SplitStep.Link ->
             if (state.locked) BottomAction("Save payment", true, vm::saveLockedPayment)
@@ -215,25 +278,49 @@ private fun PhotoStep(modifier: Modifier, online: Boolean, vm: SplitEditorViewMo
         }
     }
     Column(
-        modifier = modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Start with the receipt", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            if (online) "With online access, the photo is sent to Koban's server to be read, then deleted."
-            else "The photo is read once and then deleted. It is not kept.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Button(
-            onClick = ::takePhoto,
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Take photo") }
-        OutlinedButton(onClick = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.fillMaxWidth()) {
-            Text("Choose from gallery")
+        Column(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+        ) {
+            Mon(MonFace.IDLE, 96.dp)
+            Text(
+                "Start with the receipt",
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                if (online) "Koban reads the items for you. With online access, the photo goes to Koban's server to be read, then it is deleted."
+                else "Koban reads the items for you. The photo is read once and then deleted. It is not kept.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
         }
-        TextButton(onClick = vm::typeItemsInstead, modifier = Modifier.fillMaxWidth()) {
-            Text("Type items instead")
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = ::takePhoto,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) {
+                Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Take photo")
+            }
+            OutlinedButton(
+                onClick = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) {
+                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Choose from gallery")
+            }
+            TextButton(onClick = vm::typeItemsInstead, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text("Type items instead")
+            }
         }
     }
 }
@@ -248,45 +335,29 @@ private fun ItemsStep(modifier: Modifier, state: SplitEditorState, vm: SplitEdit
     }
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            Text("Items", style = MaterialTheme.typography.headlineMedium)
-            state.readSource?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            if (diff != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Differs from the receipt total by RM ${AmountFormatter.formatDisplay(diff.abs())}.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = { fixOpen = true }) { Text("Fix") }
+        val hasTop = state.readSource != null || diff != null || state.message != null ||
+            (state.readNote != null && diff == null)
+        if (hasTop) item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                state.readSource?.let {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(
+                            Icons.Default.Check, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)
+                        )
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-            }
-            state.message?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            state.readNote?.takeIf { diff == null }?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                if (diff != null) MismatchCard(diff, total, state.printedTotal, onFix = { fixOpen = true })
+                state.message?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                }
+                state.readNote?.takeIf { diff == null }?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         item {
@@ -298,45 +369,96 @@ private fun ItemsStep(modifier: Modifier, state: SplitEditorState, vm: SplitEdit
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        items(state.items, key = { it.key }) { row -> ItemEditor(row, vm) }
         item {
-            OutlinedButton(onClick = vm::addItem, modifier = Modifier.fillMaxWidth()) { Text("Add item") }
-        }
-        item {
-            Text("Charges", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
-        }
-        item { MoneyField("Service charge", state.serviceCharge, vm::setServiceCharge) }
-        item { MoneyField("SST", state.tax, vm::setTax) }
-        item { MoneyField("Discount", state.discount, vm::setDiscount) }
-        item {
-            MoneyField(
-                "Rounding", state.rounding, vm::setRounding,
-                keyboard = KeyboardType.Text, hint = "Use - for a negative amount"
-            )
-        }
-        item {
-            HorizontalDivider()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Total", style = MaterialTheme.typography.titleMedium)
-                if (total != null) MoneyAmount(total, MaterialTheme.typography.titleLarge)
-                else Text("Check the amounts", color = MaterialTheme.colorScheme.error)
-            }
-            state.printedTotal?.let { printed ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Column {
+                SectionHeading("Items")
+                if (state.items.isNotEmpty()) {
+                    ListGroup {
+                        state.items.forEach { row -> item { ItemEditor(row, vm) } }
+                    }
+                }
+                TextButton(
+                    onClick = vm::addItem,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) {
-                    Text("Receipt total", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    MoneyAmount(printed, MaterialTheme.typography.bodyLarge)
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add item")
                 }
             }
+        }
+        item {
+            Column {
+                SectionHeading("Charges")
+                ListGroup {
+                    item { MoneyField("Service charge", state.serviceCharge, vm::setServiceCharge) }
+                    item { MoneyField("SST", state.tax, vm::setTax) }
+                    item { MoneyField("Discount", state.discount, vm::setDiscount) }
+                    item {
+                        MoneyField(
+                            "Rounding", state.rounding, vm::setRounding,
+                            keyboard = KeyboardType.Text, hint = "Use - for a negative amount"
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            ListGroup {
+                item {
+                    KobanRow(
+                        "Total",
+                        trailing = {
+                            if (total != null) MoneyText(splitRm(total), style = MaterialTheme.typography.titleLarge)
+                            else Text("Check the amounts", color = MaterialTheme.colorScheme.error)
+                        }
+                    )
+                }
+                state.printedTotal?.let { printed ->
+                    item {
+                        KobanRow(
+                            "Receipt total",
+                            trailing = {
+                                MoneyText(
+                                    splitRm(printed),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Items and the receipt total differ: a card with the `review` outline and a Fix button. */
+@Composable
+private fun MismatchCard(diff: java.math.BigDecimal, total: java.math.BigDecimal?, printed: java.math.BigDecimal?, onFix: () -> Unit) {
+    val review = LocalMoneyColors.current.review
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, review),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = review, modifier = Modifier.size(20.dp))
+                Text(
+                    "Differs from the receipt total by RM ${AmountFormatter.formatDisplay(diff.abs())}.",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            if (total != null && printed != null) {
+                Text(
+                    "Items add up to ${splitRm(total)}. The receipt says ${splitRm(printed)}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            TonalButton("Fix", onFix, Modifier.align(Alignment.End))
         }
     }
 }
@@ -387,7 +509,7 @@ private fun FixSheet(diff: java.math.BigDecimal?, state: SplitEditorState, vm: S
 
 @Composable
 private fun ItemEditor(row: ItemRow, vm: SplitEditorViewModel) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = row.name,
@@ -397,7 +519,11 @@ private fun ItemEditor(row: ItemRow, vm: SplitEditorViewModel) {
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = { vm.removeItem(row.key) }) {
-                Icon(Icons.Default.Delete, contentDescription = "Remove ${row.name.ifBlank { "item" }}")
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Remove ${row.name.ifBlank { "item" }}",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -438,6 +564,6 @@ private fun MoneyField(
         singleLine = true,
         isError = value.isNotBlank() && AmountFormatter.parseInput(value) == null,
         keyboardOptions = KeyboardOptions(keyboardType = keyboard),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
     )
 }
