@@ -8,12 +8,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -74,6 +71,7 @@ import com.expensetracker.app.ui.components.Mon
 import com.expensetracker.app.ui.components.MonFace
 import com.expensetracker.app.ui.components.MoneyText
 import com.expensetracker.app.ui.components.SectionHeading
+import com.expensetracker.app.ui.components.StepProgress
 import com.expensetracker.app.ui.components.TonalButton
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.viewmodel.ItemRow
@@ -137,7 +135,10 @@ fun SplitEditorScreen(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            if (!state.loading) StepHeader(state.step)
+            if (!state.loading) {
+                val number = stepNumber(state.step)
+                StepProgress(number, stepNames.size, stepNames[number - 1], Modifier.padding(horizontal = 16.dp))
+            }
             val content = Modifier.fillMaxWidth().weight(1f)
             when {
                 state.loading -> Centered(content) { CircularProgressIndicator() }
@@ -167,40 +168,13 @@ fun SplitEditorScreen(
 
 private val stepNames = listOf("Receipt", "Items", "People", "Who had what", "Payment", "Summary")
 
-/** Same look as the onboarding header (private there), with this flow's 6 steps. */
-@Composable
-private fun StepHeader(step: SplitStep) {
-    val number = when (step) {
-        SplitStep.Photo, SplitStep.Reading -> 1
-        SplitStep.Items -> 2
-        SplitStep.People -> 3
-        SplitStep.Assign -> 4
-        SplitStep.Link -> 5
-        SplitStep.Summary -> 6
-    }
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            repeat(stepNames.size) { index ->
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(4.dp)
-                        .background(
-                            if (index < number) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
-                )
-            }
-        }
-        Text(
-            "Step $number of ${stepNames.size} · ${stepNames[number - 1]}",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+private fun stepNumber(step: SplitStep) = when (step) {
+    SplitStep.Photo, SplitStep.Reading -> 1
+    SplitStep.Items -> 2
+    SplitStep.People -> 3
+    SplitStep.Assign -> 4
+    SplitStep.Link -> 5
+    SplitStep.Summary -> 6
 }
 
 /** `RM 12.50`, grouped. */

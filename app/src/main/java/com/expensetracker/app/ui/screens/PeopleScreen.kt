@@ -1,7 +1,5 @@
 package com.expensetracker.app.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -32,10 +30,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -44,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.data.Balance
 import com.expensetracker.app.data.PeopleMath
 import com.expensetracker.app.data.PersonSummary
+import com.expensetracker.app.ui.components.InitialsAvatar
 import com.expensetracker.app.ui.components.KobanRow
 import com.expensetracker.app.ui.components.LargeTopBar
 import com.expensetracker.app.ui.components.ListGroup
@@ -242,19 +239,7 @@ private fun PersonRow(summary: PersonSummary, avatarColor: Color, onClick: () ->
         subtitleColor = statusColor,
         leading = {
             // A tint of the color of the person under normal text keeps the initial readable in light and dark.
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clearAndSetSemantics {}
-                    .background(avatarColor.copy(alpha = 0.3f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = name.trim().take(1).uppercase(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
+            InitialsAvatar(name, tint = avatarColor)
         },
         showChevron = true,
         onClick = onClick,

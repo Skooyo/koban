@@ -15,7 +15,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.ui.unit.Dp
+import com.expensetracker.app.ui.components.InitialsAvatar
 import com.expensetracker.app.ui.components.CategoryDot
 import com.expensetracker.app.ui.components.KobanRow
 import com.expensetracker.app.ui.components.LargeTopBar
@@ -284,7 +284,7 @@ fun GroupsScreen(onOpenGroup: (String) -> Unit, vm: GroupsViewModel = hiltViewMo
                                         KobanRow(
                                             title = g.name,
                                             subtitle = "${g.members} ${if (g.members == 1) "member" else "members"}$owner",
-                                            leading = { Avatar(g.name, 1, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer, 40.dp) },
+                                            leading = { InitialsAvatar(g.name, tint = MaterialTheme.colorScheme.primaryContainer) },
                                             trailing = if (g.requests > 0) {
                                                 {
                                                     Text(
@@ -486,7 +486,7 @@ private fun GroupBody(
                 )
                 d.requests.forEach { r ->
                     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(r.alias, 2)
+                        InitialsAvatar(r.alias, size = 36.dp)
                         Text(r.alias, Modifier.padding(start = 12.dp).weight(1f), style = MaterialTheme.typography.bodyLarge)
                         TextButton(onClick = { vm.run { answer(r, false) } }, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) { Text("Decline") }
                         TonalButton("Approve", onClick = { vm.run { answer(r, true) } })
@@ -571,8 +571,7 @@ private fun MemberRow(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (isMe) Avatar(m.alias, 2, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
-            else Avatar(m.alias, 2)
+            InitialsAvatar(m.alias, size = 36.dp, tint = if (isMe) MaterialTheme.colorScheme.primaryContainer else null)
             Text(
                 name,
                 Modifier.padding(start = 12.dp).weight(1f),
@@ -616,25 +615,6 @@ private fun MemberRow(
                 TextButton(onClick = onRemove, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) { Text("Remove", color = MaterialTheme.colorScheme.error) }
             }
         }
-    }
-}
-
-/** A round badge with the first [letters] letters of [alias]. */
-@Composable
-private fun Avatar(
-    alias: String,
-    letters: Int,
-    container: Color = MaterialTheme.colorScheme.secondaryContainer,
-    content: Color = MaterialTheme.colorScheme.onSecondaryContainer,
-    size: Dp = 36.dp
-) {
-    val words = alias.trim().split(Regex("\\s+"))
-    val initials = if (letters > 1 && words.size > 1) words.take(letters).joinToString("") { it.take(1) } else alias.trim().take(letters)
-    Box(
-        Modifier.size(size).clip(CircleShape).background(container),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(initials.uppercase(), style = MaterialTheme.typography.titleSmall, color = content)
     }
 }
 

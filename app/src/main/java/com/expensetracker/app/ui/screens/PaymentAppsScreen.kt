@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expensetracker.app.ui.components.InitialsAvatar
 import com.expensetracker.app.ui.components.KobanRow
 import com.expensetracker.app.ui.viewmodel.PaymentAppsViewModel
 
@@ -134,7 +135,7 @@ fun PaymentAppsScreen(
                                     if (app.icon != null) {
                                         Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(40.dp))
                                     } else {
-                                        Initials(app.label)
+                                        InitialsAvatar(app.label)
                                     }
                                 },
                                 trailing = { Checkbox(checked = checked, onCheckedChange = null) },
@@ -149,20 +150,5 @@ fun PaymentAppsScreen(
                 }
             }
         }
-    }
-}
-
-/** Two-letter circle for an app that has no icon. */
-@Composable
-private fun Initials(label: String) {
-    Box(
-        Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label.trim().take(2).uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
     }
 }

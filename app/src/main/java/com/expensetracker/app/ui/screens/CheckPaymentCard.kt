@@ -55,6 +55,7 @@ import com.expensetracker.app.data.PendingPaymentEntity
 import com.expensetracker.app.data.TransactionType
 import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.CaptureFormat
+import com.expensetracker.app.ui.components.InitialsAvatar
 import com.expensetracker.app.ui.components.AmountInput
 import com.expensetracker.app.ui.components.CategoryDot
 import com.expensetracker.app.ui.components.DirectionSegments
@@ -105,7 +106,7 @@ internal fun CheckPaymentCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                SourceAvatar(card.appName)
+                InitialsAvatar(card.appName, size = 32.dp)
                 Text(
                     text = "${card.appName} · $timeText",
                     style = MaterialTheme.typography.bodyMedium,
@@ -189,23 +190,6 @@ internal fun CheckPaymentCard(
                 .padding(top = 22.dp, start = 18.dp)
                 .graphicsLayer { alpha = (-stamp()).coerceIn(0f, 1f) }
         )
-    }
-}
-
-/** The app's initials in a circle, for example "MB" for Maybank MAE. */
-@Composable
-private fun SourceAvatar(appName: String) {
-    val words = appName.trim().split(' ').filter { it.isNotEmpty() }
-    val initials = (if (words.size >= 2) "${words[0].first()}${words[1].first()}" else appName.trim().take(2)).uppercase()
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clearAndSetSemantics {},
-        contentAlignment = Alignment.Center
-    ) {
-        Text(initials, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

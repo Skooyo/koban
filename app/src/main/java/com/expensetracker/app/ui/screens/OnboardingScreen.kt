@@ -12,15 +12,12 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -63,6 +60,7 @@ import com.expensetracker.app.listener.NotificationAccessHelper
 import com.expensetracker.app.listener.OemBatteryHelper
 import com.expensetracker.app.ui.components.Mon
 import com.expensetracker.app.ui.components.MonFace
+import com.expensetracker.app.ui.components.StepProgress
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.viewmodel.OnboardingRules
 import com.expensetracker.app.ui.viewmodel.OnboardingStep
@@ -152,7 +150,7 @@ fun OnboardingScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             val number = OnboardingRules.stepNumber(step)
-            if (number != null) ProgressHeader(number, stepNames.getValue(step))
+            if (number != null) StepProgress(number, 4, stepNames.getValue(step))
             when (step) {
                 OnboardingStep.WELCOME -> WelcomeStep()
                 OnboardingStep.ACCESS -> AccessStep()
@@ -168,26 +166,6 @@ fun OnboardingScreen(
 @Composable
 private fun MainButton(text: String, onClick: () -> Unit) {
     Button(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(text) }
-}
-
-@Composable
-private fun ProgressHeader(number: Int, name: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            repeat(4) { index ->
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(4.dp)
-                        .background(
-                            if (index < number) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceContainerHighest
-                        )
-                )
-            }
-        }
-        Text("Step $number of 4 · $name", style = MaterialTheme.typography.bodySmall)
-    }
 }
 
 @Composable

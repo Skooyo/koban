@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -36,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -291,4 +293,53 @@ private fun RowScope.Segment(label: String, on: Boolean, action: Modifier) {
             color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+/** A segmented progress bar (gold = done) with "Step [number] of [total] · [name]" under it. */
+@Composable
+fun StepProgress(number: Int, total: Int, name: String, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            repeat(total) { index ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(4.dp)
+                        .background(
+                            if (index < number) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceContainerHigh
+                        )
+                )
+            }
+        }
+        Text(
+            "Step $number of $total · $name",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Two letters of [name] in a circle: the first letter of the first two words, or the first two letters of a one-word name.
+ * Hidden from TalkBack: the row title carries the name. */
+@Composable
+fun InitialsAvatar(name: String, modifier: Modifier = Modifier, size: Dp = 40.dp, tint: Color? = null) {
+    Box(
+        modifier
+            .size(size)
+            .clearAndSetSemantics {}
+            .background(tint?.copy(alpha = 0.3f) ?: MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initialsOf(name),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+private fun initialsOf(name: String): String {
+    val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    return (if (words.size >= 2) "${words[0].first()}${words[1].first()}" else name.trim().take(2)).uppercase()
 }

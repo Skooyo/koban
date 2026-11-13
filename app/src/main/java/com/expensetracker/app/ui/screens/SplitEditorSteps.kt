@@ -1,9 +1,7 @@
 package com.expensetracker.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -46,19 +43,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.data.ME_ID
 import com.expensetracker.app.data.SplitPersonEntity
 import com.expensetracker.app.parser.AmountFormatter
+import com.expensetracker.app.ui.components.InitialsAvatar
 import com.expensetracker.app.ui.components.KobanRow
 import com.expensetracker.app.ui.components.ListGroup
 import com.expensetracker.app.ui.components.Mon
 import com.expensetracker.app.ui.components.MonFace
 import com.expensetracker.app.ui.components.MoneyText
 import com.expensetracker.app.ui.components.TonalButton
+import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.viewmodel.ItemRow
 import com.expensetracker.app.ui.viewmodel.SplitEditorState
 import com.expensetracker.app.ui.viewmodel.SplitEditorViewModel
@@ -239,15 +237,17 @@ internal fun LinkStep(modifier: Modifier, state: SplitEditorState, vm: SplitEdit
         state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         if (selected != null && total != null && selected.amount.compareTo(total) != 0) {
             item {
+                val review = LocalMoneyColors.current.review
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceContainer,
+                    border = BorderStroke(1.dp, review),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(
                             Icons.Default.Info, contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp)
+                            tint = review, modifier = Modifier.size(20.dp)
                         )
                         Text(
                             "The payment is ${splitRm(selected.amount)}, the receipt is ${splitRm(total)}. " +
@@ -273,25 +273,10 @@ private fun PaymentOption(expense: ExpenseEntity, selected: Boolean, onSelect: (
     )
 }
 
-/** Two letters for the summary avatar. */
-@Composable
-private fun InitialsAvatar(name: String) {
-    Box(
-        Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            name.trim().take(2).uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
 private fun joinNames(names: List<String>): String =
     if (names.size <= 1) names.joinToString() else names.dropLast(1).joinToString(", ") + " and " + names.last()
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SummaryStep(
     modifier: Modifier,
@@ -351,10 +336,10 @@ internal fun SummaryStep(
             item { Text(it, color = MaterialTheme.colorScheme.error) }
         }
         item {
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TonalButton(
                     "Share summary",
