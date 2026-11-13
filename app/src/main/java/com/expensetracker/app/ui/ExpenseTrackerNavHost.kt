@@ -45,6 +45,7 @@ import com.expensetracker.app.ui.screens.GroupScreen
 import com.expensetracker.app.ui.screens.GroupsScreen
 import com.expensetracker.app.ui.screens.HomeScreen
 import com.expensetracker.app.ui.screens.NotificationDebugScreen
+import com.expensetracker.app.ui.screens.OnboardingScreen
 import com.expensetracker.app.ui.screens.PaymentAppsScreen
 import com.expensetracker.app.ui.screens.PaymentScreen
 import com.expensetracker.app.ui.screens.PeopleScreen
@@ -106,8 +107,10 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier, appViewModel: AppViewMo
         val count = appViewModel.waitingCountNow()
         // Waits for the graph on a cold start.
         val route = navController.currentBackStackEntryFlow.first().destination.route
-        // The payment-apps picker comes before the swipe screen.
-        if (route in topLevelRoutes && appViewModel.paymentAppsDue()) {
+        // Onboarding comes first, then the payment-apps picker, then the swipe screen.
+        if (route in topLevelRoutes && appViewModel.onboardingDue()) {
+            navController.navigate(Routes.ONBOARDING) { launchSingleTop = true }
+        } else if (route in topLevelRoutes && appViewModel.paymentAppsDue()) {
             navController.navigate(Routes.PAYMENT_APPS) { launchSingleTop = true }
         } else if (count > 0 && route in topLevelRoutes) {
             navController.navigate(Routes.CHECK) { launchSingleTop = true }
@@ -261,6 +264,9 @@ fun ExpenseTrackerNavHost(modifier: Modifier = Modifier, appViewModel: AppViewMo
                 PaymentAppsScreen(onClose = {
                     if (navController.currentBackStackEntry == entry) navController.popBackStack()
                 })
+            }
+            composable(Routes.ONBOARDING) {
+                OnboardingScreen(onFinished = { navController.popBackStack(Routes.HOME, inclusive = false) })
             }
             composable(Routes.NOTIFICATION_DEBUG) {
                 NotificationDebugScreen(onBack = { navController.popBackStack() })

@@ -19,6 +19,7 @@ object Routes {
     const val PAYMENT_NEW = "payment/new"
     const val PAYMENT_EDIT = "payment/edit/{expenseId}"
     const val CHECK = "check"
+    const val ONBOARDING = "onboarding"
 
     fun paymentEdit(id: String) = "payment/edit/${Uri.encode(id)}"
 
