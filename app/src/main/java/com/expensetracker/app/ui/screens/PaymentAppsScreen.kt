@@ -1,10 +1,16 @@
 package com.expensetracker.app.ui.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.draw.clip
+import com.expensetracker.app.ui.components.KobanRow
+import com.expensetracker.app.ui.components.ListGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,7 +18,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -32,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,54 +76,91 @@ fun PaymentAppsScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
                     .heightIn(min = 48.dp)
-            ) { Text("Save") }
+            ) {
+                Text(
+                    when (state.selected.size) {
+                        0 -> "Save"
+                        1 -> "Save 1 app"
+                        else -> "Save ${state.selected.size} apps"
+                    }
+                )
+            }
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+            Text(
+                text = "Koban reads notifications only from the apps you tick.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::setQuery,
-                label = { Text("Search apps") },
+                placeholder = { Text("Search apps") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 singleLine = true,
+                shape = CircleShape,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
             )
             if (apps == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
                 val shown = apps.filter { it.label.contains(state.query.trim(), ignoreCase = true) }
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(shown, key = { it.packageName }) { app ->
-                        val checked = app.packageName in state.selected
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 56.dp)
-                                .toggleable(
-                                    value = checked,
-                                    role = Role.Checkbox,
-                                    onValueChange = { viewModel.toggle(app.packageName) }
-                                )
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            if (app.icon != null) {
-                                Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(40.dp))
-                            } else {
-                                Box(Modifier.size(40.dp))
-                            }
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+                    if (shown.isEmpty()) {
+                        item {
                             Text(
-                                text = app.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
+                                text = "No apps match.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Checkbox(checked = checked, onCheckedChange = null)
+                        }
+                    } else {
+                        // ponytail: one non-lazy group composes every row; fine for a phone's app list, lazy items would break the single rounded group.
+                        item {
+                            ListGroup {
+                                shown.forEach { app ->
+                                    item {
+                                        val checked = app.packageName in state.selected
+                                        KobanRow(
+                                            title = app.label,
+                                            leading = {
+                                                if (app.icon != null) {
+                                                    Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(40.dp))
+                                                } else {
+                                                    Initials(app.label)
+                                                }
+                                            },
+                                            trailing = { Checkbox(checked = checked, onCheckedChange = null) },
+                                            modifier = Modifier.toggleable(
+                                                value = checked,
+                                                role = Role.Checkbox,
+                                                onValueChange = { viewModel.toggle(app.packageName) }
+                                            )
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** Two-letter circle for an app that has no icon. */
+@Composable
+private fun Initials(label: String) {
+    Box(
+        Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label.trim().take(2).uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
