@@ -20,8 +20,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,17 +30,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -75,7 +76,11 @@ import com.expensetracker.app.data.OpenDebtView
 import com.expensetracker.app.data.OwedItemEntity
 import com.expensetracker.app.data.PeopleMath
 import com.expensetracker.app.data.PersonDetail
+import com.expensetracker.app.ui.components.KobanRow
+import com.expensetracker.app.ui.components.ListGroup
 import com.expensetracker.app.ui.components.MoneyAmount
+import com.expensetracker.app.ui.components.SectionHeading
+import com.expensetracker.app.ui.components.TonalButton
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.viewmodel.PersonViewModel
 import kotlinx.coroutines.Dispatchers
@@ -324,7 +329,7 @@ private fun PersonContent(
     val hasQr = detail.person.qrPath != null
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp)
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp)
     ) {
         item {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -333,17 +338,15 @@ private fun PersonContent(
         }
         if (hasQr) {
             item {
-                Button(
+                TonalButton(
+                    text = "Save QR to gallery",
                     onClick = onSaveQr,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 20.dp)
-                        .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = money.gold, contentColor = Ink)
-                ) { Text("Save QR to gallery") }
+                    modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                    icon = Icons.Default.Download
+                )
                 Text(
                     text = "Then open your bank app and pick it from the gallery",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -370,115 +373,152 @@ private fun PersonContent(
                     append(headline)
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(top = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            Row(
+            Column(
                 modifier = Modifier
+                    .padding(top = 16.dp)
                     .fillMaxWidth()
-                    .heightIn(min = 56.dp)
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
                     text = text,
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
+                    fontWeight = FontWeight.Bold
                 )
                 if (balance != Balance.AllPaid) {
-                    TextButton(onClick = onSettleUp) { Text("Settle up") }
+                    Button(onClick = onSettleUp, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)) {
+                        Text("Settle up", style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
         }
         detail.settleSuggestion?.let { receive ->
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-                    Text(
-                        text = "Possible settle up: ${receiveText(receive)}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onConfirmSettle) { Text("Confirm") }
-                        OutlinedButton(onClick = onDismissSettle) { Text("Not this") }
+                RepaymentCard(
+                    title = "Possible settle up",
+                    text = receiveText(receive),
+                    onConfirm = onConfirmSettle,
+                    onDismiss = onDismissSettle,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            }
+        }
+        item { SectionHeading("$name owes you", Modifier.padding(top = 24.dp)) }
+        if (detail.owedToMe.isEmpty()) {
+            item { NothingText() }
+        } else {
+            item {
+                ListGroup {
+                    detail.owedToMe.forEach { view ->
+                        item {
+                            DebtRow(
+                                view = view,
+                                onOpen = { onOpenDebt(view) },
+                                onMarkPaid = { onMarkDebtPaid(view) },
+                                onConfirm = { onConfirmDebt(view.debt.id) },
+                                onDismiss = { onDismissDebt(view.debt.id) }
+                            )
+                        }
                     }
                 }
             }
         }
-        item { SectionTitle("$name owes you") }
-        items(detail.owedToMe, key = { "debt-${it.debt.id}" }) { view ->
-            DebtRow(
-                view = view,
-                onOpen = { onOpenDebt(view) },
-                onMarkPaid = { onMarkDebtPaid(view) },
-                onConfirm = { onConfirmDebt(view.debt.id) },
-                onDismiss = { onDismissDebt(view.debt.id) }
-            )
+        item { AddButton("Add what $name owes me", onAddOwedToMe) }
+        item { SectionHeading("You owe $name", Modifier.padding(top = 16.dp)) }
+        if (detail.iOwe.isEmpty()) {
+            item { NothingText() }
+        } else {
+            item {
+                ListGroup {
+                    detail.iOwe.forEach { owed ->
+                        item {
+                            OwedItemRow(item = owed, onClick = { onEditItem(owed) }, onMarkPaid = { onMarkItemPaid(owed.id) })
+                        }
+                    }
+                }
+            }
         }
-        item {
-            TextButton(onClick = onAddOwedToMe) { Text("+ Add what $name owes me") }
-        }
-        item { SectionTitle("You owe $name") }
-        items(detail.iOwe, key = { "item-${it.id}" }) { item ->
-            OwedItemRow(item = item, onClick = { onEditItem(item) }, onMarkPaid = { onMarkItemPaid(item.id) })
-        }
-        item {
-            TextButton(onClick = onAddItem) { Text("+ Add what I owe") }
-        }
+        item { AddButton("Add what I owe", onAddItem) }
     }
 }
 
-/** The one bold element: the QR on a white card in a gold koban ring. Tap to add or replace it. */
+/** The QR on a white box with a gold frame. Tap to add or replace it. White stays white in the dark theme so the QR scans. */
 @Composable
 private fun KobanFrame(name: String, hasQr: Boolean, qr: QrLoad?, onClick: () -> Unit) {
-    val gold = LocalMoneyColors.current.gold
-    val card = RoundedCornerShape(24.dp)
+    val card = RoundedCornerShape(28.dp)
     Box(
         modifier = Modifier
-            .border(9.dp, gold.copy(alpha = 0.18f), RoundedCornerShape(33.dp))
-            .padding(9.dp)
+            .width(240.dp)
+            .clip(card)
+            .background(Color.White)
+            .border(6.dp, MaterialTheme.colorScheme.primary, card)
+            .clickable(onClickLabel = if (hasQr) "Replace QR" else "Add QR", role = Role.Button, onClick = onClick)
+            .padding(20.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .width(240.dp)
-                .clip(card)
-                .background(Color.White)
-                .border(4.dp, gold, card)
-                .clickable(onClickLabel = if (hasQr) "Replace QR" else "Add QR", role = Role.Button, onClick = onClick)
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            val bitmap = qr?.bitmap
-            when {
-                bitmap != null -> Image(
-                    bitmap = bitmap,
-                    contentDescription = "$name's payment QR",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(bitmap.width.toFloat() / bitmap.height)
+        val bitmap = qr?.bitmap
+        when {
+            bitmap != null -> Image(
+                bitmap = bitmap,
+                contentDescription = "$name's payment QR",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(bitmap.width.toFloat() / bitmap.height)
+            )
+            // Still loading: keep the square so the layout doesn't jump.
+            hasQr && qr == null -> Box(Modifier.fillMaxWidth().aspectRatio(1f))
+            else -> Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+                Text(
+                    text = if (hasQr) "Couldn't load the QR. Tap to pick it again." else "Add their payment QR",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.Black,
+                    textAlign = TextAlign.Center
                 )
-                // Still loading: keep the square so the layout doesn't jump.
-                hasQr && qr == null -> Box(Modifier.fillMaxWidth().aspectRatio(1f))
-                else -> Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = if (hasQr) "Couldn't load the QR. Tap to pick it again." else "Add their payment QR",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Ink,
-                        textAlign = TextAlign.Center
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Column {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)
-        )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+private fun NothingText() {
+    Text("Nothing.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun AddButton(text: String, onClick: () -> Unit) {
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        TextButton(onClick = onClick, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(text)
+        }
+    }
+}
+
+/** A possible match for a received payment: gold outline, Confirm (tonal) and Not this (text). */
+@Composable
+private fun RepaymentCard(title: String, text: String, onConfirm: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.primary, shape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+            TextButton(onClick = onDismiss, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) { Text("Not this") }
+            TonalButton("Confirm", onConfirm)
+        }
     }
 }
 
@@ -491,69 +531,55 @@ private fun DebtRow(
     onDismiss: () -> Unit
 ) {
     Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 56.dp)
-                    .clickable(onClickLabel = if (view.manual) "Edit" else "Open split", role = Role.Button, onClick = onOpen)
-                    .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(view.billMerchant ?: "Split bill", style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = personDate(view.billTime),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        KobanRow(
+            title = view.billMerchant ?: "Split bill",
+            subtitle = personDate(view.billTime),
+            trailing = {
+                MoneyAmount(
+                    amount = view.debt.amount,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = LocalMoneyColors.current.received
                 )
-            }
-            MoneyAmount(
-                amount = view.debt.amount,
-                style = MaterialTheme.typography.bodyLarge,
-                color = LocalMoneyColors.current.received
-            )
-            TextButton(onClick = onMarkPaid) { Text("Mark paid") }
-        }
+            },
+            onClick = onOpen,
+            onClickLabel = if (view.manual) "Edit" else "Open split"
+        )
+        MarkPaidButton(onMarkPaid)
         view.suggestedRepayment?.let { suggested ->
-            Text(
-                text = "Possible repayment: ${receiveText(suggested)}",
-                style = MaterialTheme.typography.bodyMedium
+            RepaymentCard(
+                title = "Possible repayment",
+                text = receiveText(suggested),
+                onConfirm = onConfirm,
+                onDismiss = onDismiss,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-                Button(onClick = onConfirm) { Text("Confirm") }
-                OutlinedButton(onClick = onDismiss) { Text("Not this") }
-            }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
 @Composable
 private fun OwedItemRow(item: OwedItemEntity, onClick: () -> Unit, onMarkPaid: () -> Unit) {
     Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .clickable(onClickLabel = "Edit", role = Role.Button, onClick = onClick)
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.description, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = personDate(item.itemDate),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        KobanRow(
+            title = item.description,
+            subtitle = personDate(item.itemDate),
+            trailing = {
+                MoneyAmount(
+                    amount = item.amount,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = LocalMoneyColors.current.goldText
                 )
-            }
-            MoneyAmount(
-                amount = item.amount,
-                style = MaterialTheme.typography.bodyLarge,
-                color = LocalMoneyColors.current.goldText
-            )
-            TextButton(onClick = onMarkPaid) { Text("Mark paid") }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            },
+            onClick = onClick,
+            onClickLabel = "Edit"
+        )
+        MarkPaidButton(onMarkPaid)
+    }
+}
+
+@Composable
+private fun MarkPaidButton(onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(end = 8.dp), horizontalArrangement = Arrangement.End) {
+        TextButton(onClick = onClick, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) { Text("Mark paid") }
     }
 }
