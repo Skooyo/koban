@@ -41,3 +41,7 @@ brag-output-*/
 
 # Receipt OCR benchmark data (third-party SROIE receipts, not ours to publish)
 receipt-bench/
+
+# Flutter build output
+koban/build/
+koban/.dart_tool/
