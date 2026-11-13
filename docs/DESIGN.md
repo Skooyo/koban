@@ -136,12 +136,9 @@ Check these 10 items before a screen ships. They follow Nielsen's 10 usability h
 
 ## Where this lives in the code
 
-The Compose theme is `app/src/main/java/com/expensetracker/app/ui/theme/Theme.kt`: `MoneyColors` for amounts and categories, and the Material color schemes. The rules above are the target. Two values in the code still differ from them:
+The Compose theme is `app/src/main/java/com/expensetracker/app/ui/theme/Theme.kt`: `MoneyColors` for amounts and categories, and the Material color schemes.
 
-- The Material `primary` color is blue (`#6EA8FF` dark). The target is `gold`, with `on-gold` text.
-- Entertainment uses gold. The target is `cat-fun` (green), so gold stays the action color.
-
-Change those in `Theme.kt` before you build new screens on top of them.
+- Done on 2026-11-13: primary is gold (dark) and `#7A5D00` with white text (light, because Material also uses primary for text buttons); Entertainment uses `MoneyColors.green`.
 
 ## Tokens
 

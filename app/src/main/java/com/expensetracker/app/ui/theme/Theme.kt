@@ -33,6 +33,7 @@ data class MoneyColors(
     val orange: Color,
     val purple: Color,
     val teal: Color,
+    val green: Color,
     val gold: Color,
     val goldText: Color,
     val custom: Color,
@@ -48,6 +49,7 @@ private val LightMoney = MoneyColors(
     orange = Color(0xFFF08A1C),
     purple = Color(0xFF7B4FD6),
     teal = Color(0xFF0E9C95),
+    green = Color(0xFF6E9A12),
     gold = Color(0xFFD8A31A),
     goldText = Color(0xFF8A6A00),
     custom = Color(0xFF4C5FD5),
@@ -63,6 +65,7 @@ private val DarkMoney = MoneyColors(
     orange = Color(0xFFFFA94D),
     purple = Color(0xFFA98BFF),
     teal = Color(0xFF3CC6C0),
+    green = Color(0xFFA8D45A),
     gold = Color(0xFFF2C94C),
     goldText = Color(0xFFF2C94C),
     custom = Color(0xFF8C9EFF),
@@ -81,7 +84,7 @@ fun categoryColor(categoryId: String?): Color {
         "transport" -> c.blue
         "shopping" -> c.purple
         "bills" -> c.orange
-        "entertainment" -> c.gold
+        "entertainment" -> c.green
         "health" -> c.teal
         "other" -> c.other
         null -> c.uncategorized
@@ -90,10 +93,10 @@ fun categoryColor(categoryId: String?): Color {
 }
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF1F5FD1),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCE6F5),
-    onPrimaryContainer = Color(0xFF12305E),
+    primary = Color(0xFF7A5D00),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFF2C94C),
+    onPrimaryContainer = Color(0xFF2A2106),
     secondary = Color(0xFF4A5A70),
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFDDE3EA),
@@ -115,10 +118,10 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF6EA8FF),
-    onPrimary = Color(0xFF0A2350),
-    primaryContainer = Color(0xFF22406F),
-    onPrimaryContainer = Color(0xFFD8E6FF),
+    primary = Color(0xFFF2C94C),
+    onPrimary = Color(0xFF2A2106),
+    primaryContainer = Color(0xFF3A3420),
+    onPrimaryContainer = Color(0xFFF2C94C),
     secondary = Color(0xFFB4C0D0),
     onSecondary = Color(0xFF1E2938),
     secondaryContainer = Color(0xFF33415A),
