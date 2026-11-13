@@ -195,7 +195,7 @@ private fun StatusCard(
         }
         Text(
             text = buildString {
-                append("Captured $totalCaptured · connected: ${listenerState.isConnected}")
+                append("Captured $totalCaptured · ${if (listenerState.isConnected) "listener connected" else "listener not connected"}")
                 listenerState.lastConnectedAt?.let { append(" · last connected ${formatTimestamp(it)}") }
             },
             style = MaterialTheme.typography.bodyMedium,

@@ -151,7 +151,7 @@ fun SettingsScreen(
                         item {
                             KobanRow(
                                 title = "Reconnect listener",
-                                subtitle = uiState.reconnectMessage
+                                subtitle = uiState.reconnectMessage?.let { "$it If an alert appears, tap it or open notification access settings." }
                                     ?: "Use this when payments stop showing up. It retries for about 60 seconds.",
                                 subtitleColor = if (uiState.reconnectMessage != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
                                 leading = { Icon(Icons.Default.Sync, contentDescription = null) },

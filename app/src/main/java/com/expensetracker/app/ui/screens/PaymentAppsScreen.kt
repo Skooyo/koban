@@ -2,15 +2,9 @@ package com.expensetracker.app.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.ui.draw.clip
-import com.expensetracker.app.ui.components.KobanRow
-import com.expensetracker.app.ui.components.ListGroup
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,13 +12,18 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,10 +35,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expensetracker.app.ui.components.KobanRow
 import com.expensetracker.app.ui.viewmodel.PaymentAppsViewModel
 
 /** Pick which installed apps Koban listens to. Save with none ticked is allowed. */
@@ -116,32 +117,33 @@ fun PaymentAppsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    } else {
-                        // ponytail: one non-lazy group composes every row; fine for a phone's app list, lazy items would break the single rounded group.
-                        item {
-                            ListGroup {
-                                shown.forEach { app ->
-                                    item {
-                                        val checked = app.packageName in state.selected
-                                        KobanRow(
-                                            title = app.label,
-                                            leading = {
-                                                if (app.icon != null) {
-                                                    Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(40.dp))
-                                                } else {
-                                                    Initials(app.label)
-                                                }
-                                            },
-                                            trailing = { Checkbox(checked = checked, onCheckedChange = null) },
-                                            modifier = Modifier.toggleable(
-                                                value = checked,
-                                                role = Role.Checkbox,
-                                                onValueChange = { viewModel.toggle(app.packageName) }
-                                            )
-                                        )
+                    }
+                    itemsIndexed(shown, key = { _, app -> app.packageName }) { i, app ->
+                        val checked = app.packageName in state.selected
+                        val shape = RoundedCornerShape(
+                            topStart = if (i == 0) 16.dp else 0.dp,
+                            topEnd = if (i == 0) 16.dp else 0.dp,
+                            bottomStart = if (i == shown.lastIndex) 16.dp else 0.dp,
+                            bottomEnd = if (i == shown.lastIndex) 16.dp else 0.dp
+                        )
+                        Column(Modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainer)) {
+                            if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            KobanRow(
+                                title = app.label,
+                                leading = {
+                                    if (app.icon != null) {
+                                        Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(40.dp))
+                                    } else {
+                                        Initials(app.label)
                                     }
-                                }
-                            }
+                                },
+                                trailing = { Checkbox(checked = checked, onCheckedChange = null) },
+                                modifier = Modifier.toggleable(
+                                    value = checked,
+                                    role = Role.Checkbox,
+                                    onValueChange = { viewModel.toggle(app.packageName) }
+                                )
+                            )
                         }
                     }
                 }
