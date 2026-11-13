@@ -10,11 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,7 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 
-/** Quiet one-line status when tracking works; a clear call to action when it does not. */
+/** Quiet one-line status when tracking works; a card with Mon and a "Turn on" button when it does not. */
 @Composable
 fun ListenerStatusBanner(
     isAccessGranted: Boolean,
@@ -46,7 +42,7 @@ fun ListenerStatusBanner(
                     .background(LocalMoneyColors.current.received)
             )
             Text(
-                text = "Tracking payment notifications",
+                text = "Tracking on",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -54,31 +50,33 @@ fun ListenerStatusBanner(
         return
     }
 
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Mon(MonFace.WORRY, 40.dp)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp)
         ) {
-            Icon(imageVector = Icons.Default.Warning, contentDescription = null)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp)
-            ) {
-                Text(text = "Tracking is off", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = "Turn on notification access so new payments are recorded.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-            TextButton(onClick = onEnableClick) {
-                Text("Turn on", color = MaterialTheme.colorScheme.onErrorContainer)
-            }
+            Text(
+                text = "Tracking is off",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Koban cannot read notifications.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        TextButton(onClick = onEnableClick) {
+            Text("Turn on", style = MaterialTheme.typography.labelLarge)
         }
     }
 }

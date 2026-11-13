@@ -3,7 +3,6 @@ package com.expensetracker.app.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,16 +26,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -70,12 +71,17 @@ import com.expensetracker.app.data.DefaultCategories
 import com.expensetracker.app.data.MonthNav
 import com.expensetracker.app.data.MonthSummary
 import com.expensetracker.app.data.WeekSummary
+import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.ui.components.CategoryDonut
+import com.expensetracker.app.ui.components.CategoryDot
+import com.expensetracker.app.ui.components.DonutSlice
+import com.expensetracker.app.ui.components.LargeTopBar
+import com.expensetracker.app.ui.components.ListGroup
 import com.expensetracker.app.ui.components.MoneyAmount
-import com.expensetracker.app.ui.components.NetSpendingTotal
-import com.expensetracker.app.ui.components.PeriodTotalRow
+import com.expensetracker.app.ui.components.MoneyText
 import com.expensetracker.app.ui.components.ReceivedNote
 import com.expensetracker.app.ui.components.RelativeBar
+import com.expensetracker.app.ui.components.SegmentedControl
 import com.expensetracker.app.ui.components.UNCATEGORIZED_FILTER
 import com.expensetracker.app.ui.components.expensesByDay
 import com.expensetracker.app.ui.theme.LocalMoneyColors
@@ -107,6 +113,8 @@ fun ActivityScreen(
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
     var filterSheetOpen by rememberSaveable { mutableStateOf(false) }
     val monthLabel = MonthNav.label(uiState.month)
+    val dayFormat = remember { SimpleDateFormat("d MMM", Locale.getDefault()) }
+    val selectedLabel = uiState.weeks.firstOrNull { it.startMs == uiState.selectedWeek }?.let { weekLabel(it, dayFormat) }
 
     // Clearing the message changes the key, so show it from a scope that outlives this effect.
     LaunchedEffect(message) {
@@ -117,93 +125,89 @@ fun ActivityScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 96.dp)
-        ) {
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Activity",
-                        style = MaterialTheme.typography.headlineMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                    FilterButton(
-                        filter = uiState.categoryFilter,
-                        names = uiState.categoryNames,
-                        onOpen = { filterSheetOpen = true },
-                        onClear = { viewModel.setCategoryFilter(null) }
-                    )
-                }
-                ViewSwitch(
-                    showAll = uiState.showAll,
-                    onShowAll = viewModel::setShowAll,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-                if (!uiState.showAll) {
-                    MonthBar(
-                        label = monthLabel,
-                        canGoNext = uiState.canGoNext,
-                        onPrevious = viewModel::previousMonth,
-                        onNext = viewModel::nextMonth,
-                        onPick = { sheetOpen = true },
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    val dayFormat = remember { SimpleDateFormat("d MMM", Locale.getDefault()) }
-                    val selectedLabel = uiState.weeks.firstOrNull { it.startMs == uiState.selectedWeek }?.let { weekLabel(it, dayFormat) }
-                    NetSpendingTotal(
-                        total = uiState.monthTotal,
-                        large = true,
-                        label = if (selectedLabel != null) "Spent, $selectedLabel" else "Spent",
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    ReceivedNote(received = uiState.monthReceived)
-                    WeekStrip(
-                        weeks = uiState.weeks,
-                        selected = uiState.selectedWeek,
-                        onToggle = viewModel::toggleWeek,
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                    CategoryDonut(
-                        slices = uiState.slices,
-                        onSelect = { viewModel.setCategoryFilter(it.categoryId ?: UNCATEGORIZED_FILTER) },
-                        modifier = Modifier.padding(top = 12.dp),
-                        compact = true,
-                        onRingClick = { filterSheetOpen = true }
-                    )
-                }
-            }
-            if (uiState.showAll) {
-                val groups = allMonths
-                if (groups != null && groups.isEmpty()) {
-                    item {
-                        EmptyText(if (uiState.categoryFilter != null) "No payments in this category." else "No payments yet.")
+        Column(Modifier.fillMaxSize()) {
+            LargeTopBar(
+                title = "Activity",
+                actions = { FilterButton(onOpen = { filterSheetOpen = true }) }
+            )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 112.dp)
+            ) {
+                item {
+                    Column {
+                        SegmentedControl(
+                            labels = listOf("Month", "All"),
+                            selectedIndex = if (uiState.showAll) 1 else 0,
+                            onPick = { viewModel.setShowAll(it == 1) }
+                        )
+                        uiState.categoryFilter?.let { filter ->
+                            FilterChip(
+                                name = uiState.categoryNames[filter] ?: DefaultCategories.UNCATEGORIZED_NAME,
+                                total = uiState.monthTotal.takeIf { !uiState.showAll },
+                                period = selectedLabel ?: monthLabel,
+                                onClear = { viewModel.setCategoryFilter(null) },
+                                modifier = Modifier.padding(top = 12.dp)
+                            )
+                        }
+                        if (!uiState.showAll) {
+                            MonthBar(
+                                label = monthLabel,
+                                canGoNext = uiState.canGoNext,
+                                onPrevious = viewModel::previousMonth,
+                                onNext = viewModel::nextMonth,
+                                onPick = { sheetOpen = true },
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            ChartCard(
+                                slices = uiState.slices,
+                                label = if (selectedLabel != null) "Spent, $selectedLabel" else "Spent",
+                                total = uiState.monthTotal,
+                                received = uiState.monthReceived,
+                                onRingClick = { filterSheetOpen = true },
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            WeekStrip(
+                                weeks = uiState.weeks,
+                                selected = uiState.selectedWeek,
+                                onToggle = viewModel::toggleWeek,
+                                modifier = Modifier.padding(top = 12.dp)
+                            )
+                        }
                     }
                 }
-                groups?.forEach { group ->
-                    stickyHeader(key = "month-${group.month}") { MonthHeader(group) }
+                if (uiState.showAll) {
+                    val groups = allMonths
+                    if (groups != null && groups.isEmpty()) {
+                        item {
+                            EmptyText(if (uiState.categoryFilter != null) "No payments in this category." else "No payments yet.")
+                        }
+                    }
+                    groups?.forEach { group ->
+                        stickyHeader(key = "month-${group.month}") { MonthHeader(group) }
+                        expensesByDay(
+                            expenses = group.expenses,
+                            categoryName = { viewModel.categoryNameFor(it, uiState.categoryNames) },
+                            onEdit = { onEditPayment(it.id) }
+                        )
+                    }
+                } else if (uiState.expenses.isEmpty()) {
+                    item {
+                        EmptyText(
+                            when {
+                                uiState.categoryFilter != null -> "No payments in this category."
+                                uiState.selectedWeek != null -> "No payments in this week."
+                                else -> "No payments in $monthLabel."
+                            }
+                        )
+                    }
+                } else {
                     expensesByDay(
-                        expenses = group.expenses,
+                        expenses = uiState.expenses,
                         categoryName = { viewModel.categoryNameFor(it, uiState.categoryNames) },
                         onEdit = { onEditPayment(it.id) }
                     )
                 }
-            } else if (uiState.expenses.isEmpty()) {
-                item {
-                    EmptyText(
-                        when {
-                            uiState.categoryFilter != null -> "No payments in this category."
-                            uiState.selectedWeek != null -> "No payments in this week."
-                            else -> "No payments in $monthLabel."
-                        }
-                    )
-                }
-            } else {
-                expensesByDay(
-                    expenses = uiState.expenses,
-                    categoryName = { viewModel.categoryNameFor(it, uiState.categoryNames) },
-                    onEdit = { onEditPayment(it.id) }
-                )
             }
         }
         AddPaymentFab(
@@ -217,12 +221,15 @@ fun ActivityScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 80.dp)
-        )
+        ) { data ->
+            Snackbar(data, modifier = Modifier.padding(horizontal = 16.dp), shape = RoundedCornerShape(16.dp))
+        }
     }
 
     if (sheetOpen) {
         MonthSheet(
             months = sheetMonths,
+            current = uiState.month,
             onPick = viewModel::pickMonth,
             onDismiss = { sheetOpen = false }
         )
@@ -241,67 +248,100 @@ fun ActivityScreen(
 
 private fun filterColorId(filter: String): String? = if (filter == UNCATEGORIZED_FILTER) null else filter
 
-/** "Filter" pill; with a filter on, the category's dot and name (opens the sheet) and a ✕ that clears it. */
+private fun rm(amount: BigDecimal) = "${AmountFormatter.currencySymbol("MYR")} ${AmountFormatter.formatGrouped(amount)}"
+
+/** Outlined "Filter" button; opens the category sheet. */
 @Composable
-private fun FilterButton(
-    filter: String?,
-    names: Map<String, String>,
-    onOpen: () -> Unit,
-    onClear: () -> Unit
-) {
-    if (filter == null) {
+private fun FilterButton(onOpen: () -> Unit) {
+    Surface(
+        onClick = onOpen,
+        shape = CircleShape,
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .semantics { contentDescription = "Filter by category" }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.FilterList, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text("Filter", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
+        }
+    }
+}
+
+/** The category now shown: a gold-soft chip that clears the filter, and what was spent in it. */
+@Composable
+private fun FilterChip(name: String, total: BigDecimal?, period: String, onClear: () -> Unit, modifier: Modifier = Modifier) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(
-            onClick = onOpen,
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            onClick = onClear,
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.primaryContainer,
             modifier = Modifier
                 .heightIn(min = 48.dp)
-                .semantics { contentDescription = "Filter by category" }
+                .widthIn(max = 200.dp)
+                .semantics { contentDescription = "Filtered by $name. Clear filter" }
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.FilterList, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("Filter", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
-            }
-        }
-        return
-    }
-    val name = names[filter] ?: DefaultCategories.UNCATEGORIZED_NAME
-    val color = categoryColor(filterColorId(filter))
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(2.dp, color)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .widthIn(max = 200.dp)
-                    .clickable(role = Role.Button, onClickLabel = "Pick a category", onClick = onOpen)
-                    .padding(start = 14.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+            Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text(
                     text = name,
                     style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clickable(role = Role.Button, onClick = onClear)
-                    .semantics { contentDescription = "Filtered by $name. Clear filter" },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("✕", style = MaterialTheme.typography.labelLarge)
+        }
+        if (total != null) {
+            Row(Modifier.weight(1f, fill = false)) {
+                MoneyAmount(amount = total, style = MaterialTheme.typography.bodyMedium, color = muted)
+                Text(" $period", style = MaterialTheme.typography.bodyMedium, color = muted, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** Ring, "Spent" and the big total, and the money received, in one card. */
+@Composable
+private fun ChartCard(
+    slices: List<DonutSlice>,
+    label: String,
+    total: BigDecimal,
+    received: BigDecimal,
+    onRingClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        CategoryDonut(slices = slices, onClick = onRingClick)
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            MoneyText(
+                rm(total),
+                Modifier.padding(top = 4.dp),
+                style = MaterialTheme.typography.displayMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (received > BigDecimal.ZERO) {
+                MoneyText(
+                    "+ ${rm(received)} received",
+                    Modifier.padding(top = 4.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = LocalMoneyColors.current.received
+                )
             }
         }
     }
@@ -337,13 +377,15 @@ private fun CategoryFilterSheet(
             modifier = Modifier
                 .navigationBarsPadding()
                 .selectableGroup(),
-            contentPadding = PaddingValues(horizontal = 24.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp)
         ) {
-            item(key = "all") {
-                FilterOptionRow(null, "All categories", totals.total, selected == null) { pick(null) }
-            }
-            items(options, key = { it.first }) { (id, name) ->
-                FilterOptionRow(categoryColor(filterColorId(id)), name, spent[id], selected == id) { pick(id) }
+            item {
+                ListGroup {
+                    item { FilterOptionRow(null, "All categories", totals.total, selected == null) { pick(null) } }
+                    options.forEach { (id, name) ->
+                        item { FilterOptionRow(categoryColor(filterColorId(id)), name, spent[id], selected == id) { pick(id) } }
+                    }
+                }
             }
         }
     }
@@ -355,15 +397,14 @@ private fun FilterOptionRow(dot: Color?, name: String, total: BigDecimal?, selec
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(dot ?: Color.Transparent)
-        )
+        Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+            if (dot != null) CategoryDot(dot)
+            else Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Text(
             text = name,
             style = MaterialTheme.typography.bodyLarge,
@@ -385,22 +426,22 @@ private fun FilterOptionRow(dot: Color?, name: String, total: BigDecimal?, selec
             )
         }
         Box(modifier = Modifier.padding(start = 8.dp).size(24.dp), contentAlignment = Alignment.Center) {
-            if (selected) Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            if (selected) Icon(Icons.Default.Check, contentDescription = null, tint = LocalMoneyColors.current.goldText)
         }
     }
 }
 
-/** Gold "＋ Add" button with dark ink text, as the payment page's bottom button. */
+/** The one gold action of Home and Activity: add icon and "Add payment". */
 @Composable
 internal fun AddPaymentFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ExtendedFloatingActionButton(
         onClick = onClick,
         modifier = modifier,
-        containerColor = LocalMoneyColors.current.gold,
-        contentColor = Ink
-    ) {
-        Text("＋ Add", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    }
+        icon = { Icon(Icons.Default.Add, contentDescription = null) },
+        text = { Text("Add payment", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary
+    )
 }
 
 @Composable
@@ -411,22 +452,6 @@ private fun EmptyText(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 24.dp)
     )
-}
-
-/** "Month" | "All" pill switch, styled as the payment page's Expense/Income switch. */
-@Composable
-private fun ViewSwitch(showAll: Boolean, onShowAll: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(4.dp)
-            .selectableGroup()
-    ) {
-        TypeSegment("Month", !showAll, MaterialTheme.colorScheme.inverseSurface) { onShowAll(false) }
-        TypeSegment("All", showAll, MaterialTheme.colorScheme.inverseSurface) { onShowAll(true) }
-    }
 }
 
 /** Sticky month header of the All view: month name and that month's spent total. */
@@ -495,32 +520,49 @@ private fun WeekStrip(
     val listState = rememberLazyListState()
     LaunchedEffect(selected, weeks) {
         val index = weeks.indexOfFirst { it.startMs == selected }
-        if (index >= 0) listState.animateScrollToItem(index)
+        if (index >= 0) listState.animateScrollToItem(index + 1)
     }
     LazyRow(modifier = modifier, state = listState, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item(key = "whole-month") {
+            PeriodChip(selected == null, onClick = { selected?.let(onToggle) }) {
+                Text("Whole month", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            }
+        }
         items(weeks, key = { it.startMs }) { week ->
             val isSelected = week.startMs == selected
-            Surface(
-                selected = isSelected,
-                onClick = { onToggle(week.startMs) },
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = if (isSelected) {
-                    BorderStroke(2.dp, LocalMoneyColors.current.gold)
-                } else {
-                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                },
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            PeriodChip(isSelected, onClick = { onToggle(week.startMs) }) {
+                Column {
                     Text(
                         text = weekLabel(week, dayFormat),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    MoneyAmount(amount = week.total, style = MaterialTheme.typography.titleSmall)
+                    MoneyAmount(
+                        amount = week.total,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
+        }
+    }
+}
+
+/** Chip of the week strip: gold-soft with a check when chosen, outlined when not. */
+@Composable
+private fun PeriodChip(selected: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
+    Surface(
+        selected = selected,
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+        border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.heightIn(min = 48.dp)
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (selected) Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.padding(end = 8.dp).size(18.dp))
+            content()
         }
     }
 }
@@ -529,6 +571,7 @@ private fun WeekStrip(
 @Composable
 private fun MonthSheet(
     months: List<MonthSummary>,
+    current: YearMonth,
     onPick: (YearMonth) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -543,22 +586,43 @@ private fun MonthSheet(
         )
         LazyColumn(
             modifier = Modifier.navigationBarsPadding(),
-            contentPadding = PaddingValues(horizontal = 24.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp)
         ) {
-            items(months, key = { "${it.year}-${it.month}" }) { month ->
-                val yearMonth = YearMonth.of(month.year, month.month + 1)
-                PeriodTotalRow(
-                    title = MonthNav.label(yearMonth),
-                    subtitle = null,
-                    total = month.total,
-                    onClick = {
-                        onPick(yearMonth)
-                        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+            item {
+                ListGroup {
+                    months.forEach { month ->
+                        val yearMonth = YearMonth.of(month.year, month.month + 1)
+                        val isCurrent = yearMonth == current
+                        item {
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .selectable(selected = isCurrent, role = Role.RadioButton) {
+                                        onPick(yearMonth)
+                                        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                                    }
+                                    .heightIn(min = 56.dp)
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = MonthNav.label(yearMonth),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = if (isCurrent) LocalMoneyColors.current.goldText else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    MoneyAmount(amount = month.total, style = MaterialTheme.typography.bodyLarge)
+                                }
+                                RelativeBar(
+                                    total = month.total,
+                                    max = largest,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
-                ) {
-                    RelativeBar(total = month.total, max = largest)
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
     }

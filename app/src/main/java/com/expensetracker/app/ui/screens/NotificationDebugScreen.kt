@@ -1,7 +1,17 @@
 package com.expensetracker.app.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,11 +22,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -30,9 +38,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -42,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.listener.CapturedNotification
 import com.expensetracker.app.listener.NotificationCaptureEvent
 import com.expensetracker.app.listener.NotificationDisposition
+import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.viewmodel.NotificationDebugFilter
 import com.expensetracker.app.ui.viewmodel.NotificationDebugViewModel
 import java.text.SimpleDateFormat
@@ -98,38 +108,12 @@ fun NotificationDebugScreen(
                     isAccessGranted = uiState.isAccessGranted,
                     isServiceConnected = uiState.isServiceConnected,
                     listenerState = uiState.listenerState,
-                    totalCaptured = uiState.notifications.size
+                    totalCaptured = uiState.notifications.size,
+                    refreshMessage = uiState.refreshMessage,
+                    onReconnect = viewModel::reconnectListener,
+                    onSnapshot = viewModel::snapshotActiveNotifications,
+                    onClear = viewModel::clearLog
                 )
-            }
-
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = viewModel::reconnectListener,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Reconnect listener")
-                    }
-                    OutlinedButton(
-                        onClick = viewModel::snapshotActiveNotifications,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Snapshot active notifications")
-                    }
-                    OutlinedButton(
-                        onClick = viewModel::clearLog,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Clear log")
-                    }
-                    uiState.refreshMessage?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
             }
 
             item {
@@ -171,57 +155,76 @@ fun NotificationDebugScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StatusCard(
     isAccessGranted: Boolean,
     isServiceConnected: Boolean,
     listenerState: com.expensetracker.app.listener.ListenerDebugState,
-    totalCaptured: Int
+    totalCaptured: Int,
+    refreshMessage: String?,
+    onReconnect: () -> Unit,
+    onSnapshot: () -> Unit,
+    onClear: () -> Unit
 ) {
     val healthy = isAccessGranted && isServiceConnected
-    val containerColor = if (healthy) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
-    val contentColor = if (healthy) Color(0xFF2E7D32) else Color(0xFFE65100)
+    val statusColor = if (healthy) LocalMoneyColors.current.received else LocalMoneyColors.current.review
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = containerColor)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            androidx.compose.foundation.layout.Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = if (healthy) Icons.Default.CheckCircle else Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = contentColor
-                )
-                Text(
-                    text = when {
-                        !isAccessGranted -> "Notification access not granted"
-                        !isServiceConnected -> "Access granted, listener not connected"
-                        else -> "Listener active"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = contentColor
-                )
-            }
+            Box(Modifier.size(10.dp).clip(CircleShape).background(statusColor))
             Text(
-                text = "Captured: $totalCaptured · Connected: ${listenerState.isConnected}",
-                style = MaterialTheme.typography.bodySmall,
-                color = contentColor
+                text = when {
+                    !isAccessGranted -> "Notification access not granted"
+                    !isServiceConnected -> "Access granted, listener not connected"
+                    else -> "Listener active"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
-            listenerState.lastConnectedAt?.let {
-                Text(
-                    text = "Last connected: ${formatTimestamp(it)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = contentColor
-                )
+        }
+        Text(
+            text = buildString {
+                append("Captured $totalCaptured · ${if (listenerState.isConnected) "listener connected" else "listener not connected"}")
+                listenerState.lastConnectedAt?.let { append(" · last connected ${formatTimestamp(it)}") }
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            OutlinedButton(onClick = onReconnect, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
+                Text("Reconnect listener")
             }
+            OutlinedButton(onClick = onSnapshot, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
+                Text("Snapshot")
+            }
+            TextButton(
+                onClick = onClear,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Clear log")
+            }
+        }
+        refreshMessage?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
@@ -231,65 +234,78 @@ private fun CapturedNotificationCard(
     notification: CapturedNotification,
     onMarkAsPayment: (CapturedNotification) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = notification.packageName,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = notification.disposition.label(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = notification.disposition.color()
-                )
-            }
             Text(
-                text = "${notification.event.label()} · ${formatTimestamp(notification.capturedAt)}",
+                text = "${notification.packageName} · ${notification.event.label()} · ${formatTimestamp(notification.capturedAt)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            StatusBadge(notification.disposition.label(), notification.disposition.color())
+        }
+        notification.title?.let { title ->
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Text(
+            text = notification.body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        notification.detail?.let { detail ->
+            Text(
+                text = detail,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            notification.title?.let { title ->
-                Text(
-                    text = "Title: $title",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-            Text(
-                text = notification.body,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            notification.detail?.let { detail ->
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Text(
-                text = "Posted: ${formatTimestamp(notification.postTime)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            // Any logged notification the app did not turn into a card: skipped, missed or only seen in the tray.
-            if (notification.disposition != NotificationDisposition.WAITING &&
-                notification.disposition != NotificationDisposition.PENDING
+        }
+        Text(
+            text = "Posted ${formatTimestamp(notification.postTime)}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        // Any logged notification the app did not turn into a card: skipped, missed or only seen in the tray.
+        if (notification.disposition != NotificationDisposition.WAITING &&
+            notification.disposition != NotificationDisposition.PENDING
+        ) {
+            TextButton(
+                onClick = { onMarkAsPayment(notification) },
+                modifier = Modifier.align(Alignment.End).defaultMinSize(minHeight = 48.dp)
             ) {
-                OutlinedButton(onClick = { onMarkAsPayment(notification) }) {
-                    Text("Add as payment")
-                }
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Add as payment")
             }
         }
     }
+}
+
+/** Outlined status badge: label and outline share one color. */
+@Composable
+private fun StatusBadge(text: String, color: Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        modifier = Modifier
+            .border(1.dp, color, CircleShape)
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    )
 }
 
 private fun NotificationDebugFilter.label(): String = when (this) {
@@ -308,7 +324,7 @@ private fun NotificationCaptureEvent.label(): String = when (this) {
 private fun NotificationDisposition.label(): String = when (this) {
     NotificationDisposition.PENDING -> "Pending"
     NotificationDisposition.WAITING -> "Waiting for check"
-    NotificationDisposition.SKIPPED_ALLOWLIST -> "Allowlist"
+    NotificationDisposition.SKIPPED_ALLOWLIST -> "Not a payment app"
     NotificationDisposition.SKIPPED_NO_RULE -> "No rule matched"
     NotificationDisposition.SKIPPED_DUPLICATE -> "Duplicate"
     NotificationDisposition.SKIPPED_GROUP_SUMMARY -> "Group"
@@ -319,10 +335,10 @@ private fun NotificationDisposition.label(): String = when (this) {
 
 @Composable
 private fun NotificationDisposition.color(): Color = when (this) {
-    NotificationDisposition.WAITING -> Color(0xFF2E7D32)
+    NotificationDisposition.WAITING -> LocalMoneyColors.current.review
+    NotificationDisposition.SKIPPED_NO_RULE, NotificationDisposition.SKIPPED_ERROR -> MaterialTheme.colorScheme.error
     NotificationDisposition.PENDING -> MaterialTheme.colorScheme.primary
-    NotificationDisposition.INFO_ONLY -> MaterialTheme.colorScheme.onSurfaceVariant
-    else -> Color(0xFFE65100)
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 private fun formatTimestamp(ms: Long): String {

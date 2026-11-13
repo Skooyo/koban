@@ -42,7 +42,7 @@ import java.math.RoundingMode
 
 /**
  * Money with a small currency symbol. A negative [amount] means money received:
- * it shows as "+RM" in the received colour.
+ * it shows as "+ RM" in the received colour.
  */
 @Composable
 fun MoneyAmount(
@@ -57,7 +57,7 @@ fun MoneyAmount(
     val symbolColor = MaterialTheme.colorScheme.onSurfaceVariant
     Text(
         text = buildAnnotatedString {
-            if (received) append("+")
+            if (received) append("+ ")
             withStyle(SpanStyle(fontSize = style.fontSize * symbolScale, color = symbolColor)) {
                 append(AmountFormatter.currencySymbol(currency))
                 append(" ")
@@ -127,100 +127,9 @@ fun NoteStrip(
     }
 }
 
-/** The large total at the top of Home. Tap opens the transactions for the period. */
-@Composable
-fun PeriodHero(
-    summary: PeriodSummary,
-    onOpen: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClickLabel = "Open transactions", onClick = onOpen)
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = summary.title, style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = summary.subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 10.dp)
-            )
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Column {
-            MoneyAmount(
-                amount = summary.total,
-                style = MaterialTheme.typography.displayLarge,
-                symbolScale = 0.4f
-            )
-            ReceivedNote(received = summary.received, modifier = Modifier.padding(top = 4.dp))
-        }
-        NoteStrip(breakdown = summary.breakdown)
-        if (summary.breakdown.isEmpty()) {
-            Text(
-                text = "No payments recorded yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            CategoryBreakdownList(breakdown = summary.breakdown)
-        }
-    }
-}
-
-/** One tappable period with its total, e.g. a week or a month. [below] draws under the total. */
-@Composable
-fun PeriodTotalRow(
-    title: String,
-    subtitle: String?,
-    total: BigDecimal,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    below: @Composable () -> Unit = {}
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.titleMedium)
-                subtitle?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            MoneyAmount(amount = total, style = MaterialTheme.typography.titleLarge)
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp)
-            )
-        }
-        below()
-    }
-}
-
 /** Thin bar that compares [total] with the largest total in a list. */
 @Composable
-fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifier) {
+fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.primary) {
     val fraction = if (max == null || max <= BigDecimal.ZERO || total <= BigDecimal.ZERO) {
         0f
     } else {
@@ -237,7 +146,7 @@ fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifi
             Modifier
                 .fillMaxWidth(fraction)
                 .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.primary)
+                .background(color)
         )
     }
 }
@@ -247,30 +156,9 @@ fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifi
 fun ReceivedNote(received: BigDecimal, modifier: Modifier = Modifier) {
     if (received <= BigDecimal.ZERO) return
     Text(
-        text = "+${AmountFormatter.currencySymbol("MYR")} ${AmountFormatter.formatGrouped(received)} received",
+        text = "+ ${AmountFormatter.currencySymbol("MYR")} ${AmountFormatter.formatGrouped(received)} received",
         style = MaterialTheme.typography.bodyMedium,
         color = LocalMoneyColors.current.received,
         modifier = modifier
     )
-}
-
-@Composable
-fun NetSpendingTotal(
-    total: BigDecimal,
-    modifier: Modifier = Modifier,
-    large: Boolean = false,
-    label: String = "Spent"
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        MoneyAmount(
-            amount = total,
-            style = if (large) MaterialTheme.typography.displayMedium else MaterialTheme.typography.displaySmall,
-            symbolScale = 0.45f
-        )
-    }
 }

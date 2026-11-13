@@ -1,50 +1,43 @@
 package com.expensetracker.app.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.draw.clip
+import com.expensetracker.app.ui.components.DialogTextField
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -52,12 +45,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.data.Balance
 import com.expensetracker.app.data.PeopleMath
 import com.expensetracker.app.data.PersonSummary
+import com.expensetracker.app.ui.components.InitialsAvatar
+import com.expensetracker.app.ui.components.KobanRow
+import com.expensetracker.app.ui.components.LargeTopBar
+import com.expensetracker.app.ui.components.ListGroup
+import com.expensetracker.app.ui.components.SectionHeading
+import com.expensetracker.app.ui.components.TonalButton
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.viewmodel.PeopleViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-
-internal val Ink = Color(0xFF1B2430)
 
 private fun groupTitle(group: PeopleMath.Group) = when (group) {
     PeopleMath.Group.YOU_OWE -> "You owe"
@@ -65,7 +62,6 @@ private fun groupTitle(group: PeopleMath.Group) = when (group) {
     PeopleMath.Group.OTHERS -> "Everyone else"
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PeopleScreen(
     onOpenPerson: (String) -> Unit,
@@ -86,21 +82,6 @@ fun PeopleScreen(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
-        topBar = {
-            TopAppBar(
-                windowInsets = WindowInsets(0),
-                title = {
-                    Column {
-                        Text("People")
-                        Text(
-                            text = "Their payment QRs, and what you owe each other",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            )
-        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
@@ -108,10 +89,10 @@ fun PeopleScreen(
                     addError = null
                     adding = true
                 },
-                containerColor = money.gold,
-                contentColor = Ink,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Add person") }
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                icon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
+                text = { Text("Add person", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
             )
         }
     ) { padding ->
@@ -119,19 +100,33 @@ fun PeopleScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp)
+            contentPadding = PaddingValues(bottom = 112.dp)
         ) {
             item {
-                OutlinedButton(onClick = onSplitBill, modifier = Modifier.padding(bottom = 12.dp)) {
-                    Text("Split a bill")
-                }
-                OutlinedTextField(
+                LargeTopBar(
+                    "People",
+                    subtitle = "Payment QRs, and what you owe each other"
+                )
+                TextField(
                     value = query,
                     onValueChange = viewModel::setQuery,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     placeholder = { Text("Search people") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    singleLine = true
+                    singleLine = true,
+                    shape = CircleShape,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    )
+                )
+                TonalButton(
+                    text = "Split a bill",
+                    onClick = onSplitBill,
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                    icon = Icons.Default.Receipt
                 )
             }
             if (sections.isEmpty()) {
@@ -141,52 +136,55 @@ fun PeopleScreen(
                         else "Nobody matches that search.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 16.dp)
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
                     )
                 }
             }
             sections.forEach { (group, people) ->
                 item(key = "group-$group") {
-                    Text(
-                        text = groupTitle(group),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)
-                    )
-                }
-                items(people, key = { "person-${it.person.id}" }) { summary ->
-                    PersonRow(
-                        summary = summary,
-                        avatarColor = avatarColors[Math.floorMod(summary.person.id.hashCode(), avatarColors.size)],
-                        onClick = { onOpenPerson(summary.person.id) }
-                    )
+                    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp)) {
+                        SectionHeading(groupTitle(group))
+                        ListGroup {
+                            people.forEach { summary ->
+                                item(key = summary.person.id) {
+                                    PersonRow(
+                                        summary = summary,
+                                        avatarColor = avatarColors[Math.floorMod(summary.person.id.hashCode(), avatarColors.size)],
+                                        onClick = { onOpenPerson(summary.person.id) }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
             if (bills.isNotEmpty()) {
                 item {
-                    Text(
-                        text = "Past splits",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 24.dp)
-                    )
+                    SectionHeading("Past splits", Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp))
                 }
-                items(bills, key = { "bill-${it.id}" }) { bill ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .clickable(onClickLabel = "Open", role = Role.Button) { onOpenSplit(bill.id) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = bill.merchant ?: "Split bill",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = personDate(bill.billTime),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                itemsIndexed(bills, key = { _, bill -> bill.id }) { i, bill ->
+                    val first = i == 0
+                    val last = i == bills.lastIndex
+                    val shape = RoundedCornerShape(
+                        topStart = if (first) 16.dp else 0.dp,
+                        topEnd = if (first) 16.dp else 0.dp,
+                        bottomStart = if (last) 16.dp else 0.dp,
+                        bottomEnd = if (last) 16.dp else 0.dp
+                    )
+                    Column(Modifier.padding(horizontal = 16.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainer)) {
+                        if (!first) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        KobanRow(
+                            title = bill.merchant ?: "Split bill",
+                            trailing = {
+                                Text(
+                                    text = personDate(bill.billTime),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            showChevron = true,
+                            onClick = { onOpenSplit(bill.id) },
+                            onClickLabel = "Open"
                         )
                     }
                 }
@@ -196,19 +194,20 @@ fun PeopleScreen(
 
     if (adding) {
         AlertDialog(
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             onDismissRequest = { adding = false },
             title = { Text("Add person") },
             text = {
-                OutlinedTextField(
+                DialogTextField(
                     value = newName,
                     onValueChange = {
                         newName = it
                         addError = null
                     },
-                    label = { Text("Name") },
-                    singleLine = true,
+                    label = "Name",
                     isError = addError != null,
-                    supportingText = addError?.let { message -> { Text(message) } },
+                    supportingText = addError,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
                 )
             },
@@ -244,38 +243,16 @@ private fun PersonRow(summary: PersonSummary, avatarColor: Color, onClick: () ->
         is Balance.PaysYou -> money.received
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .clickable(onClickLabel = "Open", role = Role.Button, onClick = onClick)
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clearAndSetSemantics {}
-                    .background(avatarColor, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = name.trim().take(1).uppercase(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (avatarColor.luminance() > 0.18f) Ink else Color.White
-                )
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = PeopleMath.statusLine(name, summary.balance, summary.person.qrPath != null),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = statusColor
-                )
-            }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-    }
+    KobanRow(
+        title = name,
+        subtitle = PeopleMath.statusLine(name, summary.balance, summary.person.qrPath != null),
+        subtitleColor = statusColor,
+        leading = {
+            // A tint of the color of the person under normal text keeps the initial readable in light and dark.
+            InitialsAvatar(name, tint = avatarColor)
+        },
+        showChevron = true,
+        onClick = onClick,
+        onClickLabel = "Open"
+    )
 }

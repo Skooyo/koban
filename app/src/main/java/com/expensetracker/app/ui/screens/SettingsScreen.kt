@@ -1,23 +1,29 @@
 package com.expensetracker.app.ui.screens
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,8 +40,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -43,7 +52,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.BuildConfig
+import com.expensetracker.app.ui.components.CategoryDot
+import com.expensetracker.app.ui.components.KobanRow
+import com.expensetracker.app.ui.components.ListGroup
 import com.expensetracker.app.ui.components.ListenerStatusBanner
+import com.expensetracker.app.ui.components.SectionHeading
+import com.expensetracker.app.ui.components.TonalButton
+import com.expensetracker.app.ui.theme.categoryColor
 import com.expensetracker.app.ui.viewmodel.AppViewModel
 import com.expensetracker.app.ui.viewmodel.SettingsViewModel
 import com.expensetracker.app.update.UpdateState
@@ -60,7 +75,10 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val darkMode by appViewModel.darkModeEnabled.collectAsStateWithLifecycle()
+    val online by viewModel.onlineFeatures.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     var newCategoryName by remember { mutableStateOf("") }
+    var codeInput by remember { mutableStateOf("") }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -93,113 +111,190 @@ fun SettingsScreen(
                 .padding(padding)
                 .fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             item {
-                ListenerStatusBanner(
-                    isAccessGranted = uiState.isAccessGranted,
-                    onEnableClick = viewModel::openNotificationSettings
-                )
-            }
-
-            item {
-                Button(
-                    onClick = onOpenNotificationDebug,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = if (uiState.capturedNotificationCount > 0) {
-                            "View notification log (${uiState.capturedNotificationCount})"
-                        } else {
-                            "View notification log"
+                Column {
+                    SectionHeading("Tracking")
+                    ListenerStatusBanner(
+                        isAccessGranted = uiState.isAccessGranted,
+                        onEnableClick = viewModel::openNotificationSettings
+                    )
+                    ListGroup(Modifier.padding(top = 8.dp)) {
+                        item {
+                            val count = uiState.allowlistedPackages.size
+                            KobanRow(
+                                title = "Payment apps",
+                                subtitle = when (count) {
+                                    0 -> "None chosen. Koban listens to no app."
+                                    1 -> "1 app chosen"
+                                    else -> "$count apps chosen"
+                                },
+                                leading = { Icon(Icons.AutoMirrored.Filled.ListAlt, contentDescription = null) },
+                                showChevron = true,
+                                onClick = onOpenPaymentApps
+                            )
                         }
-                    )
-                }
-                Text(
-                    text = "Lists every notification the listener receives, with save/skip reasons.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-
-            item {
-                Button(
-                    onClick = viewModel::reconnectListener,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Reconnect listener")
-                }
-                Text(
-                    text = "Runs reconnect attempts for ~60 seconds. If an alert appears, tap it or open notification access settings.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                uiState.reconnectMessage?.let { message ->
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                        item {
+                            KobanRow(
+                                title = "Notification log",
+                                subtitle = if (uiState.capturedNotificationCount > 0) {
+                                    "${uiState.capturedNotificationCount} notifications captured"
+                                } else {
+                                    "Every notification the listener receives, with save and skip reasons"
+                                },
+                                leading = { Icon(Icons.Default.BugReport, contentDescription = null) },
+                                showChevron = true,
+                                onClick = onOpenNotificationDebug
+                            )
+                        }
+                        item {
+                            KobanRow(
+                                title = "Reconnect listener",
+                                subtitle = uiState.reconnectMessage?.let { "$it If an alert appears, tap it or open notification access settings." }
+                                    ?: "Use this when payments stop showing up. It retries for about 60 seconds.",
+                                subtitleColor = if (uiState.reconnectMessage != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                                leading = { Icon(Icons.Default.Sync, contentDescription = null) },
+                                showChevron = true,
+                                onClick = viewModel::reconnectListener
+                            )
+                        }
+                    }
                 }
             }
 
             item {
-                Text(
-                    text = "Appearance",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Dark mode", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            text = "Use dark theme across the app",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                Column {
+                    SectionHeading("Appearance")
+                    ListGroup {
+                        item {
+                            KobanRow(
+                                title = "Dark mode",
+                                subtitle = "Use the dark theme across the app",
+                                leading = { Icon(Icons.Default.Palette, contentDescription = null) },
+                                trailing = { Switch(checked = darkMode, onCheckedChange = null) },
+                                modifier = Modifier.toggleable(
+                                    value = darkMode,
+                                    role = Role.Switch,
+                                    onValueChange = appViewModel::setDarkMode
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Column {
+                    SectionHeading("Categories")
+                    if (uiState.categories.isNotEmpty()) {
+                        ListGroup {
+                            uiState.categories.forEach { category ->
+                                item(key = category.id) {
+                                    KobanRow(
+                                        title = category.name,
+                                        subtitle = if (category.isDefault) "Built in" else "Your own",
+                                        leading = { CategoryDot(categoryColor(category.id)) },
+                                        trailing = if (category.isDefault) null else {
+                                            {
+                                                IconButton(onClick = { viewModel.deleteCategory(category.id) }) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "Remove category ${category.name}")
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Row(
+                        Modifier.padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = newCategoryName,
+                            onValueChange = { newCategoryName = it },
+                            label = { Text("New category") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        TonalButton(
+                            text = "Add",
+                            onClick = {
+                                viewModel.addCategory(newCategoryName)
+                                newCategoryName = ""
+                            },
+                            enabled = newCategoryName.isNotBlank()
                         )
                     }
-                    Switch(
-                        checked = darkMode,
-                        onCheckedChange = appViewModel::setDarkMode
+                    Text(
+                        text = "Categories and notes are saved on this phone only.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 }
             }
 
             item {
-                Text(
-                    text = "Spending categories",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Categories and notes are saved locally on your phone (Room database).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            items(uiState.categories, key = { it.id }) { category ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    androidx.compose.foundation.layout.Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = category.name + if (category.isDefault) " (default)" else "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (!category.isDefault) {
-                            IconButton(onClick = { viewModel.deleteCategory(category.id) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Remove category")
+                Column {
+                    SectionHeading("Online")
+                    ListGroup {
+                        item {
+                            KobanRow(
+                                title = "Online features",
+                                subtitle = if (online) "On: groups and reading receipts with Claude can use the internet."
+                                else "Off: Koban makes no network calls. Groups and reading receipts with Claude stop.",
+                                leading = { Icon(Icons.Default.Cloud, contentDescription = null) },
+                                trailing = { Switch(checked = online, onCheckedChange = null) },
+                                modifier = Modifier.toggleable(
+                                    value = online,
+                                    role = Role.Switch,
+                                    onValueChange = viewModel::setOnlineFeatures
+                                )
+                            )
+                        }
+                        if (uiState.onlineAccess) {
+                            item {
+                                KobanRow(
+                                    title = "Invite code",
+                                    subtitle = "Accepted. Receipts are read by Claude on Koban's server.",
+                                    leading = { Icon(Icons.Default.Lock, contentDescription = null) },
+                                    trailing = {
+                                        TextButton(onClick = viewModel::removeOnlineAccess) { Text("Remove") }
+                                    }
+                                )
+                            }
+                        } else {
+                            item {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Invite code", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        text = "Enter an invite code from Koban's owner to read receipts with Claude. " +
+                                            "Everything else works without one.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    OutlinedTextField(
+                                        value = codeInput,
+                                        onValueChange = { codeInput = it.uppercase() },
+                                        label = { Text("XXXX-XXXX") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        isError = uiState.inviteMessage != null,
+                                        supportingText = uiState.inviteMessage?.let { { Text(it) } },
+                                        keyboardOptions = KeyboardOptions(
+                                            capitalization = KeyboardCapitalization.Characters,
+                                            autoCorrectEnabled = false
+                                        )
+                                    )
+                                    TonalButton(
+                                        text = if (uiState.inviteBusy) "Checking…" else "Use code",
+                                        onClick = { viewModel.enterInviteCode(codeInput) },
+                                        enabled = codeInput.isNotBlank() && !uiState.inviteBusy
+                                    )
+                                }
                             }
                         }
                     }
@@ -207,247 +302,114 @@ fun SettingsScreen(
             }
 
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = newCategoryName,
-                        onValueChange = { newCategoryName = it },
-                        label = { Text("New category name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Button(
-                        onClick = {
-                            viewModel.addCategory(newCategoryName)
-                            newCategoryName = ""
-                        },
-                        enabled = newCategoryName.isNotBlank()
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Text("Add category", modifier = Modifier.padding(start = 4.dp))
+                Column {
+                    SectionHeading("Background")
+                    ListGroup {
+                        item {
+                            if (uiState.isBatteryOptimizationIgnored) {
+                                KobanRow(
+                                    title = "Battery optimization",
+                                    subtitle = "Off. Good for background tracking.",
+                                    leading = { Icon(Icons.Default.BatteryAlert, contentDescription = null) },
+                                    trailing = {
+                                        Icon(Icons.Default.Check, contentDescription = "Done", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                )
+                            } else {
+                                KobanRow(
+                                    title = "Battery optimization",
+                                    subtitle = "On. Tracking may stop in the background. Tap to turn it off.",
+                                    subtitleColor = MaterialTheme.colorScheme.error,
+                                    leading = { Icon(Icons.Default.BatteryAlert, contentDescription = null) },
+                                    showChevron = true,
+                                    onClick = viewModel::openBatterySettings,
+                                    onClickLabel = "Disable battery optimization"
+                                )
+                            }
+                        }
+                        if (uiState.isXiaomiDevice) {
+                            item {
+                                KobanRow(
+                                    title = "Xiaomi autostart",
+                                    subtitle = "Autostart and Background autostart are required. " +
+                                        "Do not use “Clear all” in recents: it can revoke notification access.",
+                                    subtitleColor = MaterialTheme.colorScheme.error,
+                                    leading = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                    showChevron = true,
+                                    onClick = viewModel::openManufacturerBackgroundSettings,
+                                    onClickLabel = "Open Xiaomi autostart and battery settings"
+                                )
+                            }
+                            if (uiState.xiaomiBackgroundChecklist.isNotEmpty()) {
+                                item {
+                                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        uiState.xiaomiBackgroundChecklist.forEach { step ->
+                                            Text(
+                                                text = "• $step",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
-            }
-
-            item {
-                val count = uiState.allowlistedPackages.size
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp)
-                        .clickable(role = Role.Button, onClick = onOpenPaymentApps),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(text = "Payment apps", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = when (count) {
-                            0 -> "None chosen. Koban listens to no app."
-                            1 -> "1 app chosen"
-                            else -> "$count apps chosen"
-                        },
+                        text = "You do not need to keep the app open. After you grant notification access, a small " +
+                            "persistent notification keeps Android from stopping the listener. " +
+                            "Checklist: enable Notification access, allow that notification, then make a payment. " +
+                            "Check the notification log if nothing is saved.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            item {
-                val online by viewModel.onlineFeatures.collectAsStateWithLifecycle()
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .toggleable(
-                            value = online,
-                            role = Role.Switch,
-                            onValueChange = viewModel::setOnlineFeatures
-                        ),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Online features", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = if (online) "On: groups and reading receipts with Claude can use the internet."
-                            else "Off: Koban makes no network calls. Groups and reading receipts with Claude stop.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(checked = online, onCheckedChange = null)
-                }
-            }
-
-            item {
-                val online by viewModel.onlineFeatures.collectAsStateWithLifecycle()
-                val updateState by viewModel.updateState.collectAsStateWithLifecycle()
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "App version", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = BuildConfig.VERSION_NAME,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    TextButton(onClick = viewModel::checkForUpdates, enabled = online) {
-                        Text("Check for updates")
-                    }
-                }
-                val note = when {
-                    !online -> "Turn on Online features to check for updates."
-                    updateState == UpdateState.UpToDate -> "Koban is up to date."
-                    else -> null
-                }
-                if (note != null) {
-                    Text(
-                        text = note,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            item {
-                var codeInput by remember { mutableStateOf("") }
-                Text(text = "Invite code", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = if (uiState.onlineAccess) "Online access: on. Receipts are read by Claude on Koban's server."
-                    else "Enter an invite code from Koban's owner to read receipts with Claude. " +
-                        "Everything else works without one.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (uiState.onlineAccess) {
-                    androidx.compose.material3.OutlinedButton(
-                        onClick = viewModel::removeOnlineAccess,
-                        modifier = Modifier.padding(top = 8.dp)
-                    ) { Text("Remove online access") }
-                } else {
-                    OutlinedTextField(
-                        value = codeInput,
-                        onValueChange = { codeInput = it.uppercase() },
-                        label = { Text("XXXX-XXXX") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        singleLine = true,
-                        isError = uiState.inviteMessage != null,
-                        supportingText = uiState.inviteMessage?.let { { Text(it) } },
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters,
-                            autoCorrectEnabled = false
-                        )
-                    )
-                    Button(
-                        onClick = { viewModel.enterInviteCode(codeInput) },
-                        enabled = codeInput.isNotBlank() && !uiState.inviteBusy,
-                        modifier = Modifier.padding(top = 8.dp)
-                    ) { Text(if (uiState.inviteBusy) "Checking…" else "Use code") }
-                }
-            }
-
-            item {
-                Text(
-                    text = "Parser test tool",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Paste a sample notification to verify amount and merchant extraction.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            item {
-                OutlinedTextField(
-                    value = uiState.regexTestInput,
-                    onValueChange = viewModel::updateRegexTestInput,
-                    label = { Text("Notification text") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
-                )
-                Button(
-                    onClick = viewModel::runRegexTest,
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    Text("Test parse")
-                }
-                uiState.regexTestResult?.let { result ->
-                    Text(
-                        text = result,
-                        modifier = Modifier.padding(top = 8.dp),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            item {
-                Text(
-                    text = "Background reliability",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "You do not need to keep the app open on screen. After granting notification access, a small persistent notification appears so Android does not kill the listener when you swipe the app away.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (uiState.isXiaomiDevice) {
-                    Text(
-                        text = "Xiaomi / HyperOS (15T): Autostart and Background autostart are required. " +
-                            "Do not use “Clear all” in recents — it can revoke notification access.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    Button(
-                        onClick = viewModel::openManufacturerBackgroundSettings,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                    ) {
-                        Text("Open Xiaomi autostart / battery settings")
-                    }
-                    uiState.xiaomiBackgroundChecklist.forEach { step ->
-                        Text(
-                            text = "• $step",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-                if (!uiState.isBatteryOptimizationIgnored) {
-                    Text(
-                        text = "Battery optimization is enabled for this app — tracking may stop in the background.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    Button(
-                        onClick = viewModel::openBatterySettings,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                    ) {
-                        Text("Disable battery optimization")
-                    }
-                } else {
-                    Text(
-                        text = "Battery optimization is disabled — good for background tracking.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
             }
 
             item {
-                Text(
-                    text = "Checklist: enable Notification access, allow the persistent tracking notification, then make a payment. Check the notification log if nothing is saved.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column {
+                    SectionHeading("About")
+                    ListGroup {
+                        item {
+                            KobanRow(
+                                title = "App version ${BuildConfig.VERSION_NAME}",
+                                subtitle = when {
+                                    !online -> "Turn on Online features to check for updates."
+                                    updateState == UpdateState.UpToDate -> "Koban is up to date."
+                                    else -> null
+                                },
+                                leading = { Icon(Icons.Default.Info, contentDescription = null) },
+                                trailing = {
+                                    TextButton(onClick = viewModel::checkForUpdates, enabled = online) {
+                                        Text("Check for updates")
+                                    }
+                                }
+                            )
+                        }
+                        item {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Parser test tool", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    text = "Paste a sample notification to check amount and shop extraction.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                OutlinedTextField(
+                                    value = uiState.regexTestInput,
+                                    onValueChange = viewModel::updateRegexTestInput,
+                                    label = { Text("Notification text") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    minLines = 3
+                                )
+                                TonalButton(text = "Test parse", onClick = viewModel::runRegexTest)
+                                uiState.regexTestResult?.let { result ->
+                                    Text(text = result, style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

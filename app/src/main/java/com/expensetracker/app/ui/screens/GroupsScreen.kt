@@ -5,6 +5,27 @@ import android.content.Intent
 import android.text.format.DateUtils
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Share
+import com.expensetracker.app.ui.components.DialogTextField
+import com.expensetracker.app.ui.components.InitialsAvatar
+import com.expensetracker.app.ui.components.CategoryDot
+import com.expensetracker.app.ui.components.KobanRow
+import com.expensetracker.app.ui.components.LargeTopBar
+import com.expensetracker.app.ui.components.ListGroup
+import com.expensetracker.app.ui.components.Mon
+import com.expensetracker.app.ui.components.MonFace
+import com.expensetracker.app.ui.components.MoneyText
+import com.expensetracker.app.ui.components.SegmentedControl
+import com.expensetracker.app.ui.components.TonalButton
+import com.expensetracker.app.ui.theme.LocalMoneyColors
+import com.expensetracker.app.ui.theme.categoryColor as themeCategoryColor
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,27 +47,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -70,6 +82,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -96,13 +109,12 @@ private val Block = 24.dp
 
 private fun rm(v: BigDecimal) = "RM ${AmountFormatter.formatGrouped(v)}"
 
-private val otherColors = listOf(Color(0xFF8A93A8), Color(0xFF6B7389), Color(0xFFA3ABBD))
-
-/** The app's own color for a default category name; a person's own categories are grey. */
-private fun categoryColor(name: String, index: Int): Color =
-    DefaultCategories.all.firstOrNull { it.name.equals(name, ignoreCase = true) }
-        ?.let { Color(android.graphics.Color.parseColor(it.colorHex)) }
-        ?: otherColors[index % otherColors.size]
+/** The app's own color for a default category name; a person's own categories use the shared "other" grey. */
+@Composable
+private fun categoryColor(name: String): Color =
+    themeCategoryColor(
+        DefaultCategories.all.firstOrNull { it.name.equals(name, ignoreCase = true) }?.id ?: "other"
+    )
 
 @Composable
 private fun Messages(vm: GroupsViewModel, host: SnackbarHostState) {
@@ -116,15 +128,16 @@ private fun Messages(vm: GroupsViewModel, host: SnackbarHostState) {
 private fun NameDialog(title: String, label: String, start: String, confirm: String, max: Int, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var text by rememberSaveable { mutableStateOf(start) }
     AlertDialog(
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            OutlinedTextField(
+            DialogTextField(
                 value = text,
                 onValueChange = { text = it.take(max) },
-                label = { Text(label) },
-                singleLine = true,
-                supportingText = { Text("${text.trim().length} of $max") }
+                label = label,
+                supportingText = "${text.trim().length} of $max"
             )
         },
         confirmButton = { TextButton(onClick = { onConfirm(text.trim()) }, enabled = text.isNotBlank()) { Text(confirm) } },
@@ -135,6 +148,8 @@ private fun NameDialog(title: String, label: String, start: String, confirm: Str
 @Composable
 private fun ConfirmDialog(title: String, body: String, confirm: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(body) },
@@ -146,16 +161,56 @@ private fun ConfirmDialog(title: String, body: String, confirm: String, onDismis
 }
 
 @Composable
-private fun CenterState(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, body: String, content: @Composable () -> Unit) {
+private fun OnlineOffState(onTurnOn: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().padding(horizontal = Edge, vertical = 48.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Edge, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        content()
+        Mon(MonFace.IDLE, 120.dp)
+        Text("Online features are off", style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(
+            "Groups need online features. While they are off, Koban makes no network calls.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Button(onClick = onTurnOn, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)) { Text("Turn on online features") }
+    }
+}
+
+@Composable
+private fun SignedOutState(busy: Boolean, onSignIn: () -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Edge, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Compare spending with friends", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Members see each other's totals per category, for each week and month.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = LocalMoneyColors.current.received)
+                Text("Shared: category totals, week and month", style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Never shared: single payments, shops, times, notes, money in", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        Button(onClick = onSignIn, enabled = !busy, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)) {
+            Text(if (busy) "Signing in…" else "Sign in with Google")
+        }
+        Text(
+            "Groups use the invite code you entered in Settings.",
+            Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -178,43 +233,23 @@ fun GroupsScreen(onOpenGroup: (String) -> Unit, vm: GroupsViewModel = hiltViewMo
         contentWindowInsets = WindowInsets(0),
         snackbarHost = { SnackbarHost(host) },
         topBar = {
-            TopAppBar(
-                windowInsets = WindowInsets(0),
-                title = { Text("Groups") },
-                actions = {
-                    if (signedIn) {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Account") }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text("Change your name") }, onClick = { menu = false; dialog = "alias" })
-                            DropdownMenuItem(text = { Text("Sign out") }, onClick = { menu = false; vm.run { signOut(); null } })
-                            DropdownMenuItem(text = { Text("Delete account") }, onClick = { menu = false; dialog = "delete" })
-                        }
+            LargeTopBar("Groups") {
+                if (signedIn) {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Account") }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text("Change your name") }, onClick = { menu = false; dialog = "alias" })
+                        DropdownMenuItem(text = { Text("Sign out") }, onClick = { menu = false; vm.run { signOut(); null } })
+                        DropdownMenuItem(text = { Text("Delete account") }, onClick = { menu = false; dialog = "delete" })
                     }
                 }
-            )
+            }
         }
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
-                !state.online -> CenterState(
-                    Icons.Default.WifiOff, "Online features are off",
-                    "Groups need online features. While they are off, Koban makes no network calls."
-                ) { Button(onClick = { vm.setOnline(true) }) { Text("Turn on online features") } }
+                !state.online -> OnlineOffState { vm.setOnline(true) }
 
-                state.userId == null -> CenterState(
-                    Icons.Default.Groups, "Compare spending with friends",
-                    "Members see each other's totals per category, for each week and month. " +
-                        "Single payments, merchants, times, notes and money in are never shared."
-                ) {
-                    Button(onClick = { vm.run { signIn(activity) } }, enabled = !busy) {
-                        Text(if (busy) "Signing in…" else "Sign in with Google")
-                    }
-                    Text(
-                        "Groups use the invite code you entered in Settings.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                state.userId == null -> SignedOutState(busy) { vm.run { signIn(activity) } }
 
                 else -> PullToRefreshBox(isRefreshing = state.loading, onRefresh = vm::refresh) {
                     LazyColumn(
@@ -236,38 +271,42 @@ fun GroupsScreen(onOpenGroup: (String) -> Unit, vm: GroupsViewModel = hiltViewMo
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        items(state.groups, key = { it.id }) { g ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainer,
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(role = Role.Button) { onOpenGroup(g.id) }
-                            ) {
-                                Row(Modifier.padding(16.dp).heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(g.name, style = MaterialTheme.typography.titleMedium)
+                        if (state.groups.isNotEmpty()) item {
+                            ListGroup {
+                                state.groups.forEach { g ->
+                                    item(key = g.id) {
                                         val owner = if (g.ownerId == state.userId) " · you are the owner" else ""
-                                        Text(
-                                            "${g.members} ${if (g.members == 1) "member" else "members"}$owner",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    if (g.requests > 0) {
-                                        Text(
-                                            "${g.requests} ${if (g.requests == 1) "request" else "requests"}",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            modifier = Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer)
-                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                        KobanRow(
+                                            title = g.name,
+                                            subtitle = "${g.members} ${if (g.members == 1) "member" else "members"}$owner",
+                                            leading = { InitialsAvatar(g.name, tint = MaterialTheme.colorScheme.primaryContainer) },
+                                            trailing = if (g.requests > 0) {
+                                                {
+                                                    Text(
+                                                        "${g.requests} ${if (g.requests == 1) "request" else "requests"}",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        modifier = Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer)
+                                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            } else null,
+                                            showChevron = true,
+                                            onClickLabel = "Open group",
+                                            onClick = { onOpenGroup(g.id) }
                                         )
                                     }
                                 }
                             }
                         }
                         item {
-                            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Button(onClick = { dialog = "make" }, enabled = !busy) { Text("Make a group") }
-                                OutlinedButton(onClick = { dialog = "join" }, enabled = !busy) { Text("Join a group") }
+                            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Button(onClick = { dialog = "make" }, enabled = !busy, modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp)) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Make a group")
+                                }
+                                OutlinedButton(onClick = { dialog = "join" }, enabled = !busy, modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp)) { Text("Join a group") }
                             }
                             Text(
                                 "You can be in up to 5 groups. Each group has up to 10 members.",
@@ -284,7 +323,7 @@ fun GroupsScreen(onOpenGroup: (String) -> Unit, vm: GroupsViewModel = hiltViewMo
 
     val close = { dialog = "" }
     when (dialog) {
-        "make" -> NameDialog("Make a group", "Group name", "", "Make", 40, close) { name -> vm.run(onOk = close) { makeGroup(name) } }
+        "make" -> NameDialog("Make a group", "Group name", "", "Make group", 40, close) { name -> vm.run(onOk = close) { makeGroup(name) } }
         "join" -> NameDialog("Join a group", "Group code, for example GRP-7KQ2", "", "Ask to join", 8, close) { code ->
             vm.run(onOk = { close(); scope.launch { host.showSnackbar("Request sent. You join when the group owner approves it.") } }) { askToJoin(code) }
         }
@@ -387,6 +426,7 @@ private fun GroupBody(
     val context = LocalContext.current
     val mine = d.members.firstOrNull { it.userId == me }
     val today = LocalDate.now(GroupRepository.ZONE)
+    val top = d.members.maxOfOrNull { it.total.toFloat() } ?: 0f
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -395,15 +435,11 @@ private fun GroupBody(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    Period.entries.forEachIndexed { i, p ->
-                        SegmentedButton(
-                            selected = p == period,
-                            onClick = { vm.setPeriod(p) },
-                            shape = SegmentedButtonDefaults.itemShape(i, Period.entries.size)
-                        ) { Text(if (p == Period.WEEK) "Week" else "Month") }
-                    }
-                }
+                SegmentedControl(
+                    labels = Period.entries.map { if (it == Period.WEEK) "Week" else "Month" },
+                    selectedIndex = Period.entries.indexOf(period),
+                    onPick = { vm.setPeriod(Period.entries[it]) }
+                )
                 Text(
                     "Updated ${if (System.currentTimeMillis() - loadedAt.toEpochMilli() < 60_000) "just now"
                     else DateUtils.getRelativeTimeSpanString(loadedAt.toEpochMilli(), System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)}. Pull down to refresh.",
@@ -417,20 +453,26 @@ private fun GroupBody(
             val place = d.members.indexOf(mine) + 1
             val days = GroupRepository.daysLeft(period, today)
             val label = if (period == Period.MONTH) "You spent in ${today.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)}" else "You spent this week"
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(rm(mine.total), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "${ordinal(place)} of ${d.members.size} in ${d.group.name}. Resets in $days ${if (days == 1) "day" else "days"}.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(16.dp).semantics(mergeDescendants = true) {},
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                MoneyText(rm(mine.total), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    "${ordinal(place)} of ${d.members.size} in ${d.group.name}. Resets in $days ${if (days == 1) "day" else "days"}.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
         }
 
         if (isOwner && d.requests.isNotEmpty()) item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp)).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text("Join requests", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "Only you see these, because you own the group. Requests end after 7 days.",
@@ -439,10 +481,10 @@ private fun GroupBody(
                 )
                 d.requests.forEach { r ->
                     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(r.alias)
+                        InitialsAvatar(r.alias, size = 36.dp)
                         Text(r.alias, Modifier.padding(start = 12.dp).weight(1f), style = MaterialTheme.typography.bodyLarge)
-                        TextButton(onClick = { vm.run { answer(r, false) } }) { Text("Decline") }
-                        Button(onClick = { vm.run { answer(r, true) } }) { Text("Approve") }
+                        TextButton(onClick = { vm.run { answer(r, false) } }, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) { Text("Decline") }
+                        TonalButton("Approve", onClick = { vm.run { answer(r, true) } })
                     }
                 }
             }
@@ -451,45 +493,51 @@ private fun GroupBody(
         item {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Members", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Text(
+                        "Members",
+                        Modifier.weight(1f).semantics { heading() }.padding(start = 4.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     IconButton(onClick = { help = !help }) {
                         Icon(Icons.Default.Info, contentDescription = if (help) "Hide how to read this list" else "How to read this list")
                     }
                 }
-                if (help) Text(
-                    "Members are listed by total spending. A higher total is not a win. Tap a member to see their categories, in their own names.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                    Column {
-                        d.members.forEachIndexed { i, m ->
-                            if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                ListGroup {
+                    d.members.forEach { m ->
+                        item(key = m.userId) {
                             MemberRow(
-                                rank = i + 1, m = m, isMe = m.userId == me, isOwner = isOwner, expanded = open == m.userId,
+                                m = m, isMe = m.userId == me, isOwner = isOwner, expanded = open == m.userId,
+                                barFraction = if (top > 0f) (m.total.toFloat() / top).coerceIn(0.02f, 1f) else 1f,
                                 onToggle = { open = if (open == m.userId) null else m.userId },
                                 onRemove = { onRemove(m) }, onHandOver = { onHandOver(m) }
                             )
                         }
                     }
                 }
+                if (help) Text(
+                    "Members are listed by total spending. A higher total is not a win. Tap a member to see their categories, in their own names.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                )
             }
         }
 
         item {
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Group code", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(d.group.code, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    }
-                    OutlinedButton(onClick = {
-                        val send = Intent(Intent.ACTION_SEND).setType("text/plain")
-                            .putExtra(Intent.EXTRA_TEXT, "Join my Koban group \"${d.group.name}\" with the code ${d.group.code}.")
-                        context.startActivity(Intent.createChooser(send, "Share group code"))
-                    }) { Text("Share code") }
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Group code", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(d.group.code, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 }
+                TonalButton("Share code", icon = Icons.Default.Share, onClick = {
+                    val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, "Join my Koban group \"${d.group.name}\" with the code ${d.group.code}.")
+                    context.startActivity(Intent.createChooser(send, "Share group code"))
+                })
             }
         }
     }
@@ -497,11 +545,11 @@ private fun GroupBody(
 
 @Composable
 private fun MemberRow(
-    rank: Int,
     m: Member,
     isMe: Boolean,
     isOwner: Boolean,
     expanded: Boolean,
+    barFraction: Float,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onHandOver: () -> Unit
@@ -512,26 +560,29 @@ private fun MemberRow(
         Modifier
             .fillMaxWidth()
             .animateContentSize()
-            .clickable(role = Role.Button, onClick = onToggle)
+            .clickable(role = Role.Button, onClickLabel = if (expanded) "Hide categories" else "Show categories", onClick = onToggle)
             .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$rank", Modifier.width(24.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Avatar(m.alias)
-            Text(name, Modifier.padding(start = 12.dp).weight(1f), style = MaterialTheme.typography.bodyLarge, fontWeight = if (isMe) FontWeight.SemiBold else null)
-            Text(rm(m.total), style = MaterialTheme.typography.titleMedium)
-            Icon(
-                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            InitialsAvatar(m.alias, size = 36.dp, tint = if (isMe) MaterialTheme.colorScheme.primaryContainer else null)
+            Text(
+                name,
+                Modifier.padding(start = 12.dp).weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isMe) FontWeight.SemiBold else null,
+                color = if (isMe) LocalMoneyColors.current.goldText else MaterialTheme.colorScheme.onSurface
             )
+            MoneyText(rm(m.total), Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         }
         if (m.categories.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).clearAndSetSemantics {}) {
-                m.categories.forEachIndexed { j, (c, v) ->
-                    Box(Modifier.weight(v.toFloat().coerceAtLeast(0.01f)).fillMaxSize().background(categoryColor(c, j)))
+            Row(
+                Modifier.fillMaxWidth(barFraction).height(6.dp).clip(CircleShape).clearAndSetSemantics {},
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                m.categories.forEach { (c, v) ->
+                    Box(Modifier.weight(v.toFloat().coerceAtLeast(0.01f)).fillMaxSize().background(categoryColor(c)))
                 }
             }
         }
@@ -542,37 +593,23 @@ private fun MemberRow(
         )
         if (expanded) {
             if (m.categories.isEmpty()) Text("No spending in this period.", style = MaterialTheme.typography.bodyMedium)
-            m.categories.forEachIndexed { j, (c, v) ->
+            m.categories.forEach { (c, v) ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(categoryColor(c, j)))
+                    CategoryDot(categoryColor(c))
                     Text(c, Modifier.padding(start = 12.dp).weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Text(rm(v), style = MaterialTheme.typography.bodyMedium)
+                    MoneyText(rm(v), style = MaterialTheme.typography.bodyMedium)
                 }
             }
             if (isMe) Text(
-                "This is what the other members see about you. Never shared: single payments, merchants, times, notes and money in.",
+                "This is what the other members see about you. Never shared: single payments, shops, times, notes and money in.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (isOwner && !isMe) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onHandOver) { Text("Make owner") }
-                TextButton(onClick = onRemove) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = onHandOver, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) { Text("Make owner") }
+                TextButton(onClick = onRemove, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) { Text("Remove", color = MaterialTheme.colorScheme.error) }
             }
         }
-    }
-}
-
-@Composable
-private fun Avatar(alias: String) {
-    Box(
-        Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            alias.take(1).uppercase(),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
-        )
     }
 }
 
