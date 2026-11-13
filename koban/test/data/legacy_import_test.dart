@@ -230,8 +230,8 @@ void main() {
     moved.close();
   });
 
-  // Controller ruling R1
-  test('copies the rows from a temporary copy when the old file cannot be opened in place',
+  // Controller ruling R1b
+  test('copies the rows from a copy when the old file cannot be opened in place',
       () async {
     writeWalOnlyRow();
     // A folder with the -shm name makes the read-only open of the old file fail.
@@ -243,6 +243,71 @@ void main() {
     expect((await rowCountsOf(newDb))['expenses'], 5);
     expect(File('$oldPath.pre-flutter').readAsBytesSync(), dbBytes);
     expect(File('$oldPath.pre-flutter-wal').readAsBytesSync(), walBytes);
+    expect(Directory('$dir/legacy_import_copy').existsSync(), false);
+  });
+
+  // Controller ruling R1b, review fix round 1
+  test('rolls back a hot journal in the copy and imports the values before the crash',
+      () async {
+    // A writer on a separate copy stops in the middle of a commit in rollback
+    // journal mode: the main file has some changed pages, and the -journal has
+    // the original pages.
+    Directory('$dir/writer').createSync();
+    final writerPath = '$dir/writer/expense_tracker.db';
+    File('test/fixtures/room_v11.db').copySync(writerPath);
+    final writer = sqlite3.open(writerPath);
+    writer.execute('PRAGMA journal_mode=DELETE');
+    writer.execute('CREATE TABLE filler (b BLOB)');
+    writer.execute('PRAGMA cache_size=10');
+    writer.execute('PRAGMA cache_spill=10');
+    writer.execute('BEGIN');
+    writer.execute("UPDATE categories SET name = 'CHANGED'");
+    writer.execute("UPDATE expenses SET amount = '999.99'");
+    // More dirty pages than the cache holds: SQLite syncs the journal and
+    // writes the changed pages to the main file before the commit.
+    for (var i = 0; i < 200; i++) {
+      writer.execute('INSERT INTO filler VALUES (zeroblob(4000))');
+    }
+    File(writerPath).copySync(oldPath);
+    File('$writerPath-journal').copySync('$oldPath-journal');
+    writer.close(); // The writer copy rolls back. The old copy keeps the hot journal.
+
+    // The main file alone has the half-written values.
+    File(oldPath).copySync('$dir/db-only.db');
+    final dbOnly = sqlite3.open('$dir/db-only.db', mode: OpenMode.readOnly);
+    expect(dbOnly.select("SELECT name FROM categories WHERE id = 'food'").first['name'],
+        'CHANGED');
+    dbOnly.close();
+    final dbBytes = File(oldPath).readAsBytesSync();
+    final journalBytes = File('$oldPath-journal').readAsBytesSync();
+
+    expect(await run(), isA<ImportDone>());
+    // Every imported value equals the value before the stopped commit.
+    File('test/fixtures/room_v11.db').copySync('$dir/original.db');
+    final original = sqlite3.open('$dir/original.db', mode: OpenMode.readOnly);
+    addTearDown(original.close);
+    for (final table in newDb.allTables) {
+      final sql = quotedSelect(table);
+      final newRows = [
+        for (final row in await newDb.customSelect(sql).get())
+          row.data.values.toList(),
+      ];
+      expect(newRows, original.select(sql).rows, reason: table.actualTableName);
+    }
+    // The old files did not change. They moved with the rename.
+    expect(File('$oldPath.pre-flutter').readAsBytesSync(), dbBytes);
+    expect(File('$oldPath.pre-flutter-journal').readAsBytesSync(), journalBytes);
+    expect(Directory('$dir/legacy_import_copy').existsSync(), false);
+  });
+
+  test('removes the copy folder when the import from the copy fails', () async {
+    changeOld((old) => old.execute('DROP TABLE owed_items'));
+    Directory('$oldPath-shm').createSync();
+    final r = await run() as ImportFailed;
+    expect(r.tables, ['owed_items']);
+    expect(Directory('$dir/legacy_import_copy').existsSync(), false);
+    expect(File(oldPath).existsSync(), true);
+    expect(await prefs.getBool('legacy_import_done'), isNull);
   });
 
   // Review Focus 2

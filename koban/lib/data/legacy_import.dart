@@ -206,12 +206,20 @@ Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
   }
 }
 
+/// The folder for the copy of the old files. It is next to the old file,
+/// because the app can always write there (the system temp folder can be
+/// /data/local/tmp on Android, which the app cannot write).
+Directory _copyDirFor(String path) =>
+    Directory('${File(path).parent.path}/legacy_import_copy');
+
 /// Opens the old file read-only. SQLite also reads the rows in the -wal file.
 ///
 /// Never open the old file read-write: a read-write connection checkpoints
-/// and changes it. If the read-only open fails (for example, there is no -shm
-/// file and no write access to the folder), open a copy of the .db and -wal
-/// files in a temporary folder. The second value is that folder, or null.
+/// and changes it. If the read-only open fails (for example, a hot -journal
+/// after a crash, or no -shm file and no write access), copy the .db, -wal and
+/// -journal files next to the old file and open the copy read-write. Then
+/// SQLite rolls back the hot journal or recovers the WAL in the copy only.
+/// The second value is the copy folder, or null.
 Future<(Database, Directory?)> _openOld(String path) async {
   try {
     final old = sqlite3.open(path, mode: OpenMode.readOnly);
@@ -224,15 +232,22 @@ Future<(Database, Directory?)> _openOld(String path) async {
       rethrow;
     }
   } on SqliteException {
-    final copyDir = await Directory.systemTemp.createTemp('koban_legacy_');
+    final copyDir = _copyDirFor(path);
     try {
+      // A copy folder from a stopped attempt is not trusted.
+      if (await copyDir.exists()) await copyDir.delete(recursive: true);
+      await copyDir.create();
       final copy = '${copyDir.path}/expense_tracker.db';
       await File(path).copy(copy);
-      final wal = File('$path-wal');
-      if (await wal.exists()) await wal.copy('$copy-wal');
-      return (sqlite3.open(copy, mode: OpenMode.readOnly), copyDir);
+      for (final suffix in const ['-wal', '-journal']) {
+        final side = File('$path$suffix');
+        if (await side.exists()) await side.copy('$copy$suffix');
+      }
+      return (sqlite3.open(copy, mode: OpenMode.readWrite), copyDir);
     } catch (_) {
-      await copyDir.delete(recursive: true);
+      try {
+        await copyDir.delete(recursive: true);
+      } catch (_) {}
       rethrow;
     }
   }
