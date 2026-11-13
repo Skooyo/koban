@@ -103,8 +103,14 @@ void main() {
     });
 
     test('days left counts to the next start', () {
-      expect(GroupPeriodMath.daysLeft(Period.week, today: day(2026, 11, 12)), 4);
-      expect(GroupPeriodMath.daysLeft(Period.week, today: day(2026, 11, 15)), 1);
+      expect(
+        GroupPeriodMath.daysLeft(Period.week, today: day(2026, 11, 12)),
+        4,
+      );
+      expect(
+        GroupPeriodMath.daysLeft(Period.week, today: day(2026, 11, 15)),
+        1,
+      );
       expect(
         GroupPeriodMath.daysLeft(Period.month, today: day(2026, 11, 12)),
         19,

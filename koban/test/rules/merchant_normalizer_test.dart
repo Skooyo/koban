@@ -4,9 +4,11 @@ import 'package:koban/rules/merchant_normalizer.dart';
 void main() {
   test('strips maybank debit card tail', () {
     expect(
-        MerchantNormalizer.clean(
-            'KK - SUPER MART - UMN with your Maybank Debit Card Visa ending with 3729'),
-        'KK - SUPER MART - UMN');
+      MerchantNormalizer.clean(
+        'KK - SUPER MART - UMN with your Maybank Debit Card Visa ending with 3729',
+      ),
+      'KK - SUPER MART - UMN',
+    );
   });
 
   test('leaves clean merchant alone', () {
@@ -24,8 +26,10 @@ void main() {
   });
 
   test('clean strips date and time', () {
-    expect(MerchantNormalizer.clean('KEDAI CONTOH on 20 Oct 2026, 12:45'),
-        'KEDAI CONTOH');
+    expect(
+      MerchantNormalizer.clean('KEDAI CONTOH on 20 Oct 2026, 12:45'),
+      'KEDAI CONTOH',
+    );
   });
 
   test('clean keeps numbers in name', () {

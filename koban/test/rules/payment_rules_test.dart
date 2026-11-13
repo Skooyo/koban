@@ -380,4 +380,14 @@ void main() {
     expect(PaymentRules.preselectPackages, {maybank, tng});
     expect(PaymentRules.knownPackages.contains(wallet), true);
   });
+
+  test('rule words match in any letter case', () {
+    known(
+      maybank,
+      'You have SPENT RM 5.00 AT Café Sdn. Bhd. View details',
+      '5.00',
+      'Café Sdn. Bhd',
+      TransactionType.withdraw,
+    );
+  });
 }

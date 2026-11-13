@@ -26,19 +26,29 @@ void main() {
   });
 
   test('headline names who pays', () {
-    expect(PeopleMath.headline('Jun Wei', PaysYou(m('5.31'))),
-        'Jun Wei pays you RM 5.31');
-    expect(PeopleMath.headline('Jun Wei', YouPay(m('18.00'))),
-        'You pay Jun Wei RM 18.00');
+    expect(
+      PeopleMath.headline('Jun Wei', PaysYou(m('5.31'))),
+      'Jun Wei pays you RM 5.31',
+    );
+    expect(
+      PeopleMath.headline('Jun Wei', YouPay(m('18.00'))),
+      'You pay Jun Wei RM 18.00',
+    );
   });
 
   test('status line no QR only when all paid', () {
-    expect(PeopleMath.statusLine('Daniel', const AllPaid(), hasQr: false),
-        'No QR saved yet');
-    expect(PeopleMath.statusLine('Aisyah', const AllPaid(), hasQr: true),
-        'All paid');
-    expect(PeopleMath.statusLine('Jun Wei', YouPay(m('18.00')), hasQr: false),
-        'You pay RM 18.00');
+    expect(
+      PeopleMath.statusLine('Daniel', const AllPaid(), hasQr: false),
+      'No QR saved yet',
+    );
+    expect(
+      PeopleMath.statusLine('Aisyah', const AllPaid(), hasQr: true),
+      'All paid',
+    );
+    expect(
+      PeopleMath.statusLine('Jun Wei', YouPay(m('18.00')), hasQr: false),
+      'You pay RM 18.00',
+    );
   });
 
   test('group orders you owe first', () {
@@ -48,39 +58,54 @@ void main() {
   });
 
   test('normalized name matches case and spaces', () {
-    expect(PeopleMath.normalizedName('  Jun   Wei '),
-        PeopleMath.normalizedName('jun wei'));
+    expect(
+      PeopleMath.normalizedName('  Jun   Wei '),
+      PeopleMath.normalizedName('jun wei'),
+    );
   });
 
   test('settle match single candidate', () {
     expect(
-        PeopleMath.settleMatch(
-            m('5.31'), 'SOMEONE', [SettleCandidate('p1', 'Jun Wei', m('5.31'))]),
-        'p1');
+      PeopleMath.settleMatch(m('5.31'), 'SOMEONE', [
+        SettleCandidate('p1', 'Jun Wei', m('5.31')),
+      ]),
+      'p1',
+    );
   });
 
   test('settle match sender breaks tie', () {
     expect(
-        PeopleMath.settleMatch(m('5.31'), 'PRIYA DEVI', [
-          SettleCandidate('p1', 'Jun Wei', m('5.31')),
-          SettleCandidate('p2', 'Priya', m('5.31')),
-        ]),
-        'p2');
+      PeopleMath.settleMatch(m('5.31'), 'PRIYA DEVI', [
+        SettleCandidate('p1', 'Jun Wei', m('5.31')),
+        SettleCandidate('p2', 'Priya', m('5.31')),
+      ]),
+      'p2',
+    );
   });
 
   test('settle match ambiguous without sender returns null', () {
     expect(
-        PeopleMath.settleMatch(m('5.31'), null, [
-          SettleCandidate('p1', 'Jun Wei', m('5.31')),
-          SettleCandidate('p2', 'Priya', m('5.31')),
-        ]),
-        isNull);
+      PeopleMath.settleMatch(m('5.31'), null, [
+        SettleCandidate('p1', 'Jun Wei', m('5.31')),
+        SettleCandidate('p2', 'Priya', m('5.31')),
+      ]),
+      isNull,
+    );
   });
 
   test('settle match ignores people I owe', () {
     expect(
-        PeopleMath.settleMatch(
-            m('5.31'), null, [SettleCandidate('p1', 'Jun Wei', m('-5.31'))]),
-        isNull);
+      PeopleMath.settleMatch(m('5.31'), null, [
+        SettleCandidate('p1', 'Jun Wei', m('-5.31')),
+      ]),
+      isNull,
+    );
+  });
+
+  test('normalized name treats a non-breaking space like a space', () {
+    expect(
+      PeopleMath.normalizedName('Ali Bin'),
+      PeopleMath.normalizedName('Ali Bin'),
+    );
   });
 }

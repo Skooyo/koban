@@ -137,7 +137,7 @@ void main() {
 
   test('text with a non-breaking space and mixed case parses like Kotlin', () {
     final r = NotificationParser.parse(
-      'Pembayaran RM 12.50 kepada KEDAI Café berjaya',
+      'Pembayaran RM\u00a012.50 kepada KEDAI Café berjaya',
     );
     // The desktop JVM gives null (its \s is ASCII only). Android ICU \s matches U+00A0 like Dart, so 12.50 is the Android result.
     expect(r?.amount, d('12.50'));

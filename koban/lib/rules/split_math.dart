@@ -1,5 +1,7 @@
 import 'package:decimal/decimal.dart';
 
+import 'amount_formatter.dart';
+
 /// The id of the owner in a split.
 const String meId = 'me';
 
@@ -33,8 +35,6 @@ abstract final class SplitMath {
   static const int _precision = 10;
   static final Decimal _cent = Decimal.parse('0.01');
 
-  static Decimal _money(Decimal value) => value.round(scale: 2);
-
   /// Divide to [_precision] decimal places, half away from zero.
   /// The same as Kotlin BigDecimal.divide(x, 10, RoundingMode.HALF_UP).
   static Decimal _divide(Decimal a, Decimal b) {
@@ -52,7 +52,9 @@ abstract final class SplitMath {
   static Decimal computedTotal(
     List<SplitItemInput> items,
     SplitCharges charges,
-  ) => _money(_sum(items.map((i) => i.price)) + _netCharges(charges));
+  ) => AmountFormatter.toMoney(
+    _sum(items.map((i) => i.price)) + _netCharges(charges),
+  );
 
   /// The share of each person. The values add up to [computedTotal].
   /// Throws [ArgumentError] when an item has no person.
@@ -94,7 +96,7 @@ abstract final class SplitMath {
     var othersTotal = Decimal.zero;
     for (final entry in exact.entries) {
       if (entry.key == meId) continue;
-      result[entry.key] = _money(entry.value);
+      result[entry.key] = AmountFormatter.toMoney(entry.value);
       othersTotal += result[entry.key]!;
     }
     final total = computedTotal(items, charges);
@@ -128,6 +130,6 @@ abstract final class SplitMath {
 
   static Decimal ownerSpending(Decimal linkedAmount, Decimal othersOwe) {
     final left = linkedAmount - othersOwe;
-    return _money(left < Decimal.zero ? Decimal.zero : left);
+    return AmountFormatter.toMoney(left < Decimal.zero ? Decimal.zero : left);
   }
 }

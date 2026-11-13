@@ -5,6 +5,7 @@ import 'package:decimal/decimal.dart';
 import 'amount_formatter.dart';
 import 'merchant_normalizer.dart';
 import 'parsed_expense.dart';
+import 'text.dart';
 import 'types.dart';
 
 /// Read an amount, a direction and a shop name from a bank or wallet notification text.
@@ -129,7 +130,7 @@ abstract final class NotificationParser {
     return null;
   }
 
-  static String _stripAmount(String text, String amountStr) => _trimChars(
+  static String _stripAmount(String text, String amountStr) => trimChars(
     text
         .replaceAll(_rmAmountText, '')
         .replaceAll(_anyAmountText, '')
@@ -137,19 +138,6 @@ abstract final class NotificationParser {
         .trim(),
     '-:·•"\'',
   );
-
-  /// Remove the given characters from both ends, like Kotlin String.trim(chars).
-  static String _trimChars(String s, String chars) {
-    var start = 0;
-    var end = s.length;
-    while (start < end && chars.contains(s[start])) {
-      start++;
-    }
-    while (end > start && chars.contains(s[end - 1])) {
-      end--;
-    }
-    return s.substring(start, end);
-  }
 
   static ParseConfidence _determineConfidence(
     String text,

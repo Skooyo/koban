@@ -18,8 +18,9 @@ final tie = [
 void main() {
   test('match single debt exact', () {
     expect(
-      RepaymentMatcher.match(
-          Decimal.parse('7.38'), null, [debt('d1', 'a', 'Aisyah', '7.38')]),
+      RepaymentMatcher.match(Decimal.parse('7.38'), null, [
+        debt('d1', 'a', 'Aisyah', '7.38'),
+      ]),
       ['d1'],
     );
   });
@@ -53,13 +54,16 @@ void main() {
 
   test('match ambiguous without name returns empty', () {
     expect(
-        RepaymentMatcher.match(Decimal.parse('10.00'), null, tie), <String>[]);
+      RepaymentMatcher.match(Decimal.parse('10.00'), null, tie),
+      <String>[],
+    );
   });
 
   test('match no subset returns empty', () {
     expect(
-      RepaymentMatcher.match(
-          Decimal.parse('7.00'), null, [debt('d1', 'a', 'Aisyah', '7.38')]),
+      RepaymentMatcher.match(Decimal.parse('7.00'), null, [
+        debt('d1', 'a', 'Aisyah', '7.38'),
+      ]),
       <String>[],
     );
   });

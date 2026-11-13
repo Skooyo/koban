@@ -67,11 +67,8 @@ class SettleCandidate {
 
 /// Pure rules for the people list and person screen.
 abstract final class PeopleMath {
-  static String normalizedName(String name) => name
-      .trim()
-      // Kotlin \s is ASCII only. Dart \s also matches Unicode spaces.
-      .replaceAll(RegExp(r'[ \t\n\x0B\f\r]+'), ' ')
-      .toLowerCase();
+  static String normalizedName(String name) =>
+      name.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 
   static Decimal net(List<Decimal> owedToMe, List<Decimal> iOwe) =>
       AmountFormatter.toMoney(_sum(owedToMe) - _sum(iOwe));

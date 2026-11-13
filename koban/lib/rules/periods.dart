@@ -153,8 +153,7 @@ class GroupPeriodMath {
   }
 
   /// First day of the period that holds [day]. Week starts on Monday.
-  static DateTime start(DateTime day, Period period) =>
-      period == Period.week
+  static DateTime start(DateTime day, Period period) => period == Period.week
       ? DateTime.utc(day.year, day.month, day.day - (day.weekday - 1))
       : DateTime.utc(day.year, day.month, 1);
 

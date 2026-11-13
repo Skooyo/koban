@@ -8,6 +8,8 @@ abstract final class AmountFormatter {
   static Decimal toMoney(Decimal v) => v.round(scale: _scale);
 
   /// Plain text with always two decimal places, for example "14.50".
+  /// Use this text when you store an amount in the database (Room stored
+  /// toPlainString of the rounded value, for example 14.50).
   static String formatDisplay(Decimal v) => toMoney(v).toStringAsFixed(_scale);
 
   /// "1,284.10" for screens. Edit fields keep [formatDisplay] so the text parses back.
@@ -18,7 +20,9 @@ abstract final class AmountFormatter {
     final dot = unsigned.indexOf('.');
     final whole = unsigned.substring(0, dot);
     final grouped = whole.replaceAllMapped(
-        RegExp(r'\B(?=(\d{3})+$)'), (_) => ',');
+      RegExp(r'\B(?=(\d{3})+$)'),
+      (_) => ',',
+    );
     return '${negative ? '-' : ''}$grouped${unsigned.substring(dot)}';
   }
 

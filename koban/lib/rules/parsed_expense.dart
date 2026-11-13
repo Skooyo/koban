@@ -34,7 +34,13 @@ class ParsedExpense {
 
   @override
   int get hashCode => Object.hash(
-      amount, currency, merchant, confidence, transactionType, directionClear);
+    amount,
+    currency,
+    merchant,
+    confidence,
+    transactionType,
+    directionClear,
+  );
 
   @override
   String toString() =>
