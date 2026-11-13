@@ -1,6 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show CouldNotRollBackException, DriftWrappedException;
+// The app database runs in a background isolate, so its errors come as
+// DriftRemoteException. Only this type is used from the experimental library.
+// ignore: experimental_member_use
+import 'package:drift/remote.dart' show DriftRemoteException;
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -40,10 +46,21 @@ final class ImportSkipped extends ImportResult {
 }
 
 /// The import copied all old rows. [rowCounts] is the old row count of each table.
+///
+/// Known limit: when the settings cannot be read, the rows still copy and the
+/// done-mark is set, so a later start does not try the settings again.
 final class ImportDone extends ImportResult {
-  const ImportDone(this.rowCounts);
+  const ImportDone(this.rowCounts, {this.settingsError});
 
   final Map<String, int> rowCounts;
+
+  /// The error text when the old settings could not be read. Null when they copied.
+  final String? settingsError;
+
+  /// The line for the notification log, or null when there is no problem to log.
+  String? get logLine => settingsError == null
+      ? null
+      : 'Settings import failed ($settingsError)';
 }
 
 /// The import did not copy the rows. The old file did not change.
@@ -92,7 +109,15 @@ Future<ImportResult> importLegacyData({
     if (!await File(path).exists()) return const ImportSkipped();
 
     // Step 3: settings first, so capture keeps the payment app list if the table copy fails.
-    await _copySettings(await legacy.readSettings(), prefs);
+    // A settings read error does not stop the rows. The result reports it.
+    String? settingsError;
+    Map<String, Object?> settings = const {};
+    try {
+      settings = await legacy.readSettings();
+    } catch (e) {
+      settingsError = _describe(e);
+    }
+    await _copySettings(settings, prefs);
 
     // Steps 4 and 5.
     final counts = await _copyTables(db, path);
@@ -105,12 +130,38 @@ Future<ImportResult> importLegacyData({
     try {
       await _renameOldFiles(path);
     } catch (_) {}
-    return ImportDone(counts);
-  } on _Failure catch (f) {
-    return f.result;
+    return ImportDone(counts, settingsError: settingsError);
   } catch (e) {
-    return ImportFailed(const [], '$e');
+    return _failureOf(e);
   }
+}
+
+/// The failure result for an error. When SQLite rolled back the transaction by
+/// itself, the ROLLBACK of Drift fails too, and Drift wraps the first error.
+ImportFailed _failureOf(Object e) => switch (e) {
+      _Failure(:final result) => result,
+      CouldNotRollBackException(:final cause) => _failureOf(cause),
+      _ => ImportFailed(const [], _describe(e)),
+    };
+
+/// The error text for the log. It never holds row values: the toString() of a
+/// SqliteException adds the statement and its bound values (a full payment
+/// row), so only the result code and the message stay.
+String _describe(Object e) {
+  switch (e) {
+    case SqliteException():
+      return 'SqliteException(${e.extendedResultCode}): ${e.message}';
+    case DriftRemoteException():
+      return _describe(e.remoteCause);
+    case DriftWrappedException(:final cause?):
+      return _describe(cause);
+    case PlatformException():
+      return 'PlatformException(${e.code}): ${e.message}';
+  }
+  // Other errors: the type and the first line of the text, without a statement.
+  final text = '$e'.split('\n').first;
+  final type = '${e.runtimeType}';
+  return text.startsWith(type) ? text : '$type: $text';
 }
 
 /// Writes each old setting that the new settings do not have.
@@ -137,6 +188,7 @@ Future<void> _copySettings(
 
 /// Copies the rows of the 11 tables in one transaction and returns the old row counts.
 /// When a table fails, the transaction rolls back and nothing is copied.
+/// A write error to the new database stops the transaction at the first table.
 Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
   final (old, copyDir) = await _openOld(path);
   try {
@@ -151,12 +203,25 @@ Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
     final errors = <String>[];
     await db.transaction(() async {
       for (final name in legacyTableOrder) {
+        final table = tables[name]!;
+        final columns = [for (final c in table.$columns) c.name];
+        final quoted = columns.map((c) => '"$c"').join(', ');
+        // Old side: a missing table, a missing column or an unreadable row
+        // fails this table only. The loop continues, so the result names
+        // every bad table, and the rollback below removes all rows.
+        final List<List<Object?>> rows;
         try {
-          final table = tables[name]!;
-          final columns = [for (final c in table.$columns) c.name];
-          final quoted = columns.map((c) => '"$c"').join(', ');
           // Select by name, so the column order of the old table has no effect.
-          final rows = old.select('SELECT $quoted FROM "$name"').rows;
+          rows = old.select('SELECT $quoted FROM "$name"').rows;
+        } catch (e) {
+          failed.add(name);
+          errors.add('$name: ${_describe(e)}');
+          continue;
+        }
+        // New side: any error stops the transaction at once. SQLite can roll
+        // back the transaction by itself (SQLITE_FULL, SQLITE_IOERR), and then
+        // each later write would commit alone.
+        try {
           final insert = 'INSERT OR REPLACE INTO "$name" ($quoted) '
               'VALUES (${List.filled(columns.length, '?').join(', ')})';
           // The raw stored values go in unchanged, with parameter binding.
@@ -186,8 +251,8 @@ Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
           }
           counts[name] = rows.length;
         } catch (e) {
-          failed.add(name);
-          errors.add('$name: $e');
+          throw _Failure(ImportFailed([...failed, name],
+              [...errors, '$name: ${_describe(e)}'].join('; ')));
         }
       }
       // An error out of the transaction makes Drift roll back all tables.

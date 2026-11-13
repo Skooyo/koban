@@ -11,12 +11,6 @@ void main() {
   test('the fixture is a Room version 11 file with every table filled', () {
     expect(db.select('PRAGMA user_version').first.columnAt(0), 11);
     expect(rowCounts(db), fixtureCounts);
-    expect(fixtureCounts, {
-      'expenses': 4, 'categories': 8, 'merchant_category_map': 2,
-      'pending_payments': 2, 'dropped_notifications': 2, 'split_bills': 2,
-      'split_items': 2, 'split_people': 2, 'split_item_shares': 3,
-      'split_debts': 2, 'owed_items': 2,
-    });
   });
 
   test('the fixture holds every enum value', () {

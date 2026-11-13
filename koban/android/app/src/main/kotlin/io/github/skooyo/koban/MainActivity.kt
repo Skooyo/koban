@@ -19,7 +19,9 @@ class MainActivity : FlutterActivity() {
                         try {
                             val settings = LegacySettingsReader.read(File(filesDir, "datastore"))
                             runOnUiThread { result.success(settings) }
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
+                            // Also an Error: an uncaught one on this thread stops the app,
+                            // and every start runs the import again.
                             runOnUiThread { result.error("LEGACY_SETTINGS", e.message, null) }
                         }
                     }

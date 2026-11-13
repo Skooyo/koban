@@ -127,7 +127,10 @@ void main() {
   });
 
   test('imports every row of a real 0.1.1 database', () async {
-    expect(await run(), isA<ImportDone>());
+    final r = await run() as ImportDone;
+    expect(r.rowCounts, fixtureCounts);
+    expect(r.settingsError, isNull);
+    expect(r.logLine, isNull);
     expect(await rowCountsOf(newDb), fixtureCounts);
     final e1 = await (newDb.select(newDb.expenses)
           ..where((e) => e.id.equals('e1')))
@@ -413,15 +416,78 @@ void main() {
     expect(await prefs.getKeys(), isEmpty);
   });
 
-  test('returns a failure and keeps the old file when the settings cannot be read',
+  test('copies the rows and reports the settings error when the settings cannot be read',
       () async {
     legacy = FakeLegacySource(oldPath,
-        settingsError: PlatformException(code: 'corrupt', message: 'bad file'));
+        settingsError: PlatformException(code: 'LEGACY_SETTINGS', message: 'bad file'));
+    final r = await run() as ImportDone;
+    expect(r.rowCounts, fixtureCounts);
+    expect(r.settingsError, 'PlatformException(LEGACY_SETTINGS): bad file');
+    expect(r.logLine,
+        'Settings import failed (PlatformException(LEGACY_SETTINGS): bad file)');
+    expect(await rowCountsOf(newDb), fixtureCounts);
+    expect(await prefs.getKeys(), {importDoneKey});
+    expect(await prefs.getBool(importDoneKey), true);
+    expect(File(oldPath).existsSync(), false);
+    expect(File('$oldPath.pre-flutter').existsSync(), true);
+  });
+
+  // The app opens the database in a background isolate (drift_flutter), so
+  // the error comes back as a DriftRemoteException. Check both ways.
+  for (final background in [false, true]) {
+    test('keeps the row values out of the log line when a row cannot be written '
+        '(background isolate: $background)', () async {
+      if (background) {
+        await newDb.close();
+        newDb = KobanDatabase(
+            NativeDatabase.createInBackground(File('$dir/koban-bg.sqlite')));
+      }
+      // A damaged old row: the old table has no NOT NULL rule and e1 has no currency.
+      changeOld((old) {
+        final cols = [
+          for (final r in old.select('PRAGMA table_info(expenses)')) '"${r['name']}"',
+        ];
+        old.execute('CREATE TABLE expenses_loose (${cols.join(', ')})');
+        old.execute('INSERT INTO expenses_loose SELECT * FROM expenses');
+        old.execute('DROP TABLE expenses');
+        old.execute('ALTER TABLE expenses_loose RENAME TO expenses');
+        old.execute("UPDATE expenses SET currency = NULL WHERE id = 'e1'");
+      });
+      final r = await run() as ImportFailed;
+      expect(r.tables, ['expenses']);
+      expect(r.logLine, isNot(contains('KEDAI')));
+      expect(r.logLine, isNot(contains('Pembayaran')));
+      expect(r.logLine, isNot(contains('dk-e1')));
+      expect(r.logLine,
+          'Data import failed: expenses (expenses: SqliteException(1299): '
+          'NOT NULL constraint failed: expenses.currency)');
+      expect(File(oldPath).existsSync(), true);
+      expect(await prefs.getBool(importDoneKey), isNull);
+    });
+  }
+
+  test('stops all tables and keeps the new rows when SQLite rolls back the transaction',
+      () async {
+    // Rows that the new database had before the import.
+    await newDb.customStatement(
+        "INSERT INTO categories (id, name, colorHex, isDefault) "
+        "VALUES ('new-cat', 'New', '#000000', 0)");
+    await newDb.customStatement(
+        "INSERT INTO split_people (id, name, lastUsedAt) "
+        "VALUES ('new-person', 'New', 1763000000000)");
+    // A write to split_bills makes SQLite roll back the whole transaction,
+    // as SQLITE_FULL or SQLITE_IOERR can do.
+    await newDb.customStatement(
+        'CREATE TRIGGER fail_split_bills BEFORE INSERT ON split_bills '
+        "BEGIN SELECT RAISE(ROLLBACK, 'test write failure'); END");
+    final before = await rowCountsOf(newDb);
+
     final r = await run() as ImportFailed;
-    expect(r.tables, isEmpty);
-    expect(r.detail, contains('bad file'));
-    expect((await rowCountsOf(newDb))['expenses'], 0);
-    expect(File('$dir/expense_tracker.db').existsSync(), true);
-    expect(await prefs.getKeys(), isEmpty);
+    expect(r.tables, ['split_bills']);
+    expect(r.detail, 'split_bills: SqliteException(1811): test write failure');
+    expect(await rowCountsOf(newDb), before);
+    expect(await prefs.getBool(importDoneKey), isNull);
+    expect(File(oldPath).existsSync(), true);
+    expect(File('$oldPath.pre-flutter').existsSync(), false);
   });
 }
