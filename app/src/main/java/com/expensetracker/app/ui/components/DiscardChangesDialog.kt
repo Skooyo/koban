@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.dp
 fun DiscardChangesDialog(onDiscard: () -> Unit, onKeepEditing: () -> Unit) {
     AlertDialog(
         onDismissRequest = onKeepEditing,
-        shape = RoundedCornerShape(28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         title = { Text("Discard changes?", style = MaterialTheme.typography.headlineSmall) },
         text = { Text("Your changes are not saved.", style = MaterialTheme.typography.bodyMedium) },
         confirmButton = { TextButton(

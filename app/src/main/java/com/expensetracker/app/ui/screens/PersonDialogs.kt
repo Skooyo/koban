@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.data.ExpenseEntity
 import com.expensetracker.app.parser.AmountFormatter
+import com.expensetracker.app.ui.components.DialogTextField
 import com.expensetracker.app.ui.components.PastDatePickerDialog
 import com.expensetracker.app.ui.viewmodel.DebtPayment
 import kotlinx.coroutines.CancellationException
@@ -58,40 +59,6 @@ internal fun receiveText(e: ExpenseEntity): String =
 private fun count(n: Int, one: String, many: String) = "$n ${if (n == 1) one else many}"
 
 private val DialogShape = RoundedCornerShape(24.dp)
-
-@Composable
-private fun dialogFieldColors() = TextFieldDefaults.colors(
-    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    errorContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    focusedIndicatorColor = Color.Transparent,
-    unfocusedIndicatorColor = Color.Transparent
-)
-
-/** A text field in the dialog style: filled `surfaceContainerHigh`, no underline. */
-@Composable
-internal fun DialogTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-    isError: Boolean = false,
-    supportingText: String? = null,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
-) {
-    TextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier.fillMaxWidth(),
-        label = { Text(label) },
-        singleLine = true,
-        shape = RoundedCornerShape(12.dp),
-        isError = isError,
-        supportingText = supportingText?.let { message -> { Text(message) } },
-        keyboardOptions = keyboardOptions,
-        colors = dialogFieldColors()
-    )
-}
 
 /** Runs [save]; on failure keeps the dialog open and returns the message to show in it. */
 private suspend fun attempt(save: suspend () -> Unit): String? =

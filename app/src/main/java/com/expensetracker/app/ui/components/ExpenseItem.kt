@@ -13,8 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.data.ExpenseEntity
@@ -43,7 +41,7 @@ fun ExpenseListCard(
     val time = remember(expense.notificationPostTime, timePattern) {
         SimpleDateFormat(timePattern, Locale.getDefault()).format(Date(expense.notificationPostTime))
     }
-    val merchant = expense.merchant?.takeIf { it.isNotBlank() } ?: "Unknown merchant"
+    val merchant = expense.merchant?.takeIf { it.isNotBlank() } ?: "Unknown shop"
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val counted = expense.countedAmount
     val isRepayment = expense.transactionType == TransactionType.RECEIVE && counted?.signum() == 0
@@ -113,7 +111,7 @@ fun LazyListScope.expensesByDay(
                 DayHeader(timeMs = dayExpenses.first().notificationPostTime, expenses = dayExpenses)
                 ListGroup {
                     dayExpenses.forEach { expense ->
-                        item {
+                        item(key = expense.id) {
                             ExpenseListCard(
                                 expense = expense,
                                 categoryName = categoryName(expense),
@@ -139,7 +137,7 @@ private fun DayHeader(timeMs: Long, expenses: List<ExpenseEntity>) {
             .padding(bottom = 8.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        SectionHeading(dayLabel(timeMs), Modifier.weight(1f).padding(bottom = 0.dp).semantics { heading() })
+        SectionHeading(dayLabel(timeMs), Modifier.weight(1f).padding(bottom = 0.dp))
         MoneyAmount(
             amount = spent,
             style = MaterialTheme.typography.labelLarge,

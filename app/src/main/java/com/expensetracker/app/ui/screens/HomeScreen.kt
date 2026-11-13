@@ -198,7 +198,7 @@ fun HomeScreen(
                     item {
                         ListGroup {
                             uiState.week.recentExpenses.forEach { expense ->
-                                item {
+                                item(key = expense.id) {
                                     ExpenseListCard(
                                         expense = expense,
                                         categoryName = expense.categoryId?.let { uiState.categoryNames[it] }
@@ -254,6 +254,9 @@ private fun SpentTodayCard(summary: PeriodSummary, onOpen: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = LocalMoneyColors.current.received
             )
+        }
+        if (summary.breakdown.isEmpty() && summary.received <= BigDecimal.ZERO) {
+            Text("No payments yet today.", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium, color = muted)
         }
         if (summary.breakdown.isNotEmpty()) {
             NoteStrip(summary.breakdown, Modifier.padding(top = 16.dp), height = 8.dp)

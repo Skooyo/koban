@@ -411,7 +411,7 @@ private fun PersonContent(
             item {
                 ListGroup {
                     detail.owedToMe.forEach { view ->
-                        item {
+                        item(key = view.debt.id) {
                             DebtRow(
                                 view = view,
                                 onOpen = { onOpenDebt(view) },
@@ -432,7 +432,7 @@ private fun PersonContent(
             item {
                 ListGroup {
                     detail.iOwe.forEach { owed ->
-                        item {
+                        item(key = owed.id) {
                             OwedItemRow(item = owed, onClick = { onEditItem(owed) }, onMarkPaid = { onMarkItemPaid(owed.id) })
                         }
                     }

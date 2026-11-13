@@ -1,12 +1,17 @@
 package com.expensetracker.app.ui.screens
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.draw.clip
+import com.expensetracker.app.ui.components.DialogTextField
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -95,7 +100,7 @@ fun PeopleScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)
+            contentPadding = PaddingValues(bottom = 112.dp)
         ) {
             item {
                 LargeTopBar(
@@ -105,7 +110,7 @@ fun PeopleScreen(
                 TextField(
                     value = query,
                     onValueChange = viewModel::setQuery,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     placeholder = { Text("Search people") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     singleLine = true,
@@ -120,7 +125,7 @@ fun PeopleScreen(
                 TonalButton(
                     text = "Split a bill",
                     onClick = onSplitBill,
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
                     icon = Icons.Default.Receipt
                 )
             }
@@ -131,17 +136,17 @@ fun PeopleScreen(
                         else "Nobody matches that search.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 16.dp)
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
                     )
                 }
             }
             sections.forEach { (group, people) ->
                 item(key = "group-$group") {
-                    Column(Modifier.padding(top = 20.dp)) {
+                    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp)) {
                         SectionHeading(groupTitle(group))
                         ListGroup {
                             people.forEach { summary ->
-                                item {
+                                item(key = summary.person.id) {
                                     PersonRow(
                                         summary = summary,
                                         avatarColor = avatarColors[Math.floorMod(summary.person.id.hashCode(), avatarColors.size)],
@@ -155,27 +160,32 @@ fun PeopleScreen(
             }
             if (bills.isNotEmpty()) {
                 item {
-                    Column(Modifier.padding(top = 24.dp)) {
-                        SectionHeading("Past splits")
-                        ListGroup {
-                            bills.forEach { bill ->
-                                item {
-                                    KobanRow(
-                                        title = bill.merchant ?: "Split bill",
-                                        trailing = {
-                                            Text(
-                                                text = personDate(bill.billTime),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        },
-                                        showChevron = true,
-                                        onClick = { onOpenSplit(bill.id) },
-                                        onClickLabel = "Open"
-                                    )
-                                }
-                            }
-                        }
+                    SectionHeading("Past splits", Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp))
+                }
+                itemsIndexed(bills, key = { _, bill -> bill.id }) { i, bill ->
+                    val first = i == 0
+                    val last = i == bills.lastIndex
+                    val shape = RoundedCornerShape(
+                        topStart = if (first) 16.dp else 0.dp,
+                        topEnd = if (first) 16.dp else 0.dp,
+                        bottomStart = if (last) 16.dp else 0.dp,
+                        bottomEnd = if (last) 16.dp else 0.dp
+                    )
+                    Column(Modifier.padding(horizontal = 16.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainer)) {
+                        if (!first) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        KobanRow(
+                            title = bill.merchant ?: "Split bill",
+                            trailing = {
+                                Text(
+                                    text = personDate(bill.billTime),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            showChevron = true,
+                            onClick = { onOpenSplit(bill.id) },
+                            onClickLabel = "Open"
+                        )
                     }
                 }
             }

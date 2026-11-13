@@ -221,7 +221,7 @@ internal fun LinkStep(modifier: Modifier, state: SplitEditorState, vm: SplitEdit
         item {
             ListGroup {
                 state.candidates.forEach { expense ->
-                    item { PaymentOption(expense, expense.id == state.selectedExpenseId) { vm.selectExpense(expense.id) } }
+                    item(key = expense.id) { PaymentOption(expense, expense.id == state.selectedExpenseId) { vm.selectExpense(expense.id) } }
                 }
                 item {
                     KobanRow(
@@ -382,6 +382,8 @@ internal fun SummaryStep(
     }
     if (confirmDelete) {
         AlertDialog(
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete this split?") },
             text = { Text("The bill and what people owe are removed. Your payment counts in full again.") },

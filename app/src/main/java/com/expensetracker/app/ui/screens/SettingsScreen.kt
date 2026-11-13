@@ -190,7 +190,7 @@ fun SettingsScreen(
                     if (uiState.categories.isNotEmpty()) {
                         ListGroup {
                             uiState.categories.forEach { category ->
-                                item {
+                                item(key = category.id) {
                                     KobanRow(
                                         title = category.name,
                                         subtitle = if (category.isDefault) "Built in" else "Your own",

@@ -233,7 +233,8 @@ private fun PaymentContent(
                         subtitle = "Category",
                         leading = { CategoryDot(categoryColor(form.categoryId), 12.dp) },
                         showChevron = true,
-                        onClick = { pickingCategory = true }
+                        onClick = { pickingCategory = true },
+                        onClickLabel = "Change category"
                     )
                 }
                 item {
@@ -242,7 +243,8 @@ private fun PaymentContent(
                         subtitle = "Date",
                         leading = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
                         showChevron = true,
-                        onClick = { pickingDate = true }
+                        onClick = { pickingDate = true },
+                        onClickLabel = "Change date"
                     )
                 }
                 item {
@@ -344,6 +346,8 @@ private fun PaymentContent(
     }
     if (confirmingDelete) {
         AlertDialog(
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             onDismissRequest = { confirmingDelete = false },
             title = { Text("Delete this payment?") },
             text = { Text("It will no longer count in your totals.") },

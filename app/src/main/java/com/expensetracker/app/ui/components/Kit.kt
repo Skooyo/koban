@@ -1,6 +1,7 @@
 package com.expensetracker.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,8 +30,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +44,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected as semanticsSelected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -52,9 +58,9 @@ import com.expensetracker.app.data.TransactionType
 class ListGroupScope {
     internal val items = mutableListOf<@Composable () -> Unit>()
 
-    /** Adds one row. */
-    fun item(content: @Composable () -> Unit) {
-        items += content
+    /** Adds one row. Pass a stable [key] when rows can be deleted or reordered. */
+    fun item(key: Any? = null, content: @Composable () -> Unit) {
+        items += if (key == null) content else ({ key(key) { content() } })
     }
 }
 
@@ -149,7 +155,7 @@ fun KobanRow(
 fun SectionHeading(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        modifier = modifier.padding(bottom = 8.dp),
+        modifier = modifier.padding(bottom = 8.dp).semantics { heading() },
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -249,8 +255,9 @@ fun DirectionSegments(selected: TransactionType?, onPick: ((TransactionType) -> 
                 on = on,
                 action = when {
                     onPick != null -> Modifier.selectable(selected = on, role = Role.RadioButton) { onPick(type) }
-                    onTapWhenFixed != null -> Modifier.clickable(onClickLabel = "Change payment", onClick = onTapWhenFixed)
-                    else -> Modifier
+                    onTapWhenFixed != null -> Modifier.clickable(onClickLabel = "Change payment", role = Role.RadioButton, onClick = onTapWhenFixed)
+                        .semantics { semanticsSelected = on }
+                    else -> Modifier.semantics { semanticsSelected = on }
                 }
             )
         }
@@ -283,6 +290,7 @@ private fun RowScope.Segment(label: String, on: Boolean, action: Modifier) {
             .heightIn(min = 48.dp)
             .clip(CircleShape)
             .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+            .then(if (on) Modifier.border(1.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier)
             .then(action),
         contentAlignment = Alignment.Center
     ) {
@@ -328,7 +336,7 @@ fun InitialsAvatar(name: String, modifier: Modifier = Modifier, size: Dp = 40.dp
         modifier
             .size(size)
             .clearAndSetSemantics {}
-            .background(tint?.copy(alpha = 0.3f) ?: MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+            .background(tint?.copy(alpha = if (tint == MaterialTheme.colorScheme.primaryContainer) 1f else 0.3f) ?: MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -342,4 +350,35 @@ fun InitialsAvatar(name: String, modifier: Modifier = Modifier, size: Dp = 40.dp
 private fun initialsOf(name: String): String {
     val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
     return (if (words.size >= 2) "${words[0].first()}${words[1].first()}" else name.trim().take(2)).uppercase()
+}
+
+/** A text field in the dialog style: filled `surfaceContainerHigh`, no underline. */
+@Composable
+fun DialogTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    isError: Boolean = false,
+    supportingText: String? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        label = { Text(label) },
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        isError = isError,
+        supportingText = supportingText?.let { message -> { Text(message) } },
+        keyboardOptions = keyboardOptions,
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            errorContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent
+        )
+    )
 }

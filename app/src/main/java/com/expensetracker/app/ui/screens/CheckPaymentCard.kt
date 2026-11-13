@@ -55,6 +55,7 @@ import com.expensetracker.app.data.PendingPaymentEntity
 import com.expensetracker.app.data.TransactionType
 import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.CaptureFormat
+import com.expensetracker.app.ui.components.DialogTextField
 import com.expensetracker.app.ui.components.InitialsAvatar
 import com.expensetracker.app.ui.components.AmountInput
 import com.expensetracker.app.ui.components.CategoryDot
@@ -145,18 +146,19 @@ internal fun CheckPaymentCard(
                 )
             }
             ListGroup {
-                item { KobanRow(payment.merchant ?: "Not set", subtitle = "Shop", showChevron = true, onClick = onEdit) }
+                item { KobanRow(payment.merchant ?: "Not set", subtitle = "Shop", showChevron = true, onClick = onEdit, onClickLabel = "Change payment") }
                 item {
                     KobanRow(
                         card.categoryName,
                         subtitle = "Category",
                         leading = { CategoryDot(categoryColor(card.categoryId), 12.dp) },
                         showChevron = true,
-                        onClick = onEdit
+                        onClick = onEdit,
+                        onClickLabel = "Change payment"
                     )
                 }
                 item {
-                    KobanRow("${dateLabel(payment.notificationPostTime)}, $timeText", subtitle = "Date", showChevron = true, onClick = onEdit)
+                    KobanRow("${dateLabel(payment.notificationPostTime)}, $timeText", subtitle = "Date", showChevron = true, onClick = onEdit, onClickLabel = "Change payment")
                 }
             }
             Text(
@@ -281,40 +283,19 @@ internal fun EditPaymentSheet(
                     typePicked = true
                 }
             )
-            val fieldColors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                errorContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            )
-            TextField(
+            DialogTextField(
                 value = amountText,
                 onValueChange = { amountText = it },
-                label = { Text("Amount (${AmountFormatter.currencySymbol(payment.currency)})") },
+                label = "Amount (${AmountFormatter.currencySymbol(payment.currency)})",
                 isError = amount == null,
-                supportingText = if (amount == null) {
-                    { Text("Type an amount above 0") }
-                } else {
-                    null
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                textStyle = MaterialTheme.typography.bodyLarge,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth()
+                supportingText = if (amount == null) "Type an amount above 0" else null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
-            TextField(
+            DialogTextField(
                 value = merchant,
                 onValueChange = { merchant = it },
-                label = { Text("Shop") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors,
-                textStyle = MaterialTheme.typography.bodyLarge,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                modifier = Modifier.fillMaxWidth()
+                label = "Shop",
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
             )
             ListGroup {
                 item {
@@ -323,10 +304,11 @@ internal fun EditPaymentSheet(
                         subtitle = "Category",
                         leading = { CategoryDot(categoryColor(categoryId), 12.dp) },
                         showChevron = true,
-                        onClick = { pickingCategory = true }
+                        onClick = { pickingCategory = true },
+                        onClickLabel = "Change category"
                     )
                 }
-                item { KobanRow(dateLabel(time), subtitle = "Date", showChevron = true, onClick = { pickingDate = true }) }
+                item { KobanRow(dateLabel(time), subtitle = "Date", showChevron = true, onClick = { pickingDate = true }, onClickLabel = "Change date") }
             }
             Button(
                 onClick = {

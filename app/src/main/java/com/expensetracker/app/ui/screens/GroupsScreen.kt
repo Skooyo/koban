@@ -13,8 +13,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
+import com.expensetracker.app.ui.components.DialogTextField
 import com.expensetracker.app.ui.components.InitialsAvatar
 import com.expensetracker.app.ui.components.CategoryDot
 import com.expensetracker.app.ui.components.KobanRow
@@ -129,22 +128,16 @@ private fun Messages(vm: GroupsViewModel, host: SnackbarHostState) {
 private fun NameDialog(title: String, label: String, start: String, confirm: String, max: Int, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var text by rememberSaveable { mutableStateOf(start) }
     AlertDialog(
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            TextField(
+            DialogTextField(
                 value = text,
                 onValueChange = { text = it.take(max) },
-                label = { Text(label) },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                supportingText = { Text("${text.trim().length} of $max") }
+                label = label,
+                supportingText = "${text.trim().length} of $max"
             )
         },
         confirmButton = { TextButton(onClick = { onConfirm(text.trim()) }, enabled = text.isNotBlank()) { Text(confirm) } },
@@ -155,6 +148,8 @@ private fun NameDialog(title: String, label: String, start: String, confirm: Str
 @Composable
 private fun ConfirmDialog(title: String, body: String, confirm: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(body) },
@@ -279,7 +274,7 @@ fun GroupsScreen(onOpenGroup: (String) -> Unit, vm: GroupsViewModel = hiltViewMo
                         if (state.groups.isNotEmpty()) item {
                             ListGroup {
                                 state.groups.forEach { g ->
-                                    item {
+                                    item(key = g.id) {
                                         val owner = if (g.ownerId == state.userId) " · you are the owner" else ""
                                         KobanRow(
                                             title = g.name,
@@ -510,7 +505,7 @@ private fun GroupBody(
                 }
                 ListGroup {
                     d.members.forEach { m ->
-                        item {
+                        item(key = m.userId) {
                             MemberRow(
                                 m = m, isMe = m.userId == me, isOwner = isOwner, expanded = open == m.userId,
                                 barFraction = if (top > 0f) (m.total.toFloat() / top).coerceIn(0.02f, 1f) else 1f,

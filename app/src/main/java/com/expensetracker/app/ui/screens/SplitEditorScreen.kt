@@ -127,8 +127,8 @@ fun SplitEditorScreen(
                         enabled = action.enabled && !state.saving,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 48.dp)
                             .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .heightIn(min = 48.dp)
                     ) { Text(action.label) }
                 }
             }
@@ -193,7 +193,7 @@ private fun bottomAction(state: SplitEditorState, vm: SplitEditorViewModel): Bot
                 SplitEditorViewModel.chargesOf(state) != null,
             vm::next
         )
-        SplitStep.People -> BottomAction("Next · ${state.people.size + 1} people", true, vm::next)
+        SplitStep.People -> BottomAction("Next · ${state.people.size + 1} ${if (state.people.isEmpty()) "person" else "people"}", true, vm::next)
         SplitStep.Assign -> BottomAction("Next", SplitEditorViewModel.unassigned(state).isEmpty(), vm::next)
         SplitStep.Link ->
             if (state.locked) BottomAction("Save payment", true, vm::saveLockedPayment)
@@ -348,7 +348,7 @@ private fun ItemsStep(modifier: Modifier, state: SplitEditorState, vm: SplitEdit
                 SectionHeading("Items")
                 if (state.items.isNotEmpty()) {
                     ListGroup {
-                        state.items.forEach { row -> item { ItemEditor(row, vm) } }
+                        state.items.forEach { row -> item(key = row.key) { ItemEditor(row, vm) } }
                     }
                 }
                 TextButton(

@@ -42,7 +42,7 @@ import java.math.RoundingMode
 
 /**
  * Money with a small currency symbol. A negative [amount] means money received:
- * it shows as "+RM" in the received colour.
+ * it shows as "+ RM" in the received colour.
  */
 @Composable
 fun MoneyAmount(
@@ -57,7 +57,7 @@ fun MoneyAmount(
     val symbolColor = MaterialTheme.colorScheme.onSurfaceVariant
     Text(
         text = buildAnnotatedString {
-            if (received) append("+")
+            if (received) append("+ ")
             withStyle(SpanStyle(fontSize = style.fontSize * symbolScale, color = symbolColor)) {
                 append(AmountFormatter.currencySymbol(currency))
                 append(" ")
@@ -127,57 +127,6 @@ fun NoteStrip(
     }
 }
 
-/** The large total at the top of Home. Tap opens the transactions for the period. */
-@Composable
-fun PeriodHero(
-    summary: PeriodSummary,
-    onOpen: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClickLabel = "Open transactions", onClick = onOpen)
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = summary.title, style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = summary.subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 10.dp)
-            )
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Column {
-            MoneyAmount(
-                amount = summary.total,
-                style = MaterialTheme.typography.displayLarge,
-                symbolScale = 0.4f
-            )
-            ReceivedNote(received = summary.received, modifier = Modifier.padding(top = 4.dp))
-        }
-        NoteStrip(breakdown = summary.breakdown)
-        if (summary.breakdown.isEmpty()) {
-            Text(
-                text = "No payments recorded yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            CategoryBreakdownList(breakdown = summary.breakdown)
-        }
-    }
-}
-
 /** Thin bar that compares [total] with the largest total in a list. */
 @Composable
 fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.primary) {
@@ -207,7 +156,7 @@ fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifi
 fun ReceivedNote(received: BigDecimal, modifier: Modifier = Modifier) {
     if (received <= BigDecimal.ZERO) return
     Text(
-        text = "+${AmountFormatter.currencySymbol("MYR")} ${AmountFormatter.formatGrouped(received)} received",
+        text = "+ ${AmountFormatter.currencySymbol("MYR")} ${AmountFormatter.formatGrouped(received)} received",
         style = MaterialTheme.typography.bodyMedium,
         color = LocalMoneyColors.current.received,
         modifier = modifier

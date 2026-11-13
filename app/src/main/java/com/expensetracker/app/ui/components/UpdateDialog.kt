@@ -27,8 +27,8 @@ fun UpdateDialog(state: UpdateState, onUpdate: () -> Unit, onDismiss: () -> Unit
             AlertDialog(
                 onDismissRequest = onDismiss,
                 title = { Text("Update available", style = MaterialTheme.typography.headlineSmall) },
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = RoundedCornerShape(28.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                shape = RoundedCornerShape(24.dp),
                 text = {
                     Column(
                         modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -49,6 +49,8 @@ fun UpdateDialog(state: UpdateState, onUpdate: () -> Unit, onDismiss: () -> Unit
             )
         }
         UpdateState.Downloading -> AlertDialog(
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             onDismissRequest = {},
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -59,11 +61,15 @@ fun UpdateDialog(state: UpdateState, onUpdate: () -> Unit, onDismiss: () -> Unit
             confirmButton = {}
         )
         UpdateState.Installing -> AlertDialog(
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             onDismissRequest = onDismiss,
             text = { Text("Installing…") },
             confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
         )
         is UpdateState.Failed -> AlertDialog(
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             onDismissRequest = onDismiss,
             text = { Text(state.message) },
             confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } }

@@ -113,6 +113,8 @@ fun ActivityScreen(
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
     var filterSheetOpen by rememberSaveable { mutableStateOf(false) }
     val monthLabel = MonthNav.label(uiState.month)
+    val dayFormat = remember { SimpleDateFormat("d MMM", Locale.getDefault()) }
+    val selectedLabel = uiState.weeks.firstOrNull { it.startMs == uiState.selectedWeek }?.let { weekLabel(it, dayFormat) }
 
     // Clearing the message changes the key, so show it from a scope that outlives this effect.
     LaunchedEffect(message) {
@@ -143,7 +145,7 @@ fun ActivityScreen(
                             FilterChip(
                                 name = uiState.categoryNames[filter] ?: DefaultCategories.UNCATEGORIZED_NAME,
                                 total = uiState.monthTotal.takeIf { !uiState.showAll },
-                                period = if (uiState.selectedWeek != null) "this week" else "this month",
+                                period = selectedLabel ?: monthLabel,
                                 onClear = { viewModel.setCategoryFilter(null) },
                                 modifier = Modifier.padding(top = 12.dp)
                             )
@@ -157,8 +159,6 @@ fun ActivityScreen(
                                 onPick = { sheetOpen = true },
                                 modifier = Modifier.padding(top = 8.dp)
                             )
-                            val dayFormat = remember { SimpleDateFormat("d MMM", Locale.getDefault()) }
-                            val selectedLabel = uiState.weeks.firstOrNull { it.startMs == uiState.selectedWeek }?.let { weekLabel(it, dayFormat) }
                             ChartCard(
                                 slices = uiState.slices,
                                 label = if (selectedLabel != null) "Spent, $selectedLabel" else "Spent",
