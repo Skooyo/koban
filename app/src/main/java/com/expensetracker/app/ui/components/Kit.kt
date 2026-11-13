@@ -31,6 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -62,7 +65,7 @@ fun ListGroup(modifier: Modifier = Modifier, content: ListGroupScope.() -> Unit)
     }
 }
 
-/** A list row: optional leading icon or avatar, title with optional subtitle, optional trailing content and chevron. */
+/** A list row with optional subtitle, trailing content and chevron; leading is centered in a 40 dp box; pass a 24 dp icon or an avatar. */
 @Composable
 fun KobanRow(
     title: String,
@@ -79,7 +82,7 @@ fun KobanRow(
     Row(
         modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .defaultMinSize(minHeight = minHeight)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -154,7 +157,7 @@ fun LargeTopBar(
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
             if (subtitle != null) {
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -176,6 +179,7 @@ fun TonalButton(
         onClick = onClick,
         modifier = modifier.defaultMinSize(minHeight = 48.dp),
         enabled = enabled,
+        elevation = ButtonDefaults.buttonElevation(0.dp, 0.dp, 0.dp, 0.dp, 0.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
