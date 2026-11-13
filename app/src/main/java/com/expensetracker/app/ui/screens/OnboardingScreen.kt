@@ -45,13 +45,12 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -98,7 +97,7 @@ fun OnboardingScreen(
 
     // The picker keeps its own top bar and Save button.
     if (step == OnboardingStep.APPS) {
-        PaymentAppsScreen(onClose = viewModel::next, onBack = viewModel::back, modifier = modifier)
+        PaymentAppsScreen(onClose = viewModel::appsSaved, onBack = viewModel::back, modifier = modifier)
         return
     }
 
@@ -199,7 +198,7 @@ private fun CenteredMon(face: MonFace, size: Dp) {
 @Composable
 private fun InfoRow(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
     }
 }
@@ -265,7 +264,7 @@ private fun RunningStep() {
         context, Manifest.permission.POST_NOTIFICATIONS
     ) == PackageManager.PERMISSION_GRANTED
 
-    var askedForAlerts by remember { mutableStateOf(false) }
+    var askedForAlerts by rememberSaveable { mutableStateOf(false) }
     val alertsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
 
     Text("Keep Koban running", style = MaterialTheme.typography.headlineSmall)
@@ -276,7 +275,7 @@ private fun RunningStep() {
     // The key rebuilds the rows after every resume, so they read the phone state again.
     key(refresh) {
         if (Build.VERSION.SDK_INT >= 33) {
-            SettingRow("Alerts", "Tell me when tracking stops", alertsGranted(), "Allow alerts") {
+            SettingRow("Alerts", "Tell me when tracking stops", alertsGranted(), "Allow") {
                 val activity = context as? Activity
                 // After two denials Android shows no dialog, so send the user to the settings page.
                 if (activity != null && !activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) && askedForAlerts) {
@@ -287,11 +286,11 @@ private fun RunningStep() {
                 }
             }
         }
-        SettingRow("Battery", "No restrictions", NotificationAccessHelper.isBatteryOptimizationIgnored(context), "Open battery settings") {
+        SettingRow("Battery", "No restrictions", NotificationAccessHelper.isBatteryOptimizationIgnored(context), "Open settings") {
             NotificationAccessHelper.openBatteryOptimizationSettings(context)
         }
         if (OemBatteryHelper.isXiaomiFamily()) {
-            SettingRow("Autostart", "Start Koban after a restart", false, "Open autostart settings") {
+            SettingRow("Autostart", "Start Koban after a restart", false, "Open settings") {
                 OemBatteryHelper.openManufacturerBackgroundSettings(context)
             }
         }
@@ -321,7 +320,7 @@ private fun SettingRow(title: String, action: String, done: Boolean, buttonLabel
                 tint = LocalMoneyColors.current.received
             )
         } else {
-            FilledTonalButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = buttonLabel }) { Text("Open") }
+            FilledTonalButton(onClick = onClick) { Text(buttonLabel) }
         }
     }
 }

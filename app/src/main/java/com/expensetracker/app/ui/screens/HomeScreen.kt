@@ -136,7 +136,7 @@ fun HomeScreen(
                 }
             }
 
-            if (uiState.isAccessGranted && !uiState.hasAnyPayment) {
+            if (uiState.isAccessGranted && !uiState.hasAnyPayment && waitingCount == 0 && !listensToNoApp) {
                 item {
                     FirstPaymentCard(onAddPayment = onAddPayment, onOpenSettings = onOpenSettings)
                 }

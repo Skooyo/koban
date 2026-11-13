@@ -32,6 +32,11 @@ class OnboardingViewModel @Inject constructor(
         else -> Unit
     }
 
+    /** Save can be tapped twice. Only the first tap leaves APPS. */
+    fun appsSaved() {
+        if (step.value == OnboardingStep.APPS) go(OnboardingStep.RUNNING)
+    }
+
     fun back() = when (step.value) {
         OnboardingStep.ACCESS, OnboardingStep.BLOCKED -> go(OnboardingStep.WELCOME)
         OnboardingStep.APPS -> go(OnboardingStep.ACCESS)
@@ -46,10 +51,10 @@ class OnboardingViewModel @Inject constructor(
 
     /** Back from the system settings page: moves on if access is on, or shows the blocked help. */
     fun onResume() {
-        if (savedState.get<Boolean>(KEY_OPENED) != true) return
+        val opened = savedState.get<Boolean>(KEY_OPENED) == true
         val granted = NotificationAccessHelper.isNotificationAccessGranted(context)
-        go(OnboardingRules.afterSettings(step.value, Build.VERSION.SDK_INT, granted))
-        savedState[KEY_OPENED] = false
+        go(OnboardingRules.onResume(step.value, Build.VERSION.SDK_INT, granted, opened))
+        if (opened) savedState[KEY_OPENED] = false
     }
 
     /** Saves the done flag, then calls [onDone]. Leaving first could cancel the write. */

@@ -272,7 +272,7 @@ A snackbar confirms an action that just happened and offers Undo for 6 seconds.
 The discard dialog asks before Koban drops data the person typed.
 
 - Show it when X, Back or a swipe-down would close a screen or sheet that has changes. With no changes, close at once, with no dialog.
-- Title `Discard changes?` in `title-large`. One line in `muted`: `Your changes are not saved.` Two text buttons: `Keep editing` (left, `gold-text`) and `Discard` (right, `error`). The code today shows Discard in the theme primary; change it to `error`.
+- Title `Discard changes?` in `title-large`. One line in `muted`: `Your changes are not saved.` Two text buttons: `Keep editing` (left, `gold-text`) and `Discard` (right, `error`).
 - `Keep editing` and a tap outside the dialog both keep the screen open with the data unchanged.
 - `surface` fill, `radius-24`, 24px padding, a 50% black scrim.
 - In the code: `DiscardChangesDialog.kt`, used by the payment screen, the edit sheet and the split editor. Reuse it; do not write a second one.

@@ -18,6 +18,13 @@ object OnboardingRules {
         else -> step
     }
 
+    /** Back in the app: granted access moves on even when the user did not use our button. */
+    fun onResume(step: OnboardingStep, sdkInt: Int, accessGranted: Boolean, openedSettings: Boolean): OnboardingStep = when {
+        accessGranted && (step == OnboardingStep.ACCESS || step == OnboardingStep.BLOCKED) -> OnboardingStep.APPS
+        openedSettings -> afterSettings(step, sdkInt, accessGranted)
+        else -> step
+    }
+
     fun stepNumber(step: OnboardingStep): Int? = when (step) {
         OnboardingStep.WELCOME -> null
         OnboardingStep.ACCESS, OnboardingStep.BLOCKED -> 1
