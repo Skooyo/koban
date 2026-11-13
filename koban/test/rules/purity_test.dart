@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('rule files import no Flutter and no platform library', () {
-    final bad = RegExp(r"import\s+'(package:flutter|dart:io|dart:ui|dart:html)");
+    final bad = RegExp(
+      r'''(import|export)\s+['"](package:flutter|dart:io|dart:ui|dart:html)''',
+    );
     final files = Directory('lib/rules')
         .listSync(recursive: true)
         .whereType<File>()
