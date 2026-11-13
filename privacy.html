@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koban privacy policy</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<p><a href="./">Koban</a></p>
+<h1>Privacy policy</h1>
+<p>Last changed: 13 November 2026</p>
+
+<p>Koban is a personal expense tracker for Android. It is open source: <a href="https://github.com/Skooyo/koban">github.com/Skooyo/koban</a>. Koban has no ads and no analytics, and it does not sell data.</p>
+
+<h2>Data that stays on your phone</h2>
+<ul>
+<li>The payment notifications that Koban reads from the apps you choose, for example Touch 'n Go eWallet.</li>
+<li>Your payments, categories, notes, people and bill splits.</li>
+</ul>
+<p>Koban keeps this data in its own storage on your phone and does not send it anywhere. When you uninstall Koban, Android deletes it.</p>
+
+<h2>Data that leaves your phone</h2>
+<p>All of this is optional. It happens only when you turn on "Online features" in Koban's settings.</p>
+<ul>
+<li><strong>Invite code.</strong> To use online features, you enter an invite code. Koban's server gives your phone a random device token. The server keeps only a hash of that token.</li>
+<li><strong>Google sign-in.</strong> For groups, you sign in with Google. Google gives Koban your Google account ID, email address and name. Koban's server keeps the account ID and email address, and your first name as your nickname in groups.</li>
+<li><strong>Groups.</strong> When you are in a group, Koban sends your spending totals per category for each week and month, and your budget limits. The other members of your groups can see them. Koban does not send single payments, shop names or notification text.</li>
+<li><strong>Receipt reading.</strong> When you ask Koban to read a receipt online, Koban sends the photo to Koban's server. The server sends it to Claude, an AI model from Anthropic, to read the amount and the items. The server deletes the photo after the read. It keeps only how many reads each phone made per day.</li>
+<li><strong>Update check.</strong> Once a day, Koban asks GitHub if a new version is available. GitHub sees your IP address.</li>
+</ul>
+<p>Koban's server runs on Supabase. Google, Anthropic, GitHub and Supabase handle the data under their own privacy policies.</p>
+
+<h2>On-phone text recognition</h2>
+<p>Koban uses Google ML Kit to read text from receipt photos on your phone. ML Kit can send usage statistics to Google, but not the photo or its text.</p>
+
+<h2>Delete your data</h2>
+<ul>
+<li>To delete your online account, open Groups in Koban, open the menu and tap "Delete account". This deletes your account, your nickname, your group memberships, your shared totals and your budget limits from Koban's server.</li>
+<li>To delete the data on your phone, uninstall Koban.</li>
+</ul>
+
+<h2>Contact</h2>
+<p>For questions about this policy, open an issue at <a href="https://github.com/Skooyo/koban/issues">github.com/Skooyo/koban/issues</a>.</p>
+</main>
+</body>
+</html>
