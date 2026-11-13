@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.data.TransactionType
@@ -84,13 +85,15 @@ fun KobanRow(
     showChevron: Boolean = false,
     onClick: (() -> Unit)? = null,
     minHeight: Dp = 56.dp,
-    titleSuffix: (@Composable () -> Unit)? = null
+    titleSuffix: (@Composable () -> Unit)? = null,
+    onClickLabel: String? = null,
+    subtitleMaxLines: Int = Int.MAX_VALUE
 ) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick) else Modifier)
             .defaultMinSize(minHeight = minHeight)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -119,7 +122,9 @@ fun KobanRow(
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (subtitleColor == Color.Unspecified) muted else subtitleColor
+                    color = if (subtitleColor == Color.Unspecified) muted else subtitleColor,
+                    maxLines = subtitleMaxLines,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

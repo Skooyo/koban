@@ -54,13 +54,13 @@ fun ExpenseListCard(
         expense.transactionType == TransactionType.RECEIVE -> expense.amount.negate()
         else -> expense.effectiveAmount
     }
-    val subtitle = listOfNotNull(
+    val info = listOfNotNull(
         listOfNotNull(time, categoryName).joinToString(" · "),
         if (isRepayment) "Repayment"
         else if (partlyCounted) "paid ${AmountFormatter.currencySymbol(expense.currency)} ${AmountFormatter.formatGrouped(expense.amount)}"
-        else null,
-        expense.notes?.takeIf { it.isNotBlank() }
-    ).joinToString("\n")
+        else null
+    )
+    val subtitle = (info + listOfNotNull(expense.notes?.takeIf { it.isNotBlank() })).joinToString("\n")
 
     KobanRow(
         title = merchant,
@@ -76,18 +76,21 @@ fun ExpenseListCard(
             )
         },
         titleSuffix = if (showConfidence && expense.confidence != ParseConfidence.HIGH) {
-            { CheckBadge() }
+            { CheckBadge(if (expense.confidence == ParseConfidence.LOW) "Check amount" else "Check shop") }
         } else null,
-        onClick = onEdit
+        onClick = onEdit,
+        onClickLabel = "Edit",
+        // The info lines always show; the notes get at most 2 lines, as before the redesign.
+        subtitleMaxLines = info.size + 2
     )
 }
 
 /** Small "Check" tag for a payment whose amount or shop the parser was unsure about. */
 @Composable
-private fun CheckBadge() {
+private fun CheckBadge(text: String) {
     val review = LocalMoneyColors.current.review
     Text(
-        text = "Check",
+        text = text,
         style = MaterialTheme.typography.labelSmall,
         color = review,
         maxLines = 1,
