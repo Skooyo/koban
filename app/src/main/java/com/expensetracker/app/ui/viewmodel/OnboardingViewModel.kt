@@ -49,10 +49,15 @@ class OnboardingViewModel @Inject constructor(
         if (savedState.get<Boolean>(KEY_OPENED) != true) return
         val granted = NotificationAccessHelper.isNotificationAccessGranted(context)
         go(OnboardingRules.afterSettings(step.value, Build.VERSION.SDK_INT, granted))
+        savedState[KEY_OPENED] = false
     }
 
-    fun finish() {
-        viewModelScope.launch { settingsRepository.setOnboardingDone() }
+    /** Saves the done flag, then calls [onDone]. Leaving first could cancel the write. */
+    fun finish(onDone: () -> Unit) {
+        viewModelScope.launch {
+            settingsRepository.setOnboardingDone()
+            onDone()
+        }
     }
 
     private companion object {

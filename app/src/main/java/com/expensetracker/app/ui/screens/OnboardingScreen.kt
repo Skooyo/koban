@@ -1,6 +1,8 @@
 package com.expensetracker.app.ui.screens
 
 import android.Manifest
+import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -41,12 +43,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -85,8 +90,7 @@ fun OnboardingScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
     BackHandler {
         if (step == OnboardingStep.WELCOME) {
-            viewModel.finish()
-            onFinished()
+            viewModel.finish(onFinished)
         } else {
             viewModel.back()
         }
@@ -94,7 +98,7 @@ fun OnboardingScreen(
 
     // The picker keeps its own top bar and Save button.
     if (step == OnboardingStep.APPS) {
-        PaymentAppsScreen(onClose = viewModel::next, modifier = modifier)
+        PaymentAppsScreen(onClose = viewModel::next, onBack = viewModel::back, modifier = modifier)
         return
     }
 
@@ -127,17 +131,14 @@ fun OnboardingScreen(
                         MainButton("Open app info") { openAppInfo(context) }
                         OutlinedButton(
                             onClick = ::openAccessSettings,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 8.dp)
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp)
                         ) { Text("Try again") }
                     }
                     OnboardingStep.RUNNING -> {
                         MainButton("Next", viewModel::next)
                         TextButton(onClick = viewModel::next) { Text("Skip for now") }
                     }
-                    OnboardingStep.READY -> MainButton("Go to Home") {
-                        viewModel.finish()
-                        onFinished()
-                    }
+                    OnboardingStep.READY -> MainButton("Go to Home") { viewModel.finish(onFinished) }
                     OnboardingStep.APPS -> Unit
                 }
             }
@@ -264,6 +265,7 @@ private fun RunningStep() {
         context, Manifest.permission.POST_NOTIFICATIONS
     ) == PackageManager.PERMISSION_GRANTED
 
+    var askedForAlerts by remember { mutableStateOf(false) }
     val alertsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
 
     Text("Keep Koban running", style = MaterialTheme.typography.headlineSmall)
@@ -274,15 +276,22 @@ private fun RunningStep() {
     // The key rebuilds the rows after every resume, so they read the phone state again.
     key(refresh) {
         if (Build.VERSION.SDK_INT >= 33) {
-            SettingRow("Alerts", "Tell me when tracking stops", alertsGranted()) {
-                alertsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            SettingRow("Alerts", "Tell me when tracking stops", alertsGranted(), "Allow alerts") {
+                val activity = context as? Activity
+                // After two denials Android shows no dialog, so send the user to the settings page.
+                if (activity != null && !activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) && askedForAlerts) {
+                    openAlertSettings(context)
+                } else {
+                    askedForAlerts = true
+                    alertsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
         }
-        SettingRow("Battery", "No restrictions", NotificationAccessHelper.isBatteryOptimizationIgnored(context)) {
+        SettingRow("Battery", "No restrictions", NotificationAccessHelper.isBatteryOptimizationIgnored(context), "Open battery settings") {
             NotificationAccessHelper.openBatteryOptimizationSettings(context)
         }
         if (OemBatteryHelper.isXiaomiFamily()) {
-            SettingRow("Autostart", "Start Koban after a restart", false) {
+            SettingRow("Autostart", "Start Koban after a restart", false, "Open autostart settings") {
                 OemBatteryHelper.openManufacturerBackgroundSettings(context)
             }
         }
@@ -295,7 +304,7 @@ private fun RunningStep() {
 }
 
 @Composable
-private fun SettingRow(title: String, action: String, done: Boolean, onClick: () -> Unit) {
+private fun SettingRow(title: String, action: String, done: Boolean, buttonLabel: String, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 56.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -312,7 +321,7 @@ private fun SettingRow(title: String, action: String, done: Boolean, onClick: ()
                 tint = LocalMoneyColors.current.received
             )
         } else {
-            FilledTonalButton(onClick = onClick) { Text("Open") }
+            FilledTonalButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = buttonLabel }) { Text("Open") }
         }
     }
 }
@@ -335,8 +344,24 @@ private fun ReadyStep() {
 }
 
 private fun openAppInfo(context: Context) {
-    context.startActivity(
-        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    )
+    try {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (_: ActivityNotFoundException) {
+        // No such settings page on this phone.
+    }
+}
+
+private fun openAlertSettings(context: Context) {
+    try {
+        context.startActivity(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (_: ActivityNotFoundException) {
+        // No such settings page on this phone.
+    }
 }
