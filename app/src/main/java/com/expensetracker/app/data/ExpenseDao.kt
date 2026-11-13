@@ -10,6 +10,10 @@ import java.math.BigDecimal
 
 @Dao
 interface ExpenseDao {
+    /** True when at least one payment shows in Activity (dismissed rows do not count). */
+    @Query("SELECT EXISTS(SELECT 1 FROM expenses WHERE status != 'DISMISSED')")
+    fun observeAnyExpense(): Flow<Boolean>
+
     @Query("SELECT * FROM expenses WHERE status != 'DISMISSED' ORDER BY notificationPostTime DESC")
     fun observeAllActive(): Flow<List<ExpenseEntity>>
 

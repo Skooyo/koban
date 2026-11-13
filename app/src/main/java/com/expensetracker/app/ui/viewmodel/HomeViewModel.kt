@@ -30,7 +30,9 @@ data class HomeUiState(
     val today: PeriodSummary = PeriodSummary("", "", java.math.BigDecimal.ZERO, emptyList(), emptyList()),
     val week: PeriodSummary = PeriodSummary("", "", java.math.BigDecimal.ZERO, emptyList(), emptyList()),
     val month: PeriodSummary = PeriodSummary("", "", java.math.BigDecimal.ZERO, emptyList(), emptyList()),
-    val categoryNames: Map<String, String> = emptyMap()
+    val categoryNames: Map<String, String> = emptyMap(),
+    /** True while loading, so the first-payment card stays hidden until Room answers. */
+    val hasAnyPayment: Boolean = true
 )
 
 @HiltViewModel
@@ -55,14 +57,15 @@ class HomeViewModel @Inject constructor(
             expenseRepository.observeCurrentPeriodSummary(SpendingPeriod.DAY),
             expenseRepository.observeCurrentPeriodSummary(SpendingPeriod.WEEK),
             expenseRepository.observeCurrentPeriodSummary(SpendingPeriod.MONTH),
-            categoryRepository.observeAll()
-        ) { granted, today, week, month, categories ->
+            combine(categoryRepository.observeAll(), expenseRepository.observeHasAnyPayment(), ::Pair)
+        ) { granted, today, week, month, (categories, hasAny) ->
             HomeUiState(
                 isAccessGranted = granted,
                 today = today,
                 week = week,
                 month = month,
-                categoryNames = categories.associate { it.id to it.name }
+                categoryNames = categories.associate { it.id to it.name },
+                hasAnyPayment = hasAny
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())

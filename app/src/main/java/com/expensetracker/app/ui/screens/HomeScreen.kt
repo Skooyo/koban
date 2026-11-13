@@ -3,6 +3,9 @@ package com.expensetracker.app.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -43,6 +48,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.data.DefaultCategories
 import com.expensetracker.app.ui.components.ExpenseListCard
 import com.expensetracker.app.ui.components.ListenerStatusBanner
+import com.expensetracker.app.ui.components.Mon
+import com.expensetracker.app.ui.components.MonFace
 import com.expensetracker.app.ui.components.NoteStrip
 import com.expensetracker.app.ui.components.PeriodHero
 import com.expensetracker.app.ui.components.PeriodTotalRow
@@ -126,6 +133,12 @@ fun HomeScreen(
             if (waitingCount > 0) {
                 item {
                     WaitingBanner(count = waitingCount, onClick = onCheckPayments)
+                }
+            }
+
+            if (uiState.isAccessGranted && !uiState.hasAnyPayment) {
+                item {
+                    FirstPaymentCard(onAddPayment = onAddPayment, onOpenSettings = onOpenSettings)
                 }
             }
 
@@ -234,5 +247,63 @@ private fun WaitingBanner(count: Int, onClick: () -> Unit) {
             contentDescription = null,
             tint = money.goldText
         )
+    }
+}
+
+/** Empty Home after setup: Mon waits, plus one optional step for later. */
+@Composable
+private fun FirstPaymentCard(onAddPayment: () -> Unit, onOpenSettings: () -> Unit) {
+    Column(modifier = Modifier.padding(bottom = 24.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Mon(MonFace.IDLE, 56.dp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "Waiting for your first payment",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Pay for anything. It shows up here.",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            )
+            FilledTonalButton(onClick = onAddPayment, modifier = Modifier.fillMaxWidth()) {
+                Text("Add one by hand")
+            }
+        }
+        Text(
+            text = "Set up later",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(role = Role.Button, onClick = onOpenSettings)
+                .padding(horizontal = 4.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Online features", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Read receipts, join groups",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        }
     }
 }
