@@ -348,8 +348,13 @@ fun InitialsAvatar(name: String, modifier: Modifier = Modifier, size: Dp = 40.dp
 }
 
 private fun initialsOf(name: String): String {
-    val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-    return (if (words.size >= 2) "${words[0].first()}${words[1].first()}" else name.trim().take(2)).uppercase()
+    // Only letters and digits count, so "Touch 'n Go" gives "TN".
+    val words = name.split(Regex("\\s+")).map { w -> w.filter { it.isLetterOrDigit() } }.filter { it.isNotEmpty() }
+    return when {
+        words.size >= 2 -> "${words[0].first()}${words[1].first()}"
+        words.size == 1 -> words[0].take(2)
+        else -> name.trim().take(1)
+    }.uppercase()
 }
 
 /** A text field in the dialog style: filled `surfaceContainerHigh`, no underline. */
