@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Receipt
@@ -196,15 +195,20 @@ fun HomeScreen(
                     item {
                         SectionHeading("Latest this week", Modifier.padding(top = 12.dp))
                     }
-                    items(uiState.week.recentExpenses, key = { it.id }) { expense ->
-                        ExpenseListCard(
-                            expense = expense,
-                            categoryName = expense.categoryId?.let { uiState.categoryNames[it] }
-                                ?: DefaultCategories.UNCATEGORIZED_NAME,
-                            compact = true,
-                            timePattern = "EEE HH:mm",
-                            onEdit = { onEditPayment(expense.id) }
-                        )
+                    item {
+                        ListGroup {
+                            uiState.week.recentExpenses.forEach { expense ->
+                                item {
+                                    ExpenseListCard(
+                                        expense = expense,
+                                        categoryName = expense.categoryId?.let { uiState.categoryNames[it] }
+                                            ?: DefaultCategories.UNCATEGORIZED_NAME,
+                                        timePattern = "EEE HH:mm",
+                                        onEdit = { onEditPayment(expense.id) }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

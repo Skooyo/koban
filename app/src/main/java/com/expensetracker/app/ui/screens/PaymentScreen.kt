@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
@@ -26,8 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -68,9 +64,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
@@ -408,33 +402,6 @@ private fun TopRow(
         }
         // Edit keeps the Spent / Received switch that the screen has today, under the title row.
         if (isEditing) DirectionSegments(selected = type, onPick = onType)
-    }
-}
-
-@Composable
-internal fun RowScope.TypeSegment(label: String, selected: Boolean, selectedColor: Color, onClick: () -> Unit) {
-    val lightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    Box(
-        modifier = Modifier
-            .weight(1f)
-            .heightIn(min = 48.dp)
-            .clip(CircleShape)
-            .background(if (selected) selectedColor else Color.Transparent)
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = when {
-                !selected -> MaterialTheme.colorScheme.onSurfaceVariant
-                // Ink on the light-theme green is only ~3.6:1.
-                lightTheme && selectedColor == LocalMoneyColors.current.received -> Color.White
-                selectedColor.luminance() > 0.18f -> Ink
-                else -> Color.White
-            }
-        )
     }
 }
 

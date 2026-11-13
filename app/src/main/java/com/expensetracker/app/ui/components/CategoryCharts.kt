@@ -1,30 +1,17 @@
 package com.expensetracker.app.ui.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.expensetracker.app.data.CategoryBreakdown
 import com.expensetracker.app.data.ExpenseEntity
@@ -49,7 +36,6 @@ data class DonutSlice(val categoryId: String?, val name: String, val total: BigD
 
 const val EVERYTHING_ELSE = "Everything else"
 private const val MAX_SLICES = 6
-private const val COMPACT_ROWS = 4
 
 /**
  * Slices in a fixed order. In this order no two neighbors have colors that look alike
@@ -83,125 +69,51 @@ private fun percentOf(part: BigDecimal, whole: BigDecimal): Int =
     if (whole.signum() == 0) 0 else part.multiply(BigDecimal(100)).divide(whole, 0, RoundingMode.HALF_UP).toInt()
 
 /**
- * Spending by category as a donut, with a legend that names every slice.
- * [compact] puts a small ring on the left and at most 4 legend rows on the right.
+ * Spending by category as a small ring. The ring is a button when [onClick] is set.
+ * The gap between slices has the color of the card the ring sits on.
  */
 @Composable
 fun CategoryDonut(
     slices: List<DonutSlice>,
-    onSelect: (DonutSlice) -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
-    onRingClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null
 ) {
     if (slices.isEmpty()) return
     val colors = slices.map { sliceColor(it) }
-    val gap = MaterialTheme.colorScheme.background
+    val gap = MaterialTheme.colorScheme.surfaceContainer
     val whole = slices.fold(BigDecimal.ZERO) { a, b -> a + b.total }
     val summary = slices.joinToString(", ") { "${it.name} ${percentOf(it.total, whole)} percent" }
 
-    // Compact legend: the 3 largest named slices, then the rest folded into one gray row.
-    val folding = compact && slices.size > COMPACT_ROWS
-    val other = LocalMoneyColors.current.other
-    val top = slices.indices.filter { !slices[it].folded }
-        .sortedByDescending { slices[it].total }
-        .take(COMPACT_ROWS - 1)
-    val legend = if (folding) {
-        val rest = slices.indices - top.toSet()
-        top.map { slices[it] } +
-            DonutSlice(null, EVERYTHING_ELSE, rest.fold(BigDecimal.ZERO) { a, i -> a + slices[i].total }, folded = true)
-    } else slices
-    val legendColors = if (folding) top.map { colors[it] } + other else colors
-
-    val ring: @Composable (Modifier) -> Unit = { ringModifier ->
-        Canvas(
-            modifier = ringModifier
-                .size(if (compact) 104.dp else 176.dp)
-                .then(
-                    if (onRingClick != null) Modifier.clickable(role = Role.Button, onClickLabel = "Filter by category", onClick = onRingClick)
-                    else Modifier
-                )
-                .semantics { contentDescription = "Spending by category: $summary" }
-        ) {
-            val stroke = size.minDimension * 0.2f
-            val diameter = size.minDimension - stroke
-            val topLeft = Offset((size.width - diameter) / 2, (size.height - diameter) / 2)
-            val sweeps = slices.map { 360f * it.total.toFloat() / whole.toFloat() }
-            var start = -90f
-            sweeps.forEachIndexed { i, sweep ->
-                drawArc(colors[i], start, sweep, false, topLeft, Size(diameter, diameter), style = Stroke(stroke))
+    Canvas(
+        modifier = modifier
+            .size(104.dp)
+            .then(
+                if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = "Filter by category", onClick = onClick)
+                else Modifier
+            )
+            .semantics { contentDescription = "Spending by category: $summary" }
+    ) {
+        val stroke = size.minDimension * 0.2f
+        val diameter = size.minDimension - stroke
+        val topLeft = Offset((size.width - diameter) / 2, (size.height - diameter) / 2)
+        val sweeps = slices.map { 360f * it.total.toFloat() / whole.toFloat() }
+        var start = -90f
+        sweeps.forEachIndexed { i, sweep ->
+            drawArc(colors[i], start, sweep, false, topLeft, Size(diameter, diameter), style = Stroke(stroke))
+            start += sweep
+        }
+        // A 2dp gap between neighboring slices.
+        if (slices.size > 1) {
+            val inner = diameter / 2 - stroke / 2 - 1f
+            val outer = diameter / 2 + stroke / 2 + 1f
+            start = -90f
+            sweeps.forEach { sweep ->
+                val angle = Math.toRadians(start.toDouble())
+                val dx = cos(angle).toFloat()
+                val dy = sin(angle).toFloat()
+                drawLine(gap, center + Offset(dx * inner, dy * inner), center + Offset(dx * outer, dy * outer), 2.dp.toPx())
                 start += sweep
             }
-            // A 2dp background-colored gap between neighboring slices.
-            if (slices.size > 1) {
-                val inner = diameter / 2 - stroke / 2 - 1f
-                val outer = diameter / 2 + stroke / 2 + 1f
-                start = -90f
-                sweeps.forEach { sweep ->
-                    val angle = Math.toRadians(start.toDouble())
-                    val dx = cos(angle).toFloat()
-                    val dy = sin(angle).toFloat()
-                    drawLine(gap, center + Offset(dx * inner, dy * inner), center + Offset(dx * outer, dy * outer), 2.dp.toPx())
-                    start += sweep
-                }
-            }
-        }
-    }
-    val legendColumn: @Composable (Modifier) -> Unit = { legendModifier ->
-        Column(modifier = legendModifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            legend.forEachIndexed { i, slice ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                        .then(
-                            if (slice.folded) Modifier
-                            else Modifier.clickable(role = Role.Button, onClickLabel = "Show only ${slice.name}") { onSelect(slice) }
-                        )
-                ) {
-                    Box(
-                        Modifier
-                            .size(10.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(legendColors[i])
-                    )
-                    Text(
-                        text = slice.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 10.dp, end = if (compact) 8.dp else 0.dp)
-                    )
-                    if (!compact) {
-                        Text(
-                            text = "${percentOf(slice.total, whole)}%",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(end = 12.dp)
-                        )
-                    }
-                    MoneyAmount(amount = slice.total, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
-    }
-
-    if (compact) {
-        Row(
-            modifier = modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            ring(Modifier)
-            legendColumn(Modifier.weight(1f))
-        }
-    } else {
-        Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            ring(Modifier.align(Alignment.CenterHorizontally))
-            legendColumn(Modifier)
         }
     }
 }

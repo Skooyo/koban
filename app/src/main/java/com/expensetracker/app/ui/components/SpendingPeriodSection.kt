@@ -178,49 +178,9 @@ fun PeriodHero(
     }
 }
 
-/** One tappable period with its total, e.g. a week or a month. [below] draws under the total. */
-@Composable
-fun PeriodTotalRow(
-    title: String,
-    subtitle: String?,
-    total: BigDecimal,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    below: @Composable () -> Unit = {}
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.titleMedium)
-                subtitle?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            MoneyAmount(amount = total, style = MaterialTheme.typography.titleLarge)
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp)
-            )
-        }
-        below()
-    }
-}
-
 /** Thin bar that compares [total] with the largest total in a list. */
 @Composable
-fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifier) {
+fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.primary) {
     val fraction = if (max == null || max <= BigDecimal.ZERO || total <= BigDecimal.ZERO) {
         0f
     } else {
@@ -237,7 +197,7 @@ fun RelativeBar(total: BigDecimal, max: BigDecimal?, modifier: Modifier = Modifi
             Modifier
                 .fillMaxWidth(fraction)
                 .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.primary)
+                .background(color)
         )
     }
 }
@@ -252,25 +212,4 @@ fun ReceivedNote(received: BigDecimal, modifier: Modifier = Modifier) {
         color = LocalMoneyColors.current.received,
         modifier = modifier
     )
-}
-
-@Composable
-fun NetSpendingTotal(
-    total: BigDecimal,
-    modifier: Modifier = Modifier,
-    large: Boolean = false,
-    label: String = "Spent"
-) {
-    Column(modifier = modifier) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        MoneyAmount(
-            amount = total,
-            style = if (large) MaterialTheme.typography.displayMedium else MaterialTheme.typography.displaySmall,
-            symbolScale = 0.45f
-        )
-    }
 }

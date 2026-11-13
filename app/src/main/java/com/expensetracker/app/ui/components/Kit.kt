@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -82,7 +83,8 @@ fun KobanRow(
     trailing: (@Composable () -> Unit)? = null,
     showChevron: Boolean = false,
     onClick: (() -> Unit)? = null,
-    minHeight: Dp = 56.dp
+    minHeight: Dp = 56.dp,
+    titleSuffix: (@Composable () -> Unit)? = null
 ) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
@@ -100,7 +102,19 @@ fun KobanRow(
             Spacer(Modifier.width(12.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            if (titleSuffix == null) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        title,
+                        Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    titleSuffix()
+                }
+            }
             if (subtitle != null) {
                 Text(
                     subtitle,
@@ -223,28 +237,53 @@ fun DirectionSegments(selected: TransactionType?, onPick: ((TransactionType) -> 
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf("Spent" to TransactionType.WITHDRAW, "Received" to TransactionType.RECEIVE).forEach { (label, type) ->
             val on = selected == type
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp)
-                    .clip(CircleShape)
-                    .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                    .then(
-                        when {
-                            onPick != null -> Modifier.selectable(selected = on, role = Role.RadioButton) { onPick(type) }
-                            onTapWhenFixed != null -> Modifier.clickable(onClickLabel = "Change payment", onClick = onTapWhenFixed)
-                            else -> Modifier
-                        }
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Segment(
+                label = label,
+                on = on,
+                action = when {
+                    onPick != null -> Modifier.selectable(selected = on, role = Role.RadioButton) { onPick(type) }
+                    onTapWhenFixed != null -> Modifier.clickable(onClickLabel = "Change payment", onClick = onTapWhenFixed)
+                    else -> Modifier
+                }
+            )
         }
+    }
+}
+
+/** Two or more choices in one track, for example Month | All. The chosen one is a gold-soft pill. */
+@Composable
+fun SegmentedControl(labels: List<String>, selectedIndex: Int, onPick: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(4.dp)
+            .selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        labels.forEachIndexed { i, label ->
+            Segment(label, i == selectedIndex, Modifier.selectable(selected = i == selectedIndex, role = Role.RadioButton) { onPick(i) })
+        }
+    }
+}
+
+@Composable
+private fun RowScope.Segment(label: String, on: Boolean, action: Modifier) {
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .heightIn(min = 48.dp)
+            .clip(CircleShape)
+            .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+            .then(action),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
