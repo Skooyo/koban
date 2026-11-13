@@ -4,14 +4,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -59,6 +57,7 @@ import com.expensetracker.app.parser.AmountFormatter
 import com.expensetracker.app.parser.CaptureFormat
 import com.expensetracker.app.ui.components.AmountInput
 import com.expensetracker.app.ui.components.CategoryDot
+import com.expensetracker.app.ui.components.DirectionSegments
 import com.expensetracker.app.ui.components.DiscardChangesDialog
 import com.expensetracker.app.ui.components.KobanRow
 import com.expensetracker.app.ui.components.ListGroup
@@ -207,40 +206,6 @@ private fun SourceAvatar(appName: String) {
         contentAlignment = Alignment.Center
     ) {
         Text(initials, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-    }
-}
-
-/**
- * Spent / Received. [onPick] null makes it a plain display; [selected] null means neither is chosen yet.
- */
-@Composable
-private fun DirectionSegments(selected: TransactionType?, onPick: ((TransactionType) -> Unit)?, modifier: Modifier = Modifier, onTapWhenFixed: (() -> Unit)? = null) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("Spent" to TransactionType.WITHDRAW, "Received" to TransactionType.RECEIVE).forEach { (label, type) ->
-            val on = selected == type
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp)
-                    .clip(CircleShape)
-                    .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                    .then(
-                        when {
-                            onPick != null -> Modifier.selectable(selected = on, role = Role.RadioButton) { onPick(type) }
-                            onTapWhenFixed != null -> Modifier.clickable(onClickLabel = "Change payment", onClick = onTapWhenFixed)
-                            else -> Modifier
-                        }
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
     }
 }
 

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,8 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -40,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Storefront
@@ -49,7 +49,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
@@ -75,27 +74,28 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.data.CategoryEntity
 import com.expensetracker.app.data.DefaultCategories
 import com.expensetracker.app.data.TransactionType
 import com.expensetracker.app.ui.components.AmountInput
+import com.expensetracker.app.ui.components.CategoryDot
+import com.expensetracker.app.ui.components.DirectionSegments
 import com.expensetracker.app.ui.components.DiscardChangesDialog
+import com.expensetracker.app.ui.components.KobanRow
+import com.expensetracker.app.ui.components.ListGroup
+import com.expensetracker.app.ui.components.MoneyText
 import com.expensetracker.app.ui.components.PastDatePickerDialog
+import com.expensetracker.app.ui.components.TonalButton
 import com.expensetracker.app.ui.theme.LocalMoneyColors
 import com.expensetracker.app.ui.theme.categoryColor
 import com.expensetracker.app.ui.viewmodel.PaymentEvent
@@ -180,82 +180,117 @@ private fun PaymentContent(
             .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))
             .padding(horizontal = 16.dp)
     ) {
-        TopRow(type = form.type, onClose = {
-            if (!saving) {
-                if (hasChanges) confirmingDiscard = true else onClose()
-            }
-        }, onType = viewModel::setType)
+        TopRow(
+            type = form.type,
+            isEditing = isEditing,
+            onClose = {
+                if (!saving) {
+                    if (hasChanges) confirmingDiscard = true else onClose()
+                }
+            },
+            onType = viewModel::setType,
+            onDelete = { confirmingDelete = true },
+            deleteEnabled = !saving
+        )
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AmountDisplay(
-                text = form.amountText,
-                type = form.type,
-                caret = padVisible,
-                onClick = {
-                    focusManager.clearFocus()
-                    padRequested = true
-                }
-            )
-            val categoryName = categories.find { it.id == form.categoryId }?.name
-                ?: DefaultCategories.UNCATEGORIZED_NAME
-            PaymentCard(label = "Category", value = categoryName, onClick = { pickingCategory = true }, icon = {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .clip(CircleShape)
-                        .background(categoryColor(form.categoryId))
-                )
-            }, trailing = {
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            })
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PaymentCard(
-                    label = "Date",
-                    value = dateLabel(form.postTime),
-                    onClick = { pickingDate = true },
-                    icon = { CardIcon(Icons.Default.CalendarMonth) },
-                    modifier = Modifier.weight(1f)
-                )
-                TextCard(
-                    label = "Shop",
-                    icon = Icons.Default.Storefront,
-                    value = form.merchant,
-                    onValueChange = viewModel::setMerchant,
-                    onFocus = {
-                        shopFocused = it
-                        if (it) padRequested = false
+            val income = form.type == TransactionType.RECEIVE
+            val money = LocalMoneyColors.current
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClickLabel = "Type the amount") {
+                        focusManager.clearFocus()
+                        padRequested = true
+                    }
+                    .padding(vertical = 16.dp)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = if (form.amountText.isEmpty()) "Amount empty" else "Amount RM ${form.amountText}"
                     },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val amount = "RM ${form.amountText.ifEmpty { "0" }}"
+                MoneyText(
+                    text = if (income) "+ $amount" else amount,
+                    style = MaterialTheme.typography.displayLarge,
+                    color = when {
+                        income -> money.received
+                        form.amountText.isEmpty() -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                )
+                Text(
+                    text = if (isEditing) "${if (income) "Received" else "Spent"} · ${dateTimeLabel(form.postTime)}" else "Tap a number to change it",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            TextCard(
-                label = "Note",
-                icon = Icons.Default.EditNote,
-                value = form.notes,
-                onValueChange = viewModel::setNotes,
-                onFocus = {
-                    noteFocused = it
-                    if (it) padRequested = false
-                },
-                singleLine = false
-            )
+            val categoryName = categories.find { it.id == form.categoryId }?.name
+                ?: DefaultCategories.UNCATEGORIZED_NAME
+            ListGroup {
+                item {
+                    KobanRow(
+                        categoryName,
+                        subtitle = "Category",
+                        leading = { CategoryDot(categoryColor(form.categoryId), 12.dp) },
+                        showChevron = true,
+                        onClick = { pickingCategory = true }
+                    )
+                }
+                item {
+                    KobanRow(
+                        dateLabel(form.postTime),
+                        subtitle = "Date",
+                        leading = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                        showChevron = true,
+                        onClick = { pickingDate = true }
+                    )
+                }
+                item {
+                    TextRow(
+                        label = "Shop",
+                        placeholder = "Not set",
+                        icon = Icons.Default.Storefront,
+                        value = form.merchant,
+                        onValueChange = viewModel::setMerchant,
+                        onFocus = {
+                            shopFocused = it
+                            if (it) padRequested = false
+                        },
+                        singleLine = true
+                    )
+                }
+                item {
+                    TextRow(
+                        label = "Note",
+                        placeholder = "Optional",
+                        icon = Icons.Default.EditNote,
+                        value = form.notes,
+                        onValueChange = viewModel::setNotes,
+                        onFocus = {
+                            noteFocused = it
+                            if (it) padRequested = false
+                        },
+                        singleLine = false
+                    )
+                }
+            }
             if (inGroups && form.type == TransactionType.WITHDRAW) {
-                PaymentCard(
-                    label = "Not in groups",
-                    value = if (form.privateToGroups) "Group members do not see this payment" else "Counts in your group totals",
-                    onClick = { viewModel.setPrivateToGroups(!form.privateToGroups) },
-                    icon = { CardIcon(Icons.Default.Groups) },
-                    trailing = { Switch(checked = form.privateToGroups, onCheckedChange = null) }
-                )
+                ListGroup {
+                    item {
+                        KobanRow(
+                            "Count in group totals",
+                            subtitle = if (form.privateToGroups) "Group members do not see this payment" else "Group members see this in your totals",
+                            trailing = { Switch(checked = !form.privateToGroups, onCheckedChange = null) },
+                            onClick = { viewModel.setPrivateToGroups(!form.privateToGroups) }
+                        )
+                    }
+                }
             }
             if (form.categoryId != null && form.categoryId != loadedCategoryId && form.merchant.isNotBlank()) {
                 Text(
@@ -265,28 +300,18 @@ private fun PaymentContent(
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
             }
+            if (isEditing && form.type == TransactionType.WITHDRAW) {
+                TonalButton(
+                    text = "Split this bill",
+                    onClick = viewModel::saveAndSplit,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    icon = Icons.Default.Groups,
+                    enabled = valid
+                )
+            }
         }
         if (padVisible) {
             NumberPad(onKey = viewModel::press, onBackspace = viewModel::backspace)
-        }
-        if (isEditing && form.type == TransactionType.WITHDRAW) {
-            TextButton(
-                onClick = viewModel::saveAndSplit,
-                enabled = valid,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-            ) { Text("Split this bill") }
-        }
-        if (isEditing) {
-            TextButton(
-                onClick = { confirmingDelete = true },
-                enabled = !saving,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-            ) { Text("Delete payment") }
         }
         Button(
             onClick = viewModel::save,
@@ -294,16 +319,12 @@ private fun PaymentContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp, bottom = 12.dp)
-                .height(56.dp),
-            shape = RoundedCornerShape(18.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = LocalMoneyColors.current.gold, contentColor = Ink)
+                .height(56.dp)
         ) {
+            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
             Text(
-                text = when {
-                    isEditing -> "Save"
-                    form.type == TransactionType.RECEIVE -> "✓ Add income"
-                    else -> "✓ Add expense"
-                },
+                text = if (isEditing) "Save changes" else "Save payment",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -359,36 +380,34 @@ private fun PaymentContent(
 }
 
 @Composable
-private fun TopRow(type: TransactionType, onClose: () -> Unit, onType: (TransactionType) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(
-            onClick = onClose,
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-            )
-        ) {
-            Icon(Icons.Default.Close, contentDescription = "Close")
-        }
-        Spacer(Modifier.width(12.dp))
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(4.dp)
-        ) {
-            TypeSegment("Expense", type == TransactionType.WITHDRAW, MaterialTheme.colorScheme.inverseSurface) {
-                onType(TransactionType.WITHDRAW)
+private fun TopRow(
+    type: TransactionType,
+    isEditing: Boolean,
+    onClose: () -> Unit,
+    onType: (TransactionType) -> Unit,
+    onDelete: () -> Unit,
+    deleteEnabled: Boolean
+) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Close")
             }
-            TypeSegment("Income", type == TransactionType.RECEIVE, LocalMoneyColors.current.received) {
-                onType(TransactionType.RECEIVE)
+            if (isEditing) {
+                Text(
+                    "Payment",
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                    style = MaterialTheme.typography.titleLarge
+                )
+                IconButton(onClick = onDelete, enabled = deleteEnabled, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete payment", tint = MaterialTheme.colorScheme.error)
+                }
+            } else {
+                DirectionSegments(selected = type, onPick = onType, modifier = Modifier.weight(1f))
             }
         }
+        // Edit keeps the Spent / Received switch that the screen has today, under the title row.
+        if (isEditing) DirectionSegments(selected = type, onPick = onType)
     }
 }
 
@@ -419,176 +438,65 @@ internal fun RowScope.TypeSegment(label: String, selected: Boolean, selectedColo
     }
 }
 
+/** A [KobanRow]-shaped row whose title is typed in place. Tap anywhere on the row to type. */
 @Composable
-private fun AmountDisplay(text: String, type: TransactionType, caret: Boolean, onClick: () -> Unit) {
-    val money = LocalMoneyColors.current
-    val income = type == TransactionType.RECEIVE
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val digitColor = if (income) money.received else MaterialTheme.colorScheme.onSurface
-    val size = if (text.length > 9) 44.sp else 56.sp
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 120.dp)
-            .clickable(onClickLabel = "Type the amount", onClick = onClick)
-            .clearAndSetSemantics {
-                contentDescription = if (text.isEmpty()) "Amount empty" else "Amount RM $text"
-                role = Role.Button
-            },
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = buildAnnotatedString {
-                withStyle(SpanStyle(fontSize = size * 0.45f, color = if (income) money.received else muted)) {
-                    append(if (income) "+RM " else "RM ")
-                }
-                if (text.isEmpty()) {
-                    withStyle(SpanStyle(color = muted)) { append("0") }
-                } else {
-                    append(text)
-                }
-            },
-            fontSize = size,
-            fontWeight = FontWeight.Bold,
-            color = digitColor,
-            maxLines = 1,
-            style = MaterialTheme.typography.displayLarge.copy(fontFeatureSettings = "tnum")
-        )
-        if (caret) {
-            Box(
-                modifier = Modifier
-                    .padding(start = 4.dp)
-                    .width(3.dp)
-                    .height(48.dp)
-                    .background(money.gold)
-            )
-        }
-    }
-}
-
-private val CardShape = RoundedCornerShape(20.dp)
-
-@Composable
-private fun CardIcon(icon: ImageVector) {
-    Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-/** Round icon spot, label on top, value below. */
-@Composable
-private fun CardFrame(
+private fun TextRow(
     label: String,
-    icon: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-    trailing: @Composable () -> Unit = {},
-    value: @Composable () -> Unit
-) {
-    Row(
-        modifier = modifier
-            .clip(CardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .heightIn(min = 64.dp)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center
-        ) { icon() }
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            value()
-        }
-        trailing()
-    }
-}
-
-@Composable
-private fun PaymentCard(
-    label: String,
-    value: String,
-    onClick: () -> Unit,
-    icon: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-    trailing: @Composable () -> Unit = {}
-) {
-    CardFrame(
-        label = label,
-        icon = icon,
-        trailing = trailing,
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(CardShape)
-            .clickable(onClickLabel = "Change ${label.lowercase()}", onClick = onClick)
-            .semantics(mergeDescendants = true) {}
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun TextCard(
-    label: String,
+    placeholder: String,
     icon: ImageVector,
     value: String,
     onValueChange: (String) -> Unit,
     onFocus: (Boolean) -> Unit,
-    singleLine: Boolean,
-    modifier: Modifier = Modifier
+    singleLine: Boolean
 ) {
     val focus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    val textStyle = MaterialTheme.typography.bodyLarge.copy(
-        color = MaterialTheme.colorScheme.onSurface,
-        fontWeight = FontWeight.SemiBold
-    )
-    CardFrame(
-        label = label,
-        icon = { CardIcon(icon) },
-        modifier = modifier
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val textStyle = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface)
+    Row(
+        Modifier
             .fillMaxWidth()
-            .clip(CardShape)
             .clickable { focus.requestFocus() }
+            .defaultMinSize(minHeight = 56.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = singleLine,
-            maxLines = if (singleLine) 1 else 4,
-            textStyle = textStyle,
-            cursorBrush = SolidColor(LocalMoneyColors.current.gold),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = if (singleLine) ImeAction.Done else ImeAction.Default
-            ),
-            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focus)
-                .onFocusChanged { onFocus(it.isFocused) }
-                .semantics { contentDescription = label },
-            decorationBox = { inner ->
-                Box {
-                    if (value.isEmpty()) {
-                        Text("Optional", style = textStyle.copy(fontWeight = FontWeight.Normal), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = muted)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = singleLine,
+                maxLines = if (singleLine) 1 else 4,
+                textStyle = textStyle,
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = if (singleLine) ImeAction.Done else ImeAction.Default
+                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focus)
+                    .onFocusChanged { onFocus(it.isFocused) }
+                    .semantics { contentDescription = label },
+                decorationBox = { inner ->
+                    Box {
+                        if (value.isEmpty()) Text(placeholder, style = textStyle, color = muted)
+                        inner()
                     }
-                    inner()
                 }
-            }
+            )
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = muted)
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = muted,
+            modifier = Modifier.padding(start = 8.dp).size(24.dp)
         )
     }
 }
@@ -598,7 +506,7 @@ private val padRows = listOf("123", "456", "789", ".0<")
 @Composable
 private fun NumberPad(onKey: (Char) -> Unit, onBackspace: () -> Unit) {
     Column(
-        modifier = Modifier.padding(vertical = 8.dp),
+        modifier = Modifier.padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         padRows.forEach { row ->
@@ -607,9 +515,9 @@ private fun NumberPad(onKey: (Char) -> Unit, onBackspace: () -> Unit) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                             .clickable(role = Role.Button) { if (key == '<') onBackspace() else onKey(key) }
                             .semantics {
                                 if (key == '.') contentDescription = "Decimal point"
@@ -619,7 +527,7 @@ private fun NumberPad(onKey: (Char) -> Unit, onBackspace: () -> Unit) {
                         if (key == '<') {
                             Icon(Icons.AutoMirrored.Filled.Backspace, contentDescription = "Delete digit")
                         } else {
-                            Text(key.toString(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                            Text(key.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -640,42 +548,48 @@ internal fun CategorySheet(
     val scope = rememberCoroutineScope()
     val options = listOf<Pair<String?, String>>(null to DefaultCategories.UNCATEGORIZED_NAME) +
         categories.map { it.id to it.name }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
         Text(
             text = "Category",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { heading() }
         )
-        LazyColumn(modifier = Modifier.navigationBarsPadding()) {
-            items(options, key = { it.first ?: "" }) { (id, name) ->
-                val selected = id == selectedId
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp)
-                        .selectable(selected = selected, role = Role.RadioButton) {
-                            onPick(id)
-                            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                        }
-                        .padding(horizontal = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(categoryColor(id))
-                    )
-                    Spacer(Modifier.width(16.dp))
-                    Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    if (selected) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            ListGroup {
+                options.forEach { (id, name) ->
+                    val selected = id == selectedId
+                    item {
+                        KobanRow(
+                            name,
+                            modifier = Modifier.semantics { this.selected = selected },
+                            leading = { CategoryDot(categoryColor(id), 12.dp) },
+                            trailing = if (selected) {
+                                { Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary) }
+                            } else null,
+                            onClick = {
+                                onPick(id)
+                                scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                            }
+                        )
                     }
                 }
             }
         }
     }
 }
+
+/** "Wed, 11 Nov, 20:15". */
+private fun dateTimeLabel(time: Long): String =
+    SimpleDateFormat("EEE, d MMM, HH:mm", Locale.getDefault()).format(Date(time))
 
 /** "Today", "Yesterday", or "Mon, 12 Oct". */
 internal fun dateLabel(time: Long): String {

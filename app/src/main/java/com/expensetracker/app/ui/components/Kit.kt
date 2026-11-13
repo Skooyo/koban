@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,9 +38,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.expensetracker.app.data.TransactionType
 
 /** Collects the rows of a [ListGroup]. */
 class ListGroupScope {
@@ -208,5 +212,39 @@ fun TonalButton(
             Spacer(Modifier.width(8.dp))
         }
         Text(text, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/**
+ * Spent / Received. [onPick] null makes it a plain display; [selected] null means neither is chosen yet.
+ */
+@Composable
+fun DirectionSegments(selected: TransactionType?, onPick: ((TransactionType) -> Unit)?, modifier: Modifier = Modifier, onTapWhenFixed: (() -> Unit)? = null) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("Spent" to TransactionType.WITHDRAW, "Received" to TransactionType.RECEIVE).forEach { (label, type) ->
+            val on = selected == type
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .clip(CircleShape)
+                    .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                    .then(
+                        when {
+                            onPick != null -> Modifier.selectable(selected = on, role = Role.RadioButton) { onPick(type) }
+                            onTapWhenFixed != null -> Modifier.clickable(onClickLabel = "Change payment", onClick = onTapWhenFixed)
+                            else -> Modifier
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
