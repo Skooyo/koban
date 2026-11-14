@@ -991,1228 +991,6 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   }
 }
 
-class PendingPayments extends Table
-    with TableInfo<PendingPayments, PendingPayment> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  PendingPayments(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL PRIMARY KEY',
-  );
-  late final GeneratedColumnWithTypeConverter<Decimal, String> amount =
-      GeneratedColumn<String>(
-        'amount',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL',
-      ).withConverter<Decimal>(PendingPayments.$converteramount);
-  static const VerificationMeta _currencyMeta = const VerificationMeta(
-    'currency',
-  );
-  late final GeneratedColumn<String> currency = GeneratedColumn<String>(
-    'currency',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  static const VerificationMeta _merchantMeta = const VerificationMeta(
-    'merchant',
-  );
-  late final GeneratedColumn<String> merchant = GeneratedColumn<String>(
-    'merchant',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  late final GeneratedColumnWithTypeConverter<TransactionType, String>
-  transactionType = GeneratedColumn<String>(
-    'transactionType',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  ).withConverter<TransactionType>(PendingPayments.$convertertransactionType);
-  static const VerificationMeta _sourcePackageMeta = const VerificationMeta(
-    'sourcePackage',
-  );
-  late final GeneratedColumn<String> sourcePackage = GeneratedColumn<String>(
-    'sourcePackage',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  static const VerificationMeta _rawNotificationTextMeta =
-      const VerificationMeta('rawNotificationText');
-  late final GeneratedColumn<String> rawNotificationText =
-      GeneratedColumn<String>(
-        'rawNotificationText',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL',
-      );
-  static const VerificationMeta _notificationPostTimeMeta =
-      const VerificationMeta('notificationPostTime');
-  late final GeneratedColumn<int> notificationPostTime = GeneratedColumn<int>(
-    'notificationPostTime',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  static const VerificationMeta _notificationKeyMeta = const VerificationMeta(
-    'notificationKey',
-  );
-  late final GeneratedColumn<String> notificationKey = GeneratedColumn<String>(
-    'notificationKey',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _dedupKeyMeta = const VerificationMeta(
-    'dedupKey',
-  );
-  late final GeneratedColumn<String> dedupKey = GeneratedColumn<String>(
-    'dedupKey',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  late final GeneratedColumnWithTypeConverter<CaptureFormat, String> format =
-      GeneratedColumn<String>(
-        'format',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL',
-      ).withConverter<CaptureFormat>(PendingPayments.$converterformat);
-  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
-    'categoryId',
-  );
-  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
-    'categoryId',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  late final GeneratedColumnWithTypeConverter<bool, int> likelyPromotion =
-      GeneratedColumn<int>(
-        'likelyPromotion',
-        aliasedName,
-        false,
-        type: DriftSqlType.int,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL',
-      ).withConverter<bool>(PendingPayments.$converterlikelyPromotion);
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
-    'createdAt',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  late final GeneratedColumnWithTypeConverter<bool, int> edited =
-      GeneratedColumn<int>(
-        'edited',
-        aliasedName,
-        false,
-        type: DriftSqlType.int,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL',
-      ).withConverter<bool>(PendingPayments.$converteredited);
-  late final GeneratedColumnWithTypeConverter<bool, int> directionUnclear =
-      GeneratedColumn<int>(
-        'directionUnclear',
-        aliasedName,
-        false,
-        type: DriftSqlType.int,
-        requiredDuringInsert: false,
-        $customConstraints: 'NOT NULL DEFAULT 0',
-        defaultValue: const CustomExpression('0'),
-      ).withConverter<bool>(PendingPayments.$converterdirectionUnclear);
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    amount,
-    currency,
-    merchant,
-    transactionType,
-    sourcePackage,
-    rawNotificationText,
-    notificationPostTime,
-    notificationKey,
-    dedupKey,
-    format,
-    categoryId,
-    likelyPromotion,
-    createdAt,
-    edited,
-    directionUnclear,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'pending_payments';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<PendingPayment> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('currency')) {
-      context.handle(
-        _currencyMeta,
-        currency.isAcceptableOrUnknown(data['currency']!, _currencyMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_currencyMeta);
-    }
-    if (data.containsKey('merchant')) {
-      context.handle(
-        _merchantMeta,
-        merchant.isAcceptableOrUnknown(data['merchant']!, _merchantMeta),
-      );
-    }
-    if (data.containsKey('sourcePackage')) {
-      context.handle(
-        _sourcePackageMeta,
-        sourcePackage.isAcceptableOrUnknown(
-          data['sourcePackage']!,
-          _sourcePackageMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_sourcePackageMeta);
-    }
-    if (data.containsKey('rawNotificationText')) {
-      context.handle(
-        _rawNotificationTextMeta,
-        rawNotificationText.isAcceptableOrUnknown(
-          data['rawNotificationText']!,
-          _rawNotificationTextMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_rawNotificationTextMeta);
-    }
-    if (data.containsKey('notificationPostTime')) {
-      context.handle(
-        _notificationPostTimeMeta,
-        notificationPostTime.isAcceptableOrUnknown(
-          data['notificationPostTime']!,
-          _notificationPostTimeMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_notificationPostTimeMeta);
-    }
-    if (data.containsKey('notificationKey')) {
-      context.handle(
-        _notificationKeyMeta,
-        notificationKey.isAcceptableOrUnknown(
-          data['notificationKey']!,
-          _notificationKeyMeta,
-        ),
-      );
-    }
-    if (data.containsKey('dedupKey')) {
-      context.handle(
-        _dedupKeyMeta,
-        dedupKey.isAcceptableOrUnknown(data['dedupKey']!, _dedupKeyMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_dedupKeyMeta);
-    }
-    if (data.containsKey('categoryId')) {
-      context.handle(
-        _categoryIdMeta,
-        categoryId.isAcceptableOrUnknown(data['categoryId']!, _categoryIdMeta),
-      );
-    }
-    if (data.containsKey('createdAt')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['createdAt']!, _createdAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  PendingPayment map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return PendingPayment(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      amount: PendingPayments.$converteramount.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}amount'],
-        )!,
-      ),
-      currency: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}currency'],
-      )!,
-      merchant: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}merchant'],
-      ),
-      transactionType: PendingPayments.$convertertransactionType.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}transactionType'],
-        )!,
-      ),
-      sourcePackage: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}sourcePackage'],
-      )!,
-      rawNotificationText: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}rawNotificationText'],
-      )!,
-      notificationPostTime: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}notificationPostTime'],
-      )!,
-      notificationKey: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}notificationKey'],
-      ),
-      dedupKey: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}dedupKey'],
-      )!,
-      format: PendingPayments.$converterformat.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}format'],
-        )!,
-      ),
-      categoryId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}categoryId'],
-      ),
-      likelyPromotion: PendingPayments.$converterlikelyPromotion.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.int,
-          data['${effectivePrefix}likelyPromotion'],
-        )!,
-      ),
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}createdAt'],
-      )!,
-      edited: PendingPayments.$converteredited.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.int,
-          data['${effectivePrefix}edited'],
-        )!,
-      ),
-      directionUnclear: PendingPayments.$converterdirectionUnclear.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.int,
-          data['${effectivePrefix}directionUnclear'],
-        )!,
-      ),
-    );
-  }
-
-  @override
-  PendingPayments createAlias(String alias) {
-    return PendingPayments(attachedDatabase, alias);
-  }
-
-  static TypeConverter<Decimal, String> $converteramount =
-      const MoneyConverter();
-  static TypeConverter<TransactionType, String> $convertertransactionType =
-      const TransactionTypeConverter();
-  static TypeConverter<CaptureFormat, String> $converterformat =
-      const CaptureFormatConverter();
-  static TypeConverter<bool, int> $converterlikelyPromotion =
-      const BoolConverter();
-  static TypeConverter<bool, int> $converteredited = const BoolConverter();
-  static TypeConverter<bool, int> $converterdirectionUnclear =
-      const BoolConverter();
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class PendingPayment extends DataClass implements Insertable<PendingPayment> {
-  final String id;
-  final Decimal amount;
-  final String currency;
-  final String? merchant;
-  final TransactionType transactionType;
-  final String sourcePackage;
-  final String rawNotificationText;
-  final int notificationPostTime;
-  final String? notificationKey;
-  final String dedupKey;
-  final CaptureFormat format;
-  final String? categoryId;
-  final bool likelyPromotion;
-  final int createdAt;
-  final bool edited;
-  final bool directionUnclear;
-  const PendingPayment({
-    required this.id,
-    required this.amount,
-    required this.currency,
-    this.merchant,
-    required this.transactionType,
-    required this.sourcePackage,
-    required this.rawNotificationText,
-    required this.notificationPostTime,
-    this.notificationKey,
-    required this.dedupKey,
-    required this.format,
-    this.categoryId,
-    required this.likelyPromotion,
-    required this.createdAt,
-    required this.edited,
-    required this.directionUnclear,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    {
-      map['amount'] = Variable<String>(
-        PendingPayments.$converteramount.toSql(amount),
-      );
-    }
-    map['currency'] = Variable<String>(currency);
-    if (!nullToAbsent || merchant != null) {
-      map['merchant'] = Variable<String>(merchant);
-    }
-    {
-      map['transactionType'] = Variable<String>(
-        PendingPayments.$convertertransactionType.toSql(transactionType),
-      );
-    }
-    map['sourcePackage'] = Variable<String>(sourcePackage);
-    map['rawNotificationText'] = Variable<String>(rawNotificationText);
-    map['notificationPostTime'] = Variable<int>(notificationPostTime);
-    if (!nullToAbsent || notificationKey != null) {
-      map['notificationKey'] = Variable<String>(notificationKey);
-    }
-    map['dedupKey'] = Variable<String>(dedupKey);
-    {
-      map['format'] = Variable<String>(
-        PendingPayments.$converterformat.toSql(format),
-      );
-    }
-    if (!nullToAbsent || categoryId != null) {
-      map['categoryId'] = Variable<String>(categoryId);
-    }
-    {
-      map['likelyPromotion'] = Variable<int>(
-        PendingPayments.$converterlikelyPromotion.toSql(likelyPromotion),
-      );
-    }
-    map['createdAt'] = Variable<int>(createdAt);
-    {
-      map['edited'] = Variable<int>(
-        PendingPayments.$converteredited.toSql(edited),
-      );
-    }
-    {
-      map['directionUnclear'] = Variable<int>(
-        PendingPayments.$converterdirectionUnclear.toSql(directionUnclear),
-      );
-    }
-    return map;
-  }
-
-  PendingPaymentsCompanion toCompanion(bool nullToAbsent) {
-    return PendingPaymentsCompanion(
-      id: Value(id),
-      amount: Value(amount),
-      currency: Value(currency),
-      merchant: merchant == null && nullToAbsent
-          ? const Value.absent()
-          : Value(merchant),
-      transactionType: Value(transactionType),
-      sourcePackage: Value(sourcePackage),
-      rawNotificationText: Value(rawNotificationText),
-      notificationPostTime: Value(notificationPostTime),
-      notificationKey: notificationKey == null && nullToAbsent
-          ? const Value.absent()
-          : Value(notificationKey),
-      dedupKey: Value(dedupKey),
-      format: Value(format),
-      categoryId: categoryId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(categoryId),
-      likelyPromotion: Value(likelyPromotion),
-      createdAt: Value(createdAt),
-      edited: Value(edited),
-      directionUnclear: Value(directionUnclear),
-    );
-  }
-
-  factory PendingPayment.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return PendingPayment(
-      id: serializer.fromJson<String>(json['id']),
-      amount: serializer.fromJson<Decimal>(json['amount']),
-      currency: serializer.fromJson<String>(json['currency']),
-      merchant: serializer.fromJson<String?>(json['merchant']),
-      transactionType: serializer.fromJson<TransactionType>(
-        json['transactionType'],
-      ),
-      sourcePackage: serializer.fromJson<String>(json['sourcePackage']),
-      rawNotificationText: serializer.fromJson<String>(
-        json['rawNotificationText'],
-      ),
-      notificationPostTime: serializer.fromJson<int>(
-        json['notificationPostTime'],
-      ),
-      notificationKey: serializer.fromJson<String?>(json['notificationKey']),
-      dedupKey: serializer.fromJson<String>(json['dedupKey']),
-      format: serializer.fromJson<CaptureFormat>(json['format']),
-      categoryId: serializer.fromJson<String?>(json['categoryId']),
-      likelyPromotion: serializer.fromJson<bool>(json['likelyPromotion']),
-      createdAt: serializer.fromJson<int>(json['createdAt']),
-      edited: serializer.fromJson<bool>(json['edited']),
-      directionUnclear: serializer.fromJson<bool>(json['directionUnclear']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'amount': serializer.toJson<Decimal>(amount),
-      'currency': serializer.toJson<String>(currency),
-      'merchant': serializer.toJson<String?>(merchant),
-      'transactionType': serializer.toJson<TransactionType>(transactionType),
-      'sourcePackage': serializer.toJson<String>(sourcePackage),
-      'rawNotificationText': serializer.toJson<String>(rawNotificationText),
-      'notificationPostTime': serializer.toJson<int>(notificationPostTime),
-      'notificationKey': serializer.toJson<String?>(notificationKey),
-      'dedupKey': serializer.toJson<String>(dedupKey),
-      'format': serializer.toJson<CaptureFormat>(format),
-      'categoryId': serializer.toJson<String?>(categoryId),
-      'likelyPromotion': serializer.toJson<bool>(likelyPromotion),
-      'createdAt': serializer.toJson<int>(createdAt),
-      'edited': serializer.toJson<bool>(edited),
-      'directionUnclear': serializer.toJson<bool>(directionUnclear),
-    };
-  }
-
-  PendingPayment copyWith({
-    String? id,
-    Decimal? amount,
-    String? currency,
-    Value<String?> merchant = const Value.absent(),
-    TransactionType? transactionType,
-    String? sourcePackage,
-    String? rawNotificationText,
-    int? notificationPostTime,
-    Value<String?> notificationKey = const Value.absent(),
-    String? dedupKey,
-    CaptureFormat? format,
-    Value<String?> categoryId = const Value.absent(),
-    bool? likelyPromotion,
-    int? createdAt,
-    bool? edited,
-    bool? directionUnclear,
-  }) => PendingPayment(
-    id: id ?? this.id,
-    amount: amount ?? this.amount,
-    currency: currency ?? this.currency,
-    merchant: merchant.present ? merchant.value : this.merchant,
-    transactionType: transactionType ?? this.transactionType,
-    sourcePackage: sourcePackage ?? this.sourcePackage,
-    rawNotificationText: rawNotificationText ?? this.rawNotificationText,
-    notificationPostTime: notificationPostTime ?? this.notificationPostTime,
-    notificationKey: notificationKey.present
-        ? notificationKey.value
-        : this.notificationKey,
-    dedupKey: dedupKey ?? this.dedupKey,
-    format: format ?? this.format,
-    categoryId: categoryId.present ? categoryId.value : this.categoryId,
-    likelyPromotion: likelyPromotion ?? this.likelyPromotion,
-    createdAt: createdAt ?? this.createdAt,
-    edited: edited ?? this.edited,
-    directionUnclear: directionUnclear ?? this.directionUnclear,
-  );
-  PendingPayment copyWithCompanion(PendingPaymentsCompanion data) {
-    return PendingPayment(
-      id: data.id.present ? data.id.value : this.id,
-      amount: data.amount.present ? data.amount.value : this.amount,
-      currency: data.currency.present ? data.currency.value : this.currency,
-      merchant: data.merchant.present ? data.merchant.value : this.merchant,
-      transactionType: data.transactionType.present
-          ? data.transactionType.value
-          : this.transactionType,
-      sourcePackage: data.sourcePackage.present
-          ? data.sourcePackage.value
-          : this.sourcePackage,
-      rawNotificationText: data.rawNotificationText.present
-          ? data.rawNotificationText.value
-          : this.rawNotificationText,
-      notificationPostTime: data.notificationPostTime.present
-          ? data.notificationPostTime.value
-          : this.notificationPostTime,
-      notificationKey: data.notificationKey.present
-          ? data.notificationKey.value
-          : this.notificationKey,
-      dedupKey: data.dedupKey.present ? data.dedupKey.value : this.dedupKey,
-      format: data.format.present ? data.format.value : this.format,
-      categoryId: data.categoryId.present
-          ? data.categoryId.value
-          : this.categoryId,
-      likelyPromotion: data.likelyPromotion.present
-          ? data.likelyPromotion.value
-          : this.likelyPromotion,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      edited: data.edited.present ? data.edited.value : this.edited,
-      directionUnclear: data.directionUnclear.present
-          ? data.directionUnclear.value
-          : this.directionUnclear,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('PendingPayment(')
-          ..write('id: $id, ')
-          ..write('amount: $amount, ')
-          ..write('currency: $currency, ')
-          ..write('merchant: $merchant, ')
-          ..write('transactionType: $transactionType, ')
-          ..write('sourcePackage: $sourcePackage, ')
-          ..write('rawNotificationText: $rawNotificationText, ')
-          ..write('notificationPostTime: $notificationPostTime, ')
-          ..write('notificationKey: $notificationKey, ')
-          ..write('dedupKey: $dedupKey, ')
-          ..write('format: $format, ')
-          ..write('categoryId: $categoryId, ')
-          ..write('likelyPromotion: $likelyPromotion, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('edited: $edited, ')
-          ..write('directionUnclear: $directionUnclear')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    id,
-    amount,
-    currency,
-    merchant,
-    transactionType,
-    sourcePackage,
-    rawNotificationText,
-    notificationPostTime,
-    notificationKey,
-    dedupKey,
-    format,
-    categoryId,
-    likelyPromotion,
-    createdAt,
-    edited,
-    directionUnclear,
-  );
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is PendingPayment &&
-          other.id == this.id &&
-          other.amount == this.amount &&
-          other.currency == this.currency &&
-          other.merchant == this.merchant &&
-          other.transactionType == this.transactionType &&
-          other.sourcePackage == this.sourcePackage &&
-          other.rawNotificationText == this.rawNotificationText &&
-          other.notificationPostTime == this.notificationPostTime &&
-          other.notificationKey == this.notificationKey &&
-          other.dedupKey == this.dedupKey &&
-          other.format == this.format &&
-          other.categoryId == this.categoryId &&
-          other.likelyPromotion == this.likelyPromotion &&
-          other.createdAt == this.createdAt &&
-          other.edited == this.edited &&
-          other.directionUnclear == this.directionUnclear);
-}
-
-class PendingPaymentsCompanion extends UpdateCompanion<PendingPayment> {
-  final Value<String> id;
-  final Value<Decimal> amount;
-  final Value<String> currency;
-  final Value<String?> merchant;
-  final Value<TransactionType> transactionType;
-  final Value<String> sourcePackage;
-  final Value<String> rawNotificationText;
-  final Value<int> notificationPostTime;
-  final Value<String?> notificationKey;
-  final Value<String> dedupKey;
-  final Value<CaptureFormat> format;
-  final Value<String?> categoryId;
-  final Value<bool> likelyPromotion;
-  final Value<int> createdAt;
-  final Value<bool> edited;
-  final Value<bool> directionUnclear;
-  final Value<int> rowid;
-  const PendingPaymentsCompanion({
-    this.id = const Value.absent(),
-    this.amount = const Value.absent(),
-    this.currency = const Value.absent(),
-    this.merchant = const Value.absent(),
-    this.transactionType = const Value.absent(),
-    this.sourcePackage = const Value.absent(),
-    this.rawNotificationText = const Value.absent(),
-    this.notificationPostTime = const Value.absent(),
-    this.notificationKey = const Value.absent(),
-    this.dedupKey = const Value.absent(),
-    this.format = const Value.absent(),
-    this.categoryId = const Value.absent(),
-    this.likelyPromotion = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.edited = const Value.absent(),
-    this.directionUnclear = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  PendingPaymentsCompanion.insert({
-    required String id,
-    required Decimal amount,
-    required String currency,
-    this.merchant = const Value.absent(),
-    required TransactionType transactionType,
-    required String sourcePackage,
-    required String rawNotificationText,
-    required int notificationPostTime,
-    this.notificationKey = const Value.absent(),
-    required String dedupKey,
-    required CaptureFormat format,
-    this.categoryId = const Value.absent(),
-    required bool likelyPromotion,
-    required int createdAt,
-    required bool edited,
-    this.directionUnclear = const Value.absent(),
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       amount = Value(amount),
-       currency = Value(currency),
-       transactionType = Value(transactionType),
-       sourcePackage = Value(sourcePackage),
-       rawNotificationText = Value(rawNotificationText),
-       notificationPostTime = Value(notificationPostTime),
-       dedupKey = Value(dedupKey),
-       format = Value(format),
-       likelyPromotion = Value(likelyPromotion),
-       createdAt = Value(createdAt),
-       edited = Value(edited);
-  static Insertable<PendingPayment> custom({
-    Expression<String>? id,
-    Expression<String>? amount,
-    Expression<String>? currency,
-    Expression<String>? merchant,
-    Expression<String>? transactionType,
-    Expression<String>? sourcePackage,
-    Expression<String>? rawNotificationText,
-    Expression<int>? notificationPostTime,
-    Expression<String>? notificationKey,
-    Expression<String>? dedupKey,
-    Expression<String>? format,
-    Expression<String>? categoryId,
-    Expression<int>? likelyPromotion,
-    Expression<int>? createdAt,
-    Expression<int>? edited,
-    Expression<int>? directionUnclear,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (amount != null) 'amount': amount,
-      if (currency != null) 'currency': currency,
-      if (merchant != null) 'merchant': merchant,
-      if (transactionType != null) 'transactionType': transactionType,
-      if (sourcePackage != null) 'sourcePackage': sourcePackage,
-      if (rawNotificationText != null)
-        'rawNotificationText': rawNotificationText,
-      if (notificationPostTime != null)
-        'notificationPostTime': notificationPostTime,
-      if (notificationKey != null) 'notificationKey': notificationKey,
-      if (dedupKey != null) 'dedupKey': dedupKey,
-      if (format != null) 'format': format,
-      if (categoryId != null) 'categoryId': categoryId,
-      if (likelyPromotion != null) 'likelyPromotion': likelyPromotion,
-      if (createdAt != null) 'createdAt': createdAt,
-      if (edited != null) 'edited': edited,
-      if (directionUnclear != null) 'directionUnclear': directionUnclear,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  PendingPaymentsCompanion copyWith({
-    Value<String>? id,
-    Value<Decimal>? amount,
-    Value<String>? currency,
-    Value<String?>? merchant,
-    Value<TransactionType>? transactionType,
-    Value<String>? sourcePackage,
-    Value<String>? rawNotificationText,
-    Value<int>? notificationPostTime,
-    Value<String?>? notificationKey,
-    Value<String>? dedupKey,
-    Value<CaptureFormat>? format,
-    Value<String?>? categoryId,
-    Value<bool>? likelyPromotion,
-    Value<int>? createdAt,
-    Value<bool>? edited,
-    Value<bool>? directionUnclear,
-    Value<int>? rowid,
-  }) {
-    return PendingPaymentsCompanion(
-      id: id ?? this.id,
-      amount: amount ?? this.amount,
-      currency: currency ?? this.currency,
-      merchant: merchant ?? this.merchant,
-      transactionType: transactionType ?? this.transactionType,
-      sourcePackage: sourcePackage ?? this.sourcePackage,
-      rawNotificationText: rawNotificationText ?? this.rawNotificationText,
-      notificationPostTime: notificationPostTime ?? this.notificationPostTime,
-      notificationKey: notificationKey ?? this.notificationKey,
-      dedupKey: dedupKey ?? this.dedupKey,
-      format: format ?? this.format,
-      categoryId: categoryId ?? this.categoryId,
-      likelyPromotion: likelyPromotion ?? this.likelyPromotion,
-      createdAt: createdAt ?? this.createdAt,
-      edited: edited ?? this.edited,
-      directionUnclear: directionUnclear ?? this.directionUnclear,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (amount.present) {
-      map['amount'] = Variable<String>(
-        PendingPayments.$converteramount.toSql(amount.value),
-      );
-    }
-    if (currency.present) {
-      map['currency'] = Variable<String>(currency.value);
-    }
-    if (merchant.present) {
-      map['merchant'] = Variable<String>(merchant.value);
-    }
-    if (transactionType.present) {
-      map['transactionType'] = Variable<String>(
-        PendingPayments.$convertertransactionType.toSql(transactionType.value),
-      );
-    }
-    if (sourcePackage.present) {
-      map['sourcePackage'] = Variable<String>(sourcePackage.value);
-    }
-    if (rawNotificationText.present) {
-      map['rawNotificationText'] = Variable<String>(rawNotificationText.value);
-    }
-    if (notificationPostTime.present) {
-      map['notificationPostTime'] = Variable<int>(notificationPostTime.value);
-    }
-    if (notificationKey.present) {
-      map['notificationKey'] = Variable<String>(notificationKey.value);
-    }
-    if (dedupKey.present) {
-      map['dedupKey'] = Variable<String>(dedupKey.value);
-    }
-    if (format.present) {
-      map['format'] = Variable<String>(
-        PendingPayments.$converterformat.toSql(format.value),
-      );
-    }
-    if (categoryId.present) {
-      map['categoryId'] = Variable<String>(categoryId.value);
-    }
-    if (likelyPromotion.present) {
-      map['likelyPromotion'] = Variable<int>(
-        PendingPayments.$converterlikelyPromotion.toSql(likelyPromotion.value),
-      );
-    }
-    if (createdAt.present) {
-      map['createdAt'] = Variable<int>(createdAt.value);
-    }
-    if (edited.present) {
-      map['edited'] = Variable<int>(
-        PendingPayments.$converteredited.toSql(edited.value),
-      );
-    }
-    if (directionUnclear.present) {
-      map['directionUnclear'] = Variable<int>(
-        PendingPayments.$converterdirectionUnclear.toSql(
-          directionUnclear.value,
-        ),
-      );
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('PendingPaymentsCompanion(')
-          ..write('id: $id, ')
-          ..write('amount: $amount, ')
-          ..write('currency: $currency, ')
-          ..write('merchant: $merchant, ')
-          ..write('transactionType: $transactionType, ')
-          ..write('sourcePackage: $sourcePackage, ')
-          ..write('rawNotificationText: $rawNotificationText, ')
-          ..write('notificationPostTime: $notificationPostTime, ')
-          ..write('notificationKey: $notificationKey, ')
-          ..write('dedupKey: $dedupKey, ')
-          ..write('format: $format, ')
-          ..write('categoryId: $categoryId, ')
-          ..write('likelyPromotion: $likelyPromotion, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('edited: $edited, ')
-          ..write('directionUnclear: $directionUnclear, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class DroppedNotifications extends Table
-    with TableInfo<DroppedNotifications, DroppedNotification> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  DroppedNotifications(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _dedupKeyMeta = const VerificationMeta(
-    'dedupKey',
-  );
-  late final GeneratedColumn<String> dedupKey = GeneratedColumn<String>(
-    'dedupKey',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL PRIMARY KEY',
-  );
-  static const VerificationMeta _notificationKeyMeta = const VerificationMeta(
-    'notificationKey',
-  );
-  late final GeneratedColumn<String> notificationKey = GeneratedColumn<String>(
-    'notificationKey',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _droppedAtMeta = const VerificationMeta(
-    'droppedAt',
-  );
-  late final GeneratedColumn<int> droppedAt = GeneratedColumn<int>(
-    'droppedAt',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [dedupKey, notificationKey, droppedAt];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'dropped_notifications';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<DroppedNotification> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('dedupKey')) {
-      context.handle(
-        _dedupKeyMeta,
-        dedupKey.isAcceptableOrUnknown(data['dedupKey']!, _dedupKeyMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_dedupKeyMeta);
-    }
-    if (data.containsKey('notificationKey')) {
-      context.handle(
-        _notificationKeyMeta,
-        notificationKey.isAcceptableOrUnknown(
-          data['notificationKey']!,
-          _notificationKeyMeta,
-        ),
-      );
-    }
-    if (data.containsKey('droppedAt')) {
-      context.handle(
-        _droppedAtMeta,
-        droppedAt.isAcceptableOrUnknown(data['droppedAt']!, _droppedAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_droppedAtMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {dedupKey};
-  @override
-  DroppedNotification map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return DroppedNotification(
-      dedupKey: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}dedupKey'],
-      )!,
-      notificationKey: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}notificationKey'],
-      ),
-      droppedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}droppedAt'],
-      )!,
-    );
-  }
-
-  @override
-  DroppedNotifications createAlias(String alias) {
-    return DroppedNotifications(attachedDatabase, alias);
-  }
-
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class DroppedNotification extends DataClass
-    implements Insertable<DroppedNotification> {
-  final String dedupKey;
-  final String? notificationKey;
-  final int droppedAt;
-  const DroppedNotification({
-    required this.dedupKey,
-    this.notificationKey,
-    required this.droppedAt,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['dedupKey'] = Variable<String>(dedupKey);
-    if (!nullToAbsent || notificationKey != null) {
-      map['notificationKey'] = Variable<String>(notificationKey);
-    }
-    map['droppedAt'] = Variable<int>(droppedAt);
-    return map;
-  }
-
-  DroppedNotificationsCompanion toCompanion(bool nullToAbsent) {
-    return DroppedNotificationsCompanion(
-      dedupKey: Value(dedupKey),
-      notificationKey: notificationKey == null && nullToAbsent
-          ? const Value.absent()
-          : Value(notificationKey),
-      droppedAt: Value(droppedAt),
-    );
-  }
-
-  factory DroppedNotification.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return DroppedNotification(
-      dedupKey: serializer.fromJson<String>(json['dedupKey']),
-      notificationKey: serializer.fromJson<String?>(json['notificationKey']),
-      droppedAt: serializer.fromJson<int>(json['droppedAt']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'dedupKey': serializer.toJson<String>(dedupKey),
-      'notificationKey': serializer.toJson<String?>(notificationKey),
-      'droppedAt': serializer.toJson<int>(droppedAt),
-    };
-  }
-
-  DroppedNotification copyWith({
-    String? dedupKey,
-    Value<String?> notificationKey = const Value.absent(),
-    int? droppedAt,
-  }) => DroppedNotification(
-    dedupKey: dedupKey ?? this.dedupKey,
-    notificationKey: notificationKey.present
-        ? notificationKey.value
-        : this.notificationKey,
-    droppedAt: droppedAt ?? this.droppedAt,
-  );
-  DroppedNotification copyWithCompanion(DroppedNotificationsCompanion data) {
-    return DroppedNotification(
-      dedupKey: data.dedupKey.present ? data.dedupKey.value : this.dedupKey,
-      notificationKey: data.notificationKey.present
-          ? data.notificationKey.value
-          : this.notificationKey,
-      droppedAt: data.droppedAt.present ? data.droppedAt.value : this.droppedAt,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DroppedNotification(')
-          ..write('dedupKey: $dedupKey, ')
-          ..write('notificationKey: $notificationKey, ')
-          ..write('droppedAt: $droppedAt')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(dedupKey, notificationKey, droppedAt);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is DroppedNotification &&
-          other.dedupKey == this.dedupKey &&
-          other.notificationKey == this.notificationKey &&
-          other.droppedAt == this.droppedAt);
-}
-
-class DroppedNotificationsCompanion
-    extends UpdateCompanion<DroppedNotification> {
-  final Value<String> dedupKey;
-  final Value<String?> notificationKey;
-  final Value<int> droppedAt;
-  final Value<int> rowid;
-  const DroppedNotificationsCompanion({
-    this.dedupKey = const Value.absent(),
-    this.notificationKey = const Value.absent(),
-    this.droppedAt = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  DroppedNotificationsCompanion.insert({
-    required String dedupKey,
-    this.notificationKey = const Value.absent(),
-    required int droppedAt,
-    this.rowid = const Value.absent(),
-  }) : dedupKey = Value(dedupKey),
-       droppedAt = Value(droppedAt);
-  static Insertable<DroppedNotification> custom({
-    Expression<String>? dedupKey,
-    Expression<String>? notificationKey,
-    Expression<int>? droppedAt,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (dedupKey != null) 'dedupKey': dedupKey,
-      if (notificationKey != null) 'notificationKey': notificationKey,
-      if (droppedAt != null) 'droppedAt': droppedAt,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  DroppedNotificationsCompanion copyWith({
-    Value<String>? dedupKey,
-    Value<String?>? notificationKey,
-    Value<int>? droppedAt,
-    Value<int>? rowid,
-  }) {
-    return DroppedNotificationsCompanion(
-      dedupKey: dedupKey ?? this.dedupKey,
-      notificationKey: notificationKey ?? this.notificationKey,
-      droppedAt: droppedAt ?? this.droppedAt,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (dedupKey.present) {
-      map['dedupKey'] = Variable<String>(dedupKey.value);
-    }
-    if (notificationKey.present) {
-      map['notificationKey'] = Variable<String>(notificationKey.value);
-    }
-    if (droppedAt.present) {
-      map['droppedAt'] = Variable<int>(droppedAt.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('DroppedNotificationsCompanion(')
-          ..write('dedupKey: $dedupKey, ')
-          ..write('notificationKey: $notificationKey, ')
-          ..write('droppedAt: $droppedAt, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
 class Categories extends Table with TableInfo<Categories, Category> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -3982,440 +2760,6 @@ class SplitItemsCompanion extends UpdateCompanion<SplitItem> {
   }
 }
 
-class SplitPeople extends Table with TableInfo<SplitPeople, SplitPeopleData> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  SplitPeople(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL PRIMARY KEY',
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  static const VerificationMeta _lastUsedAtMeta = const VerificationMeta(
-    'lastUsedAt',
-  );
-  late final GeneratedColumn<int> lastUsedAt = GeneratedColumn<int>(
-    'lastUsedAt',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  static const VerificationMeta _qrPathMeta = const VerificationMeta('qrPath');
-  late final GeneratedColumn<String> qrPath = GeneratedColumn<String>(
-    'qrPath',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  late final GeneratedColumnWithTypeConverter<bool, int> archived =
-      GeneratedColumn<int>(
-        'archived',
-        aliasedName,
-        false,
-        type: DriftSqlType.int,
-        requiredDuringInsert: false,
-        $customConstraints: 'NOT NULL DEFAULT 0',
-        defaultValue: const CustomExpression('0'),
-      ).withConverter<bool>(SplitPeople.$converterarchived);
-  static const VerificationMeta _suggestedSettleExpenseIdMeta =
-      const VerificationMeta('suggestedSettleExpenseId');
-  late final GeneratedColumn<String> suggestedSettleExpenseId =
-      GeneratedColumn<String>(
-        'suggestedSettleExpenseId',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-        $customConstraints: '',
-      );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    name,
-    lastUsedAt,
-    qrPath,
-    archived,
-    suggestedSettleExpenseId,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'split_people';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<SplitPeopleData> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('lastUsedAt')) {
-      context.handle(
-        _lastUsedAtMeta,
-        lastUsedAt.isAcceptableOrUnknown(data['lastUsedAt']!, _lastUsedAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_lastUsedAtMeta);
-    }
-    if (data.containsKey('qrPath')) {
-      context.handle(
-        _qrPathMeta,
-        qrPath.isAcceptableOrUnknown(data['qrPath']!, _qrPathMeta),
-      );
-    }
-    if (data.containsKey('suggestedSettleExpenseId')) {
-      context.handle(
-        _suggestedSettleExpenseIdMeta,
-        suggestedSettleExpenseId.isAcceptableOrUnknown(
-          data['suggestedSettleExpenseId']!,
-          _suggestedSettleExpenseIdMeta,
-        ),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  SplitPeopleData map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return SplitPeopleData(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      lastUsedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}lastUsedAt'],
-      )!,
-      qrPath: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}qrPath'],
-      ),
-      archived: SplitPeople.$converterarchived.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.int,
-          data['${effectivePrefix}archived'],
-        )!,
-      ),
-      suggestedSettleExpenseId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}suggestedSettleExpenseId'],
-      ),
-    );
-  }
-
-  @override
-  SplitPeople createAlias(String alias) {
-    return SplitPeople(attachedDatabase, alias);
-  }
-
-  static TypeConverter<bool, int> $converterarchived = const BoolConverter();
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class SplitPeopleData extends DataClass implements Insertable<SplitPeopleData> {
-  final String id;
-  final String name;
-  final int lastUsedAt;
-  final String? qrPath;
-  final bool archived;
-  final String? suggestedSettleExpenseId;
-  const SplitPeopleData({
-    required this.id,
-    required this.name,
-    required this.lastUsedAt,
-    this.qrPath,
-    required this.archived,
-    this.suggestedSettleExpenseId,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
-    map['lastUsedAt'] = Variable<int>(lastUsedAt);
-    if (!nullToAbsent || qrPath != null) {
-      map['qrPath'] = Variable<String>(qrPath);
-    }
-    {
-      map['archived'] = Variable<int>(
-        SplitPeople.$converterarchived.toSql(archived),
-      );
-    }
-    if (!nullToAbsent || suggestedSettleExpenseId != null) {
-      map['suggestedSettleExpenseId'] = Variable<String>(
-        suggestedSettleExpenseId,
-      );
-    }
-    return map;
-  }
-
-  SplitPeopleCompanion toCompanion(bool nullToAbsent) {
-    return SplitPeopleCompanion(
-      id: Value(id),
-      name: Value(name),
-      lastUsedAt: Value(lastUsedAt),
-      qrPath: qrPath == null && nullToAbsent
-          ? const Value.absent()
-          : Value(qrPath),
-      archived: Value(archived),
-      suggestedSettleExpenseId: suggestedSettleExpenseId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(suggestedSettleExpenseId),
-    );
-  }
-
-  factory SplitPeopleData.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return SplitPeopleData(
-      id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      lastUsedAt: serializer.fromJson<int>(json['lastUsedAt']),
-      qrPath: serializer.fromJson<String?>(json['qrPath']),
-      archived: serializer.fromJson<bool>(json['archived']),
-      suggestedSettleExpenseId: serializer.fromJson<String?>(
-        json['suggestedSettleExpenseId'],
-      ),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
-      'lastUsedAt': serializer.toJson<int>(lastUsedAt),
-      'qrPath': serializer.toJson<String?>(qrPath),
-      'archived': serializer.toJson<bool>(archived),
-      'suggestedSettleExpenseId': serializer.toJson<String?>(
-        suggestedSettleExpenseId,
-      ),
-    };
-  }
-
-  SplitPeopleData copyWith({
-    String? id,
-    String? name,
-    int? lastUsedAt,
-    Value<String?> qrPath = const Value.absent(),
-    bool? archived,
-    Value<String?> suggestedSettleExpenseId = const Value.absent(),
-  }) => SplitPeopleData(
-    id: id ?? this.id,
-    name: name ?? this.name,
-    lastUsedAt: lastUsedAt ?? this.lastUsedAt,
-    qrPath: qrPath.present ? qrPath.value : this.qrPath,
-    archived: archived ?? this.archived,
-    suggestedSettleExpenseId: suggestedSettleExpenseId.present
-        ? suggestedSettleExpenseId.value
-        : this.suggestedSettleExpenseId,
-  );
-  SplitPeopleData copyWithCompanion(SplitPeopleCompanion data) {
-    return SplitPeopleData(
-      id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
-      lastUsedAt: data.lastUsedAt.present
-          ? data.lastUsedAt.value
-          : this.lastUsedAt,
-      qrPath: data.qrPath.present ? data.qrPath.value : this.qrPath,
-      archived: data.archived.present ? data.archived.value : this.archived,
-      suggestedSettleExpenseId: data.suggestedSettleExpenseId.present
-          ? data.suggestedSettleExpenseId.value
-          : this.suggestedSettleExpenseId,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('SplitPeopleData(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('lastUsedAt: $lastUsedAt, ')
-          ..write('qrPath: $qrPath, ')
-          ..write('archived: $archived, ')
-          ..write('suggestedSettleExpenseId: $suggestedSettleExpenseId')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    id,
-    name,
-    lastUsedAt,
-    qrPath,
-    archived,
-    suggestedSettleExpenseId,
-  );
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is SplitPeopleData &&
-          other.id == this.id &&
-          other.name == this.name &&
-          other.lastUsedAt == this.lastUsedAt &&
-          other.qrPath == this.qrPath &&
-          other.archived == this.archived &&
-          other.suggestedSettleExpenseId == this.suggestedSettleExpenseId);
-}
-
-class SplitPeopleCompanion extends UpdateCompanion<SplitPeopleData> {
-  final Value<String> id;
-  final Value<String> name;
-  final Value<int> lastUsedAt;
-  final Value<String?> qrPath;
-  final Value<bool> archived;
-  final Value<String?> suggestedSettleExpenseId;
-  final Value<int> rowid;
-  const SplitPeopleCompanion({
-    this.id = const Value.absent(),
-    this.name = const Value.absent(),
-    this.lastUsedAt = const Value.absent(),
-    this.qrPath = const Value.absent(),
-    this.archived = const Value.absent(),
-    this.suggestedSettleExpenseId = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  SplitPeopleCompanion.insert({
-    required String id,
-    required String name,
-    required int lastUsedAt,
-    this.qrPath = const Value.absent(),
-    this.archived = const Value.absent(),
-    this.suggestedSettleExpenseId = const Value.absent(),
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       name = Value(name),
-       lastUsedAt = Value(lastUsedAt);
-  static Insertable<SplitPeopleData> custom({
-    Expression<String>? id,
-    Expression<String>? name,
-    Expression<int>? lastUsedAt,
-    Expression<String>? qrPath,
-    Expression<int>? archived,
-    Expression<String>? suggestedSettleExpenseId,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (name != null) 'name': name,
-      if (lastUsedAt != null) 'lastUsedAt': lastUsedAt,
-      if (qrPath != null) 'qrPath': qrPath,
-      if (archived != null) 'archived': archived,
-      if (suggestedSettleExpenseId != null)
-        'suggestedSettleExpenseId': suggestedSettleExpenseId,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  SplitPeopleCompanion copyWith({
-    Value<String>? id,
-    Value<String>? name,
-    Value<int>? lastUsedAt,
-    Value<String?>? qrPath,
-    Value<bool>? archived,
-    Value<String?>? suggestedSettleExpenseId,
-    Value<int>? rowid,
-  }) {
-    return SplitPeopleCompanion(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      lastUsedAt: lastUsedAt ?? this.lastUsedAt,
-      qrPath: qrPath ?? this.qrPath,
-      archived: archived ?? this.archived,
-      suggestedSettleExpenseId:
-          suggestedSettleExpenseId ?? this.suggestedSettleExpenseId,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (lastUsedAt.present) {
-      map['lastUsedAt'] = Variable<int>(lastUsedAt.value);
-    }
-    if (qrPath.present) {
-      map['qrPath'] = Variable<String>(qrPath.value);
-    }
-    if (archived.present) {
-      map['archived'] = Variable<int>(
-        SplitPeople.$converterarchived.toSql(archived.value),
-      );
-    }
-    if (suggestedSettleExpenseId.present) {
-      map['suggestedSettleExpenseId'] = Variable<String>(
-        suggestedSettleExpenseId.value,
-      );
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('SplitPeopleCompanion(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('lastUsedAt: $lastUsedAt, ')
-          ..write('qrPath: $qrPath, ')
-          ..write('archived: $archived, ')
-          ..write('suggestedSettleExpenseId: $suggestedSettleExpenseId, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
 class SplitItemShares extends Table
     with TableInfo<SplitItemShares, SplitItemShare> {
   @override
@@ -5177,6 +3521,440 @@ class SplitDebtsCompanion extends UpdateCompanion<SplitDebt> {
   }
 }
 
+class SplitPeople extends Table with TableInfo<SplitPeople, SplitPeopleData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  SplitPeople(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _lastUsedAtMeta = const VerificationMeta(
+    'lastUsedAt',
+  );
+  late final GeneratedColumn<int> lastUsedAt = GeneratedColumn<int>(
+    'lastUsedAt',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _qrPathMeta = const VerificationMeta('qrPath');
+  late final GeneratedColumn<String> qrPath = GeneratedColumn<String>(
+    'qrPath',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  late final GeneratedColumnWithTypeConverter<bool, int> archived =
+      GeneratedColumn<int>(
+        'archived',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        $customConstraints: 'NOT NULL DEFAULT 0',
+        defaultValue: const CustomExpression('0'),
+      ).withConverter<bool>(SplitPeople.$converterarchived);
+  static const VerificationMeta _suggestedSettleExpenseIdMeta =
+      const VerificationMeta('suggestedSettleExpenseId');
+  late final GeneratedColumn<String> suggestedSettleExpenseId =
+      GeneratedColumn<String>(
+        'suggestedSettleExpenseId',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        $customConstraints: '',
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    lastUsedAt,
+    qrPath,
+    archived,
+    suggestedSettleExpenseId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'split_people';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SplitPeopleData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('lastUsedAt')) {
+      context.handle(
+        _lastUsedAtMeta,
+        lastUsedAt.isAcceptableOrUnknown(data['lastUsedAt']!, _lastUsedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lastUsedAtMeta);
+    }
+    if (data.containsKey('qrPath')) {
+      context.handle(
+        _qrPathMeta,
+        qrPath.isAcceptableOrUnknown(data['qrPath']!, _qrPathMeta),
+      );
+    }
+    if (data.containsKey('suggestedSettleExpenseId')) {
+      context.handle(
+        _suggestedSettleExpenseIdMeta,
+        suggestedSettleExpenseId.isAcceptableOrUnknown(
+          data['suggestedSettleExpenseId']!,
+          _suggestedSettleExpenseIdMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SplitPeopleData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SplitPeopleData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      lastUsedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}lastUsedAt'],
+      )!,
+      qrPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}qrPath'],
+      ),
+      archived: SplitPeople.$converterarchived.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}archived'],
+        )!,
+      ),
+      suggestedSettleExpenseId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}suggestedSettleExpenseId'],
+      ),
+    );
+  }
+
+  @override
+  SplitPeople createAlias(String alias) {
+    return SplitPeople(attachedDatabase, alias);
+  }
+
+  static TypeConverter<bool, int> $converterarchived = const BoolConverter();
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class SplitPeopleData extends DataClass implements Insertable<SplitPeopleData> {
+  final String id;
+  final String name;
+  final int lastUsedAt;
+  final String? qrPath;
+  final bool archived;
+  final String? suggestedSettleExpenseId;
+  const SplitPeopleData({
+    required this.id,
+    required this.name,
+    required this.lastUsedAt,
+    this.qrPath,
+    required this.archived,
+    this.suggestedSettleExpenseId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['lastUsedAt'] = Variable<int>(lastUsedAt);
+    if (!nullToAbsent || qrPath != null) {
+      map['qrPath'] = Variable<String>(qrPath);
+    }
+    {
+      map['archived'] = Variable<int>(
+        SplitPeople.$converterarchived.toSql(archived),
+      );
+    }
+    if (!nullToAbsent || suggestedSettleExpenseId != null) {
+      map['suggestedSettleExpenseId'] = Variable<String>(
+        suggestedSettleExpenseId,
+      );
+    }
+    return map;
+  }
+
+  SplitPeopleCompanion toCompanion(bool nullToAbsent) {
+    return SplitPeopleCompanion(
+      id: Value(id),
+      name: Value(name),
+      lastUsedAt: Value(lastUsedAt),
+      qrPath: qrPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(qrPath),
+      archived: Value(archived),
+      suggestedSettleExpenseId: suggestedSettleExpenseId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(suggestedSettleExpenseId),
+    );
+  }
+
+  factory SplitPeopleData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SplitPeopleData(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      lastUsedAt: serializer.fromJson<int>(json['lastUsedAt']),
+      qrPath: serializer.fromJson<String?>(json['qrPath']),
+      archived: serializer.fromJson<bool>(json['archived']),
+      suggestedSettleExpenseId: serializer.fromJson<String?>(
+        json['suggestedSettleExpenseId'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'lastUsedAt': serializer.toJson<int>(lastUsedAt),
+      'qrPath': serializer.toJson<String?>(qrPath),
+      'archived': serializer.toJson<bool>(archived),
+      'suggestedSettleExpenseId': serializer.toJson<String?>(
+        suggestedSettleExpenseId,
+      ),
+    };
+  }
+
+  SplitPeopleData copyWith({
+    String? id,
+    String? name,
+    int? lastUsedAt,
+    Value<String?> qrPath = const Value.absent(),
+    bool? archived,
+    Value<String?> suggestedSettleExpenseId = const Value.absent(),
+  }) => SplitPeopleData(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    lastUsedAt: lastUsedAt ?? this.lastUsedAt,
+    qrPath: qrPath.present ? qrPath.value : this.qrPath,
+    archived: archived ?? this.archived,
+    suggestedSettleExpenseId: suggestedSettleExpenseId.present
+        ? suggestedSettleExpenseId.value
+        : this.suggestedSettleExpenseId,
+  );
+  SplitPeopleData copyWithCompanion(SplitPeopleCompanion data) {
+    return SplitPeopleData(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      lastUsedAt: data.lastUsedAt.present
+          ? data.lastUsedAt.value
+          : this.lastUsedAt,
+      qrPath: data.qrPath.present ? data.qrPath.value : this.qrPath,
+      archived: data.archived.present ? data.archived.value : this.archived,
+      suggestedSettleExpenseId: data.suggestedSettleExpenseId.present
+          ? data.suggestedSettleExpenseId.value
+          : this.suggestedSettleExpenseId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SplitPeopleData(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('lastUsedAt: $lastUsedAt, ')
+          ..write('qrPath: $qrPath, ')
+          ..write('archived: $archived, ')
+          ..write('suggestedSettleExpenseId: $suggestedSettleExpenseId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    lastUsedAt,
+    qrPath,
+    archived,
+    suggestedSettleExpenseId,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SplitPeopleData &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.lastUsedAt == this.lastUsedAt &&
+          other.qrPath == this.qrPath &&
+          other.archived == this.archived &&
+          other.suggestedSettleExpenseId == this.suggestedSettleExpenseId);
+}
+
+class SplitPeopleCompanion extends UpdateCompanion<SplitPeopleData> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> lastUsedAt;
+  final Value<String?> qrPath;
+  final Value<bool> archived;
+  final Value<String?> suggestedSettleExpenseId;
+  final Value<int> rowid;
+  const SplitPeopleCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.lastUsedAt = const Value.absent(),
+    this.qrPath = const Value.absent(),
+    this.archived = const Value.absent(),
+    this.suggestedSettleExpenseId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SplitPeopleCompanion.insert({
+    required String id,
+    required String name,
+    required int lastUsedAt,
+    this.qrPath = const Value.absent(),
+    this.archived = const Value.absent(),
+    this.suggestedSettleExpenseId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       lastUsedAt = Value(lastUsedAt);
+  static Insertable<SplitPeopleData> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? lastUsedAt,
+    Expression<String>? qrPath,
+    Expression<int>? archived,
+    Expression<String>? suggestedSettleExpenseId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (lastUsedAt != null) 'lastUsedAt': lastUsedAt,
+      if (qrPath != null) 'qrPath': qrPath,
+      if (archived != null) 'archived': archived,
+      if (suggestedSettleExpenseId != null)
+        'suggestedSettleExpenseId': suggestedSettleExpenseId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SplitPeopleCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? lastUsedAt,
+    Value<String?>? qrPath,
+    Value<bool>? archived,
+    Value<String?>? suggestedSettleExpenseId,
+    Value<int>? rowid,
+  }) {
+    return SplitPeopleCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      lastUsedAt: lastUsedAt ?? this.lastUsedAt,
+      qrPath: qrPath ?? this.qrPath,
+      archived: archived ?? this.archived,
+      suggestedSettleExpenseId:
+          suggestedSettleExpenseId ?? this.suggestedSettleExpenseId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (lastUsedAt.present) {
+      map['lastUsedAt'] = Variable<int>(lastUsedAt.value);
+    }
+    if (qrPath.present) {
+      map['qrPath'] = Variable<String>(qrPath.value);
+    }
+    if (archived.present) {
+      map['archived'] = Variable<int>(
+        SplitPeople.$converterarchived.toSql(archived.value),
+      );
+    }
+    if (suggestedSettleExpenseId.present) {
+      map['suggestedSettleExpenseId'] = Variable<String>(
+        suggestedSettleExpenseId.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SplitPeopleCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('lastUsedAt: $lastUsedAt, ')
+          ..write('qrPath: $qrPath, ')
+          ..write('archived: $archived, ')
+          ..write('suggestedSettleExpenseId: $suggestedSettleExpenseId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class OwedItems extends Table with TableInfo<OwedItems, OwedItem> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -5695,24 +4473,1246 @@ class OwedItemsCompanion extends UpdateCompanion<OwedItem> {
   }
 }
 
+class PendingPayments extends Table
+    with TableInfo<PendingPayments, PendingPayment> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  PendingPayments(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  late final GeneratedColumnWithTypeConverter<Decimal, String> amount =
+      GeneratedColumn<String>(
+        'amount',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL',
+      ).withConverter<Decimal>(PendingPayments.$converteramount);
+  static const VerificationMeta _currencyMeta = const VerificationMeta(
+    'currency',
+  );
+  late final GeneratedColumn<String> currency = GeneratedColumn<String>(
+    'currency',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _merchantMeta = const VerificationMeta(
+    'merchant',
+  );
+  late final GeneratedColumn<String> merchant = GeneratedColumn<String>(
+    'merchant',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  late final GeneratedColumnWithTypeConverter<TransactionType, String>
+  transactionType = GeneratedColumn<String>(
+    'transactionType',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  ).withConverter<TransactionType>(PendingPayments.$convertertransactionType);
+  static const VerificationMeta _sourcePackageMeta = const VerificationMeta(
+    'sourcePackage',
+  );
+  late final GeneratedColumn<String> sourcePackage = GeneratedColumn<String>(
+    'sourcePackage',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _rawNotificationTextMeta =
+      const VerificationMeta('rawNotificationText');
+  late final GeneratedColumn<String> rawNotificationText =
+      GeneratedColumn<String>(
+        'rawNotificationText',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL',
+      );
+  static const VerificationMeta _notificationPostTimeMeta =
+      const VerificationMeta('notificationPostTime');
+  late final GeneratedColumn<int> notificationPostTime = GeneratedColumn<int>(
+    'notificationPostTime',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _notificationKeyMeta = const VerificationMeta(
+    'notificationKey',
+  );
+  late final GeneratedColumn<String> notificationKey = GeneratedColumn<String>(
+    'notificationKey',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _dedupKeyMeta = const VerificationMeta(
+    'dedupKey',
+  );
+  late final GeneratedColumn<String> dedupKey = GeneratedColumn<String>(
+    'dedupKey',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumnWithTypeConverter<CaptureFormat, String> format =
+      GeneratedColumn<String>(
+        'format',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL',
+      ).withConverter<CaptureFormat>(PendingPayments.$converterformat);
+  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
+    'categoryId',
+  );
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
+    'categoryId',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  late final GeneratedColumnWithTypeConverter<bool, int> likelyPromotion =
+      GeneratedColumn<int>(
+        'likelyPromotion',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL',
+      ).withConverter<bool>(PendingPayments.$converterlikelyPromotion);
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'createdAt',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumnWithTypeConverter<bool, int> edited =
+      GeneratedColumn<int>(
+        'edited',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL',
+      ).withConverter<bool>(PendingPayments.$converteredited);
+  late final GeneratedColumnWithTypeConverter<bool, int> directionUnclear =
+      GeneratedColumn<int>(
+        'directionUnclear',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        $customConstraints: 'NOT NULL DEFAULT 0',
+        defaultValue: const CustomExpression('0'),
+      ).withConverter<bool>(PendingPayments.$converterdirectionUnclear);
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    amount,
+    currency,
+    merchant,
+    transactionType,
+    sourcePackage,
+    rawNotificationText,
+    notificationPostTime,
+    notificationKey,
+    dedupKey,
+    format,
+    categoryId,
+    likelyPromotion,
+    createdAt,
+    edited,
+    directionUnclear,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_payments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingPayment> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('currency')) {
+      context.handle(
+        _currencyMeta,
+        currency.isAcceptableOrUnknown(data['currency']!, _currencyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_currencyMeta);
+    }
+    if (data.containsKey('merchant')) {
+      context.handle(
+        _merchantMeta,
+        merchant.isAcceptableOrUnknown(data['merchant']!, _merchantMeta),
+      );
+    }
+    if (data.containsKey('sourcePackage')) {
+      context.handle(
+        _sourcePackageMeta,
+        sourcePackage.isAcceptableOrUnknown(
+          data['sourcePackage']!,
+          _sourcePackageMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourcePackageMeta);
+    }
+    if (data.containsKey('rawNotificationText')) {
+      context.handle(
+        _rawNotificationTextMeta,
+        rawNotificationText.isAcceptableOrUnknown(
+          data['rawNotificationText']!,
+          _rawNotificationTextMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_rawNotificationTextMeta);
+    }
+    if (data.containsKey('notificationPostTime')) {
+      context.handle(
+        _notificationPostTimeMeta,
+        notificationPostTime.isAcceptableOrUnknown(
+          data['notificationPostTime']!,
+          _notificationPostTimeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_notificationPostTimeMeta);
+    }
+    if (data.containsKey('notificationKey')) {
+      context.handle(
+        _notificationKeyMeta,
+        notificationKey.isAcceptableOrUnknown(
+          data['notificationKey']!,
+          _notificationKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dedupKey')) {
+      context.handle(
+        _dedupKeyMeta,
+        dedupKey.isAcceptableOrUnknown(data['dedupKey']!, _dedupKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dedupKeyMeta);
+    }
+    if (data.containsKey('categoryId')) {
+      context.handle(
+        _categoryIdMeta,
+        categoryId.isAcceptableOrUnknown(data['categoryId']!, _categoryIdMeta),
+      );
+    }
+    if (data.containsKey('createdAt')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['createdAt']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PendingPayment map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingPayment(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      amount: PendingPayments.$converteramount.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}amount'],
+        )!,
+      ),
+      currency: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}currency'],
+      )!,
+      merchant: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}merchant'],
+      ),
+      transactionType: PendingPayments.$convertertransactionType.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}transactionType'],
+        )!,
+      ),
+      sourcePackage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sourcePackage'],
+      )!,
+      rawNotificationText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rawNotificationText'],
+      )!,
+      notificationPostTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}notificationPostTime'],
+      )!,
+      notificationKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notificationKey'],
+      ),
+      dedupKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dedupKey'],
+      )!,
+      format: PendingPayments.$converterformat.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}format'],
+        )!,
+      ),
+      categoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}categoryId'],
+      ),
+      likelyPromotion: PendingPayments.$converterlikelyPromotion.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}likelyPromotion'],
+        )!,
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}createdAt'],
+      )!,
+      edited: PendingPayments.$converteredited.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}edited'],
+        )!,
+      ),
+      directionUnclear: PendingPayments.$converterdirectionUnclear.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}directionUnclear'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  PendingPayments createAlias(String alias) {
+    return PendingPayments(attachedDatabase, alias);
+  }
+
+  static TypeConverter<Decimal, String> $converteramount =
+      const MoneyConverter();
+  static TypeConverter<TransactionType, String> $convertertransactionType =
+      const TransactionTypeConverter();
+  static TypeConverter<CaptureFormat, String> $converterformat =
+      const CaptureFormatConverter();
+  static TypeConverter<bool, int> $converterlikelyPromotion =
+      const BoolConverter();
+  static TypeConverter<bool, int> $converteredited = const BoolConverter();
+  static TypeConverter<bool, int> $converterdirectionUnclear =
+      const BoolConverter();
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class PendingPayment extends DataClass implements Insertable<PendingPayment> {
+  final String id;
+  final Decimal amount;
+  final String currency;
+  final String? merchant;
+  final TransactionType transactionType;
+  final String sourcePackage;
+  final String rawNotificationText;
+  final int notificationPostTime;
+  final String? notificationKey;
+  final String dedupKey;
+  final CaptureFormat format;
+  final String? categoryId;
+  final bool likelyPromotion;
+  final int createdAt;
+  final bool edited;
+  final bool directionUnclear;
+  const PendingPayment({
+    required this.id,
+    required this.amount,
+    required this.currency,
+    this.merchant,
+    required this.transactionType,
+    required this.sourcePackage,
+    required this.rawNotificationText,
+    required this.notificationPostTime,
+    this.notificationKey,
+    required this.dedupKey,
+    required this.format,
+    this.categoryId,
+    required this.likelyPromotion,
+    required this.createdAt,
+    required this.edited,
+    required this.directionUnclear,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    {
+      map['amount'] = Variable<String>(
+        PendingPayments.$converteramount.toSql(amount),
+      );
+    }
+    map['currency'] = Variable<String>(currency);
+    if (!nullToAbsent || merchant != null) {
+      map['merchant'] = Variable<String>(merchant);
+    }
+    {
+      map['transactionType'] = Variable<String>(
+        PendingPayments.$convertertransactionType.toSql(transactionType),
+      );
+    }
+    map['sourcePackage'] = Variable<String>(sourcePackage);
+    map['rawNotificationText'] = Variable<String>(rawNotificationText);
+    map['notificationPostTime'] = Variable<int>(notificationPostTime);
+    if (!nullToAbsent || notificationKey != null) {
+      map['notificationKey'] = Variable<String>(notificationKey);
+    }
+    map['dedupKey'] = Variable<String>(dedupKey);
+    {
+      map['format'] = Variable<String>(
+        PendingPayments.$converterformat.toSql(format),
+      );
+    }
+    if (!nullToAbsent || categoryId != null) {
+      map['categoryId'] = Variable<String>(categoryId);
+    }
+    {
+      map['likelyPromotion'] = Variable<int>(
+        PendingPayments.$converterlikelyPromotion.toSql(likelyPromotion),
+      );
+    }
+    map['createdAt'] = Variable<int>(createdAt);
+    {
+      map['edited'] = Variable<int>(
+        PendingPayments.$converteredited.toSql(edited),
+      );
+    }
+    {
+      map['directionUnclear'] = Variable<int>(
+        PendingPayments.$converterdirectionUnclear.toSql(directionUnclear),
+      );
+    }
+    return map;
+  }
+
+  PendingPaymentsCompanion toCompanion(bool nullToAbsent) {
+    return PendingPaymentsCompanion(
+      id: Value(id),
+      amount: Value(amount),
+      currency: Value(currency),
+      merchant: merchant == null && nullToAbsent
+          ? const Value.absent()
+          : Value(merchant),
+      transactionType: Value(transactionType),
+      sourcePackage: Value(sourcePackage),
+      rawNotificationText: Value(rawNotificationText),
+      notificationPostTime: Value(notificationPostTime),
+      notificationKey: notificationKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notificationKey),
+      dedupKey: Value(dedupKey),
+      format: Value(format),
+      categoryId: categoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryId),
+      likelyPromotion: Value(likelyPromotion),
+      createdAt: Value(createdAt),
+      edited: Value(edited),
+      directionUnclear: Value(directionUnclear),
+    );
+  }
+
+  factory PendingPayment.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingPayment(
+      id: serializer.fromJson<String>(json['id']),
+      amount: serializer.fromJson<Decimal>(json['amount']),
+      currency: serializer.fromJson<String>(json['currency']),
+      merchant: serializer.fromJson<String?>(json['merchant']),
+      transactionType: serializer.fromJson<TransactionType>(
+        json['transactionType'],
+      ),
+      sourcePackage: serializer.fromJson<String>(json['sourcePackage']),
+      rawNotificationText: serializer.fromJson<String>(
+        json['rawNotificationText'],
+      ),
+      notificationPostTime: serializer.fromJson<int>(
+        json['notificationPostTime'],
+      ),
+      notificationKey: serializer.fromJson<String?>(json['notificationKey']),
+      dedupKey: serializer.fromJson<String>(json['dedupKey']),
+      format: serializer.fromJson<CaptureFormat>(json['format']),
+      categoryId: serializer.fromJson<String?>(json['categoryId']),
+      likelyPromotion: serializer.fromJson<bool>(json['likelyPromotion']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      edited: serializer.fromJson<bool>(json['edited']),
+      directionUnclear: serializer.fromJson<bool>(json['directionUnclear']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'amount': serializer.toJson<Decimal>(amount),
+      'currency': serializer.toJson<String>(currency),
+      'merchant': serializer.toJson<String?>(merchant),
+      'transactionType': serializer.toJson<TransactionType>(transactionType),
+      'sourcePackage': serializer.toJson<String>(sourcePackage),
+      'rawNotificationText': serializer.toJson<String>(rawNotificationText),
+      'notificationPostTime': serializer.toJson<int>(notificationPostTime),
+      'notificationKey': serializer.toJson<String?>(notificationKey),
+      'dedupKey': serializer.toJson<String>(dedupKey),
+      'format': serializer.toJson<CaptureFormat>(format),
+      'categoryId': serializer.toJson<String?>(categoryId),
+      'likelyPromotion': serializer.toJson<bool>(likelyPromotion),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'edited': serializer.toJson<bool>(edited),
+      'directionUnclear': serializer.toJson<bool>(directionUnclear),
+    };
+  }
+
+  PendingPayment copyWith({
+    String? id,
+    Decimal? amount,
+    String? currency,
+    Value<String?> merchant = const Value.absent(),
+    TransactionType? transactionType,
+    String? sourcePackage,
+    String? rawNotificationText,
+    int? notificationPostTime,
+    Value<String?> notificationKey = const Value.absent(),
+    String? dedupKey,
+    CaptureFormat? format,
+    Value<String?> categoryId = const Value.absent(),
+    bool? likelyPromotion,
+    int? createdAt,
+    bool? edited,
+    bool? directionUnclear,
+  }) => PendingPayment(
+    id: id ?? this.id,
+    amount: amount ?? this.amount,
+    currency: currency ?? this.currency,
+    merchant: merchant.present ? merchant.value : this.merchant,
+    transactionType: transactionType ?? this.transactionType,
+    sourcePackage: sourcePackage ?? this.sourcePackage,
+    rawNotificationText: rawNotificationText ?? this.rawNotificationText,
+    notificationPostTime: notificationPostTime ?? this.notificationPostTime,
+    notificationKey: notificationKey.present
+        ? notificationKey.value
+        : this.notificationKey,
+    dedupKey: dedupKey ?? this.dedupKey,
+    format: format ?? this.format,
+    categoryId: categoryId.present ? categoryId.value : this.categoryId,
+    likelyPromotion: likelyPromotion ?? this.likelyPromotion,
+    createdAt: createdAt ?? this.createdAt,
+    edited: edited ?? this.edited,
+    directionUnclear: directionUnclear ?? this.directionUnclear,
+  );
+  PendingPayment copyWithCompanion(PendingPaymentsCompanion data) {
+    return PendingPayment(
+      id: data.id.present ? data.id.value : this.id,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      currency: data.currency.present ? data.currency.value : this.currency,
+      merchant: data.merchant.present ? data.merchant.value : this.merchant,
+      transactionType: data.transactionType.present
+          ? data.transactionType.value
+          : this.transactionType,
+      sourcePackage: data.sourcePackage.present
+          ? data.sourcePackage.value
+          : this.sourcePackage,
+      rawNotificationText: data.rawNotificationText.present
+          ? data.rawNotificationText.value
+          : this.rawNotificationText,
+      notificationPostTime: data.notificationPostTime.present
+          ? data.notificationPostTime.value
+          : this.notificationPostTime,
+      notificationKey: data.notificationKey.present
+          ? data.notificationKey.value
+          : this.notificationKey,
+      dedupKey: data.dedupKey.present ? data.dedupKey.value : this.dedupKey,
+      format: data.format.present ? data.format.value : this.format,
+      categoryId: data.categoryId.present
+          ? data.categoryId.value
+          : this.categoryId,
+      likelyPromotion: data.likelyPromotion.present
+          ? data.likelyPromotion.value
+          : this.likelyPromotion,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      edited: data.edited.present ? data.edited.value : this.edited,
+      directionUnclear: data.directionUnclear.present
+          ? data.directionUnclear.value
+          : this.directionUnclear,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingPayment(')
+          ..write('id: $id, ')
+          ..write('amount: $amount, ')
+          ..write('currency: $currency, ')
+          ..write('merchant: $merchant, ')
+          ..write('transactionType: $transactionType, ')
+          ..write('sourcePackage: $sourcePackage, ')
+          ..write('rawNotificationText: $rawNotificationText, ')
+          ..write('notificationPostTime: $notificationPostTime, ')
+          ..write('notificationKey: $notificationKey, ')
+          ..write('dedupKey: $dedupKey, ')
+          ..write('format: $format, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('likelyPromotion: $likelyPromotion, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('edited: $edited, ')
+          ..write('directionUnclear: $directionUnclear')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    amount,
+    currency,
+    merchant,
+    transactionType,
+    sourcePackage,
+    rawNotificationText,
+    notificationPostTime,
+    notificationKey,
+    dedupKey,
+    format,
+    categoryId,
+    likelyPromotion,
+    createdAt,
+    edited,
+    directionUnclear,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingPayment &&
+          other.id == this.id &&
+          other.amount == this.amount &&
+          other.currency == this.currency &&
+          other.merchant == this.merchant &&
+          other.transactionType == this.transactionType &&
+          other.sourcePackage == this.sourcePackage &&
+          other.rawNotificationText == this.rawNotificationText &&
+          other.notificationPostTime == this.notificationPostTime &&
+          other.notificationKey == this.notificationKey &&
+          other.dedupKey == this.dedupKey &&
+          other.format == this.format &&
+          other.categoryId == this.categoryId &&
+          other.likelyPromotion == this.likelyPromotion &&
+          other.createdAt == this.createdAt &&
+          other.edited == this.edited &&
+          other.directionUnclear == this.directionUnclear);
+}
+
+class PendingPaymentsCompanion extends UpdateCompanion<PendingPayment> {
+  final Value<String> id;
+  final Value<Decimal> amount;
+  final Value<String> currency;
+  final Value<String?> merchant;
+  final Value<TransactionType> transactionType;
+  final Value<String> sourcePackage;
+  final Value<String> rawNotificationText;
+  final Value<int> notificationPostTime;
+  final Value<String?> notificationKey;
+  final Value<String> dedupKey;
+  final Value<CaptureFormat> format;
+  final Value<String?> categoryId;
+  final Value<bool> likelyPromotion;
+  final Value<int> createdAt;
+  final Value<bool> edited;
+  final Value<bool> directionUnclear;
+  final Value<int> rowid;
+  const PendingPaymentsCompanion({
+    this.id = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.currency = const Value.absent(),
+    this.merchant = const Value.absent(),
+    this.transactionType = const Value.absent(),
+    this.sourcePackage = const Value.absent(),
+    this.rawNotificationText = const Value.absent(),
+    this.notificationPostTime = const Value.absent(),
+    this.notificationKey = const Value.absent(),
+    this.dedupKey = const Value.absent(),
+    this.format = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.likelyPromotion = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.edited = const Value.absent(),
+    this.directionUnclear = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PendingPaymentsCompanion.insert({
+    required String id,
+    required Decimal amount,
+    required String currency,
+    this.merchant = const Value.absent(),
+    required TransactionType transactionType,
+    required String sourcePackage,
+    required String rawNotificationText,
+    required int notificationPostTime,
+    this.notificationKey = const Value.absent(),
+    required String dedupKey,
+    required CaptureFormat format,
+    this.categoryId = const Value.absent(),
+    required bool likelyPromotion,
+    required int createdAt,
+    required bool edited,
+    this.directionUnclear = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       amount = Value(amount),
+       currency = Value(currency),
+       transactionType = Value(transactionType),
+       sourcePackage = Value(sourcePackage),
+       rawNotificationText = Value(rawNotificationText),
+       notificationPostTime = Value(notificationPostTime),
+       dedupKey = Value(dedupKey),
+       format = Value(format),
+       likelyPromotion = Value(likelyPromotion),
+       createdAt = Value(createdAt),
+       edited = Value(edited);
+  static Insertable<PendingPayment> custom({
+    Expression<String>? id,
+    Expression<String>? amount,
+    Expression<String>? currency,
+    Expression<String>? merchant,
+    Expression<String>? transactionType,
+    Expression<String>? sourcePackage,
+    Expression<String>? rawNotificationText,
+    Expression<int>? notificationPostTime,
+    Expression<String>? notificationKey,
+    Expression<String>? dedupKey,
+    Expression<String>? format,
+    Expression<String>? categoryId,
+    Expression<int>? likelyPromotion,
+    Expression<int>? createdAt,
+    Expression<int>? edited,
+    Expression<int>? directionUnclear,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (amount != null) 'amount': amount,
+      if (currency != null) 'currency': currency,
+      if (merchant != null) 'merchant': merchant,
+      if (transactionType != null) 'transactionType': transactionType,
+      if (sourcePackage != null) 'sourcePackage': sourcePackage,
+      if (rawNotificationText != null)
+        'rawNotificationText': rawNotificationText,
+      if (notificationPostTime != null)
+        'notificationPostTime': notificationPostTime,
+      if (notificationKey != null) 'notificationKey': notificationKey,
+      if (dedupKey != null) 'dedupKey': dedupKey,
+      if (format != null) 'format': format,
+      if (categoryId != null) 'categoryId': categoryId,
+      if (likelyPromotion != null) 'likelyPromotion': likelyPromotion,
+      if (createdAt != null) 'createdAt': createdAt,
+      if (edited != null) 'edited': edited,
+      if (directionUnclear != null) 'directionUnclear': directionUnclear,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PendingPaymentsCompanion copyWith({
+    Value<String>? id,
+    Value<Decimal>? amount,
+    Value<String>? currency,
+    Value<String?>? merchant,
+    Value<TransactionType>? transactionType,
+    Value<String>? sourcePackage,
+    Value<String>? rawNotificationText,
+    Value<int>? notificationPostTime,
+    Value<String?>? notificationKey,
+    Value<String>? dedupKey,
+    Value<CaptureFormat>? format,
+    Value<String?>? categoryId,
+    Value<bool>? likelyPromotion,
+    Value<int>? createdAt,
+    Value<bool>? edited,
+    Value<bool>? directionUnclear,
+    Value<int>? rowid,
+  }) {
+    return PendingPaymentsCompanion(
+      id: id ?? this.id,
+      amount: amount ?? this.amount,
+      currency: currency ?? this.currency,
+      merchant: merchant ?? this.merchant,
+      transactionType: transactionType ?? this.transactionType,
+      sourcePackage: sourcePackage ?? this.sourcePackage,
+      rawNotificationText: rawNotificationText ?? this.rawNotificationText,
+      notificationPostTime: notificationPostTime ?? this.notificationPostTime,
+      notificationKey: notificationKey ?? this.notificationKey,
+      dedupKey: dedupKey ?? this.dedupKey,
+      format: format ?? this.format,
+      categoryId: categoryId ?? this.categoryId,
+      likelyPromotion: likelyPromotion ?? this.likelyPromotion,
+      createdAt: createdAt ?? this.createdAt,
+      edited: edited ?? this.edited,
+      directionUnclear: directionUnclear ?? this.directionUnclear,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<String>(
+        PendingPayments.$converteramount.toSql(amount.value),
+      );
+    }
+    if (currency.present) {
+      map['currency'] = Variable<String>(currency.value);
+    }
+    if (merchant.present) {
+      map['merchant'] = Variable<String>(merchant.value);
+    }
+    if (transactionType.present) {
+      map['transactionType'] = Variable<String>(
+        PendingPayments.$convertertransactionType.toSql(transactionType.value),
+      );
+    }
+    if (sourcePackage.present) {
+      map['sourcePackage'] = Variable<String>(sourcePackage.value);
+    }
+    if (rawNotificationText.present) {
+      map['rawNotificationText'] = Variable<String>(rawNotificationText.value);
+    }
+    if (notificationPostTime.present) {
+      map['notificationPostTime'] = Variable<int>(notificationPostTime.value);
+    }
+    if (notificationKey.present) {
+      map['notificationKey'] = Variable<String>(notificationKey.value);
+    }
+    if (dedupKey.present) {
+      map['dedupKey'] = Variable<String>(dedupKey.value);
+    }
+    if (format.present) {
+      map['format'] = Variable<String>(
+        PendingPayments.$converterformat.toSql(format.value),
+      );
+    }
+    if (categoryId.present) {
+      map['categoryId'] = Variable<String>(categoryId.value);
+    }
+    if (likelyPromotion.present) {
+      map['likelyPromotion'] = Variable<int>(
+        PendingPayments.$converterlikelyPromotion.toSql(likelyPromotion.value),
+      );
+    }
+    if (createdAt.present) {
+      map['createdAt'] = Variable<int>(createdAt.value);
+    }
+    if (edited.present) {
+      map['edited'] = Variable<int>(
+        PendingPayments.$converteredited.toSql(edited.value),
+      );
+    }
+    if (directionUnclear.present) {
+      map['directionUnclear'] = Variable<int>(
+        PendingPayments.$converterdirectionUnclear.toSql(
+          directionUnclear.value,
+        ),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingPaymentsCompanion(')
+          ..write('id: $id, ')
+          ..write('amount: $amount, ')
+          ..write('currency: $currency, ')
+          ..write('merchant: $merchant, ')
+          ..write('transactionType: $transactionType, ')
+          ..write('sourcePackage: $sourcePackage, ')
+          ..write('rawNotificationText: $rawNotificationText, ')
+          ..write('notificationPostTime: $notificationPostTime, ')
+          ..write('notificationKey: $notificationKey, ')
+          ..write('dedupKey: $dedupKey, ')
+          ..write('format: $format, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('likelyPromotion: $likelyPromotion, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('edited: $edited, ')
+          ..write('directionUnclear: $directionUnclear, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class DroppedNotifications extends Table
+    with TableInfo<DroppedNotifications, DroppedNotification> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  DroppedNotifications(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _dedupKeyMeta = const VerificationMeta(
+    'dedupKey',
+  );
+  late final GeneratedColumn<String> dedupKey = GeneratedColumn<String>(
+    'dedupKey',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _notificationKeyMeta = const VerificationMeta(
+    'notificationKey',
+  );
+  late final GeneratedColumn<String> notificationKey = GeneratedColumn<String>(
+    'notificationKey',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _droppedAtMeta = const VerificationMeta(
+    'droppedAt',
+  );
+  late final GeneratedColumn<int> droppedAt = GeneratedColumn<int>(
+    'droppedAt',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [dedupKey, notificationKey, droppedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'dropped_notifications';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DroppedNotification> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('dedupKey')) {
+      context.handle(
+        _dedupKeyMeta,
+        dedupKey.isAcceptableOrUnknown(data['dedupKey']!, _dedupKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dedupKeyMeta);
+    }
+    if (data.containsKey('notificationKey')) {
+      context.handle(
+        _notificationKeyMeta,
+        notificationKey.isAcceptableOrUnknown(
+          data['notificationKey']!,
+          _notificationKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('droppedAt')) {
+      context.handle(
+        _droppedAtMeta,
+        droppedAt.isAcceptableOrUnknown(data['droppedAt']!, _droppedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_droppedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {dedupKey};
+  @override
+  DroppedNotification map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DroppedNotification(
+      dedupKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dedupKey'],
+      )!,
+      notificationKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notificationKey'],
+      ),
+      droppedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}droppedAt'],
+      )!,
+    );
+  }
+
+  @override
+  DroppedNotifications createAlias(String alias) {
+    return DroppedNotifications(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class DroppedNotification extends DataClass
+    implements Insertable<DroppedNotification> {
+  final String dedupKey;
+  final String? notificationKey;
+  final int droppedAt;
+  const DroppedNotification({
+    required this.dedupKey,
+    this.notificationKey,
+    required this.droppedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['dedupKey'] = Variable<String>(dedupKey);
+    if (!nullToAbsent || notificationKey != null) {
+      map['notificationKey'] = Variable<String>(notificationKey);
+    }
+    map['droppedAt'] = Variable<int>(droppedAt);
+    return map;
+  }
+
+  DroppedNotificationsCompanion toCompanion(bool nullToAbsent) {
+    return DroppedNotificationsCompanion(
+      dedupKey: Value(dedupKey),
+      notificationKey: notificationKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notificationKey),
+      droppedAt: Value(droppedAt),
+    );
+  }
+
+  factory DroppedNotification.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DroppedNotification(
+      dedupKey: serializer.fromJson<String>(json['dedupKey']),
+      notificationKey: serializer.fromJson<String?>(json['notificationKey']),
+      droppedAt: serializer.fromJson<int>(json['droppedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'dedupKey': serializer.toJson<String>(dedupKey),
+      'notificationKey': serializer.toJson<String?>(notificationKey),
+      'droppedAt': serializer.toJson<int>(droppedAt),
+    };
+  }
+
+  DroppedNotification copyWith({
+    String? dedupKey,
+    Value<String?> notificationKey = const Value.absent(),
+    int? droppedAt,
+  }) => DroppedNotification(
+    dedupKey: dedupKey ?? this.dedupKey,
+    notificationKey: notificationKey.present
+        ? notificationKey.value
+        : this.notificationKey,
+    droppedAt: droppedAt ?? this.droppedAt,
+  );
+  DroppedNotification copyWithCompanion(DroppedNotificationsCompanion data) {
+    return DroppedNotification(
+      dedupKey: data.dedupKey.present ? data.dedupKey.value : this.dedupKey,
+      notificationKey: data.notificationKey.present
+          ? data.notificationKey.value
+          : this.notificationKey,
+      droppedAt: data.droppedAt.present ? data.droppedAt.value : this.droppedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DroppedNotification(')
+          ..write('dedupKey: $dedupKey, ')
+          ..write('notificationKey: $notificationKey, ')
+          ..write('droppedAt: $droppedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(dedupKey, notificationKey, droppedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DroppedNotification &&
+          other.dedupKey == this.dedupKey &&
+          other.notificationKey == this.notificationKey &&
+          other.droppedAt == this.droppedAt);
+}
+
+class DroppedNotificationsCompanion
+    extends UpdateCompanion<DroppedNotification> {
+  final Value<String> dedupKey;
+  final Value<String?> notificationKey;
+  final Value<int> droppedAt;
+  final Value<int> rowid;
+  const DroppedNotificationsCompanion({
+    this.dedupKey = const Value.absent(),
+    this.notificationKey = const Value.absent(),
+    this.droppedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DroppedNotificationsCompanion.insert({
+    required String dedupKey,
+    this.notificationKey = const Value.absent(),
+    required int droppedAt,
+    this.rowid = const Value.absent(),
+  }) : dedupKey = Value(dedupKey),
+       droppedAt = Value(droppedAt);
+  static Insertable<DroppedNotification> custom({
+    Expression<String>? dedupKey,
+    Expression<String>? notificationKey,
+    Expression<int>? droppedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (dedupKey != null) 'dedupKey': dedupKey,
+      if (notificationKey != null) 'notificationKey': notificationKey,
+      if (droppedAt != null) 'droppedAt': droppedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DroppedNotificationsCompanion copyWith({
+    Value<String>? dedupKey,
+    Value<String?>? notificationKey,
+    Value<int>? droppedAt,
+    Value<int>? rowid,
+  }) {
+    return DroppedNotificationsCompanion(
+      dedupKey: dedupKey ?? this.dedupKey,
+      notificationKey: notificationKey ?? this.notificationKey,
+      droppedAt: droppedAt ?? this.droppedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (dedupKey.present) {
+      map['dedupKey'] = Variable<String>(dedupKey.value);
+    }
+    if (notificationKey.present) {
+      map['notificationKey'] = Variable<String>(notificationKey.value);
+    }
+    if (droppedAt.present) {
+      map['droppedAt'] = Variable<int>(droppedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DroppedNotificationsCompanion(')
+          ..write('dedupKey: $dedupKey, ')
+          ..write('notificationKey: $notificationKey, ')
+          ..write('droppedAt: $droppedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$KobanDatabase extends GeneratedDatabase {
   _$KobanDatabase(QueryExecutor e) : super(e);
   $KobanDatabaseManager get managers => $KobanDatabaseManager(this);
   late final Expenses expenses = Expenses(this);
-  late final PendingPayments pendingPayments = PendingPayments(this);
-  late final DroppedNotifications droppedNotifications = DroppedNotifications(
-    this,
-  );
   late final Categories categories = Categories(this);
   late final MerchantCategoryMap merchantCategoryMap = MerchantCategoryMap(
     this,
   );
   late final SplitBills splitBills = SplitBills(this);
   late final SplitItems splitItems = SplitItems(this);
-  late final SplitPeople splitPeople = SplitPeople(this);
   late final SplitItemShares splitItemShares = SplitItemShares(this);
   late final SplitDebts splitDebts = SplitDebts(this);
+  late final SplitPeople splitPeople = SplitPeople(this);
   late final OwedItems owedItems = OwedItems(this);
+  late final PendingPayments pendingPayments = PendingPayments(this);
+  late final DroppedNotifications droppedNotifications = DroppedNotifications(
+    this,
+  );
   late final Index indexExpensesDedupKey = Index(
     'index_expenses_dedupKey',
     'CREATE UNIQUE INDEX index_expenses_dedupKey ON expenses (dedupKey)',
@@ -5741,6 +5741,384 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
     'index_split_items_billId',
     'CREATE INDEX index_split_items_billId ON split_items (billId)',
   );
+  Selectable<bool> anyExpense() {
+    return customSelect(
+      'SELECT EXISTS (SELECT 1 AS _c0 FROM expenses WHERE status != \'DISMISSED\') AS anyExpense',
+      variables: [],
+      readsFrom: {this.expenses},
+    ).map((QueryRow row) => row.read<bool>('anyExpense'));
+  }
+
+  Selectable<Expense> allActive() {
+    return customSelect(
+      'SELECT * FROM expenses WHERE status != \'DISMISSED\' ORDER BY notificationPostTime DESC',
+      variables: [],
+      readsFrom: {this.expenses},
+    ).asyncMap(this.expenses.mapFromRow);
+  }
+
+  Selectable<Decimal> totalForRange(int start, int end) {
+    return customSelect(
+      'SELECT CAST(COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) AS TEXT) AS total FROM expenses WHERE status != \'DISMISSED\' AND notificationPostTime >= ?1 AND notificationPostTime < ?2',
+      variables: [Variable<int>(start), Variable<int>(end)],
+      readsFrom: {this.expenses},
+    ).map(
+      (QueryRow row) =>
+          const MoneyConverter().fromSql(row.read<String>('total')),
+    );
+  }
+
+  Selectable<Decimal> receivedForRange(int start, int end) {
+    return customSelect(
+      'SELECT CAST(COALESCE(SUM(amount), 0) AS TEXT) AS total FROM expenses WHERE status != \'DISMISSED\' AND transactionType = \'RECEIVE\' AND notificationPostTime >= ?1 AND notificationPostTime < ?2',
+      variables: [Variable<int>(start), Variable<int>(end)],
+      readsFrom: {this.expenses},
+    ).map(
+      (QueryRow row) =>
+          const MoneyConverter().fromSql(row.read<String>('total')),
+    );
+  }
+
+  Selectable<Expense> inRange(int start, int end) {
+    return customSelect(
+      'SELECT * FROM expenses WHERE status != \'DISMISSED\' AND notificationPostTime >= ?1 AND notificationPostTime < ?2 ORDER BY notificationPostTime DESC',
+      variables: [Variable<int>(start), Variable<int>(end)],
+      readsFrom: {this.expenses},
+    ).asyncMap(this.expenses.mapFromRow);
+  }
+
+  Selectable<TotalsByCategoryResult> totalsByCategory(int start, int end) {
+    return customSelect(
+      'SELECT categoryId, CAST(COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) AS TEXT) AS total FROM expenses WHERE status != \'DISMISSED\' AND notificationPostTime >= ?1 AND notificationPostTime < ?2 GROUP BY categoryId HAVING COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) != 0 ORDER BY COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) DESC',
+      variables: [Variable<int>(start), Variable<int>(end)],
+      readsFrom: {this.expenses},
+    ).map(
+      (QueryRow row) => TotalsByCategoryResult(
+        categoryId: row.readNullable<String>('categoryId'),
+        total: const MoneyConverter().fromSql(row.read<String>('total')),
+      ),
+    );
+  }
+
+  Future<int> setCategoryForMerchant(
+    String? categoryId,
+    String? merchantKey,
+    TransactionType type,
+  ) {
+    return customUpdate(
+      'UPDATE expenses SET categoryId = ?1 WHERE lower(trim(merchant)) = ?2 AND transactionType = ?3',
+      variables: [
+        Variable<String>(categoryId),
+        Variable<String>(merchantKey),
+        Variable<String>(Expenses.$convertertransactionType.toSql(type)),
+      ],
+      updates: {this.expenses},
+      updateKind: UpdateKind.update,
+    );
+  }
+
+  Selectable<MonthlyTotalsResult> monthlyTotals() {
+    return customSelect(
+      'SELECT(CAST(strftime(\'%Y\', notificationPostTime / 1000, \'unixepoch\', \'localtime\') AS INTEGER) * 100 + CAST(strftime(\'%m\', notificationPostTime / 1000, \'unixepoch\', \'localtime\') AS INTEGER))AS yearMonth, CAST(COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) AS TEXT) AS total, CAST(COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN amount ELSE 0 END), 0) AS TEXT) AS received FROM expenses WHERE status != \'DISMISSED\' GROUP BY yearMonth ORDER BY yearMonth DESC',
+      variables: [],
+      readsFrom: {this.expenses},
+    ).map(
+      (QueryRow row) => MonthlyTotalsResult(
+        yearMonth: row.read<int>('yearMonth'),
+        total: const MoneyConverter().fromSql(row.read<String>('total')),
+        received: const MoneyConverter().fromSql(row.read<String>('received')),
+      ),
+    );
+  }
+
+  Selectable<Decimal> totalForRangeOnce(int start, int end) {
+    return customSelect(
+      'SELECT CAST(COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) AS TEXT) AS total FROM expenses WHERE status != \'DISMISSED\' AND notificationPostTime >= ?1 AND notificationPostTime < ?2',
+      variables: [Variable<int>(start), Variable<int>(end)],
+      readsFrom: {this.expenses},
+    ).map(
+      (QueryRow row) =>
+          const MoneyConverter().fromSql(row.read<String>('total')),
+    );
+  }
+
+  Selectable<Category> allCategories() {
+    return customSelect(
+      'SELECT * FROM categories ORDER BY name ASC',
+      variables: [],
+      readsFrom: {this.categories},
+    ).asyncMap(this.categories.mapFromRow);
+  }
+
+  Selectable<int> categoryCount() {
+    return customSelect(
+      'SELECT COUNT(*) AS _c0 FROM categories',
+      variables: [],
+      readsFrom: {this.categories},
+    ).map((QueryRow row) => row.read<int>('_c0'));
+  }
+
+  Selectable<Category> categoryById(String id) {
+    return customSelect(
+      'SELECT * FROM categories WHERE id = ?1',
+      variables: [Variable<String>(id)],
+      readsFrom: {this.categories},
+    ).asyncMap(this.categories.mapFromRow);
+  }
+
+  Future<int> deleteCustomCategory(String id) {
+    return customUpdate(
+      'DELETE FROM categories WHERE id = ?1 AND isDefault = 0',
+      variables: [Variable<String>(id)],
+      updates: {this.categories},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Selectable<MerchantCategoryMapData> merchantMappingByKey(String key) {
+    return customSelect(
+      'SELECT * FROM merchant_category_map WHERE merchantKey = ?1 LIMIT 1',
+      variables: [Variable<String>(key)],
+      readsFrom: {this.merchantCategoryMap},
+    ).asyncMap(this.merchantCategoryMap.mapFromRow);
+  }
+
+  Selectable<SplitBill> bills() {
+    return customSelect(
+      'SELECT * FROM split_bills WHERE manual = 0 ORDER BY billTime DESC',
+      variables: [],
+      readsFrom: {this.splitBills},
+    ).asyncMap(this.splitBills.mapFromRow);
+  }
+
+  Selectable<SplitBill> bill(String billId) {
+    return customSelect(
+      'SELECT * FROM split_bills WHERE id = ?1',
+      variables: [Variable<String>(billId)],
+      readsFrom: {this.splitBills},
+    ).asyncMap(this.splitBills.mapFromRow);
+  }
+
+  Selectable<SplitBill> billByLinkedExpense(String? expenseId) {
+    return customSelect(
+      'SELECT * FROM split_bills WHERE linkedExpenseId = ?1 LIMIT 1',
+      variables: [Variable<String>(expenseId)],
+      readsFrom: {this.splitBills},
+    ).asyncMap(this.splitBills.mapFromRow);
+  }
+
+  Selectable<SplitItem> items(String billId) {
+    return customSelect(
+      'SELECT * FROM split_items WHERE billId = ?1 ORDER BY position',
+      variables: [Variable<String>(billId)],
+      readsFrom: {this.splitItems},
+    ).asyncMap(this.splitItems.mapFromRow);
+  }
+
+  Selectable<SplitItemShare> shares(String billId) {
+    return customSelect(
+      'SELECT s.* FROM split_item_shares AS s JOIN split_items AS i ON i.id = s.itemId WHERE i.billId = ?1',
+      variables: [Variable<String>(billId)],
+      readsFrom: {this.splitItemShares, this.splitItems},
+    ).asyncMap(this.splitItemShares.mapFromRow);
+  }
+
+  Selectable<SplitDebt> debts(String billId) {
+    return customSelect(
+      'SELECT * FROM split_debts WHERE billId = ?1',
+      variables: [Variable<String>(billId)],
+      readsFrom: {this.splitDebts},
+    ).asyncMap(this.splitDebts.mapFromRow);
+  }
+
+  Selectable<SplitDebt> debtsByRepayment(String? expenseId) {
+    return customSelect(
+      'SELECT * FROM split_debts WHERE repaymentExpenseId = ?1',
+      variables: [Variable<String>(expenseId)],
+      readsFrom: {this.splitDebts},
+    ).asyncMap(this.splitDebts.mapFromRow);
+  }
+
+  Selectable<SplitDebt> debt(String debtId) {
+    return customSelect(
+      'SELECT * FROM split_debts WHERE id = ?1',
+      variables: [Variable<String>(debtId)],
+      readsFrom: {this.splitDebts},
+    ).asyncMap(this.splitDebts.mapFromRow);
+  }
+
+  Selectable<OpenDebtRowsResult> openDebtRows() {
+    return customSelect(
+      'SELECT d.id AS debtId, d.billId AS billId, d.personId AS personId, p.name AS personName, b.merchant AS merchant, b.billTime AS billTime, d.amount AS amount, b.manual AS manual FROM split_debts AS d JOIN split_people AS p ON p.id = d.personId JOIN split_bills AS b ON b.id = d.billId WHERE d.status = \'OPEN\' ORDER BY b.billTime ASC',
+      variables: [],
+      readsFrom: {this.splitDebts, this.splitPeople, this.splitBills},
+    ).map(
+      (QueryRow row) => OpenDebtRowsResult(
+        debtId: row.read<String>('debtId'),
+        billId: row.read<String>('billId'),
+        personId: row.read<String>('personId'),
+        personName: row.read<String>('personName'),
+        merchant: row.readNullable<String>('merchant'),
+        billTime: row.read<int>('billTime'),
+        amount: SplitDebts.$converteramount.fromSql(row.read<String>('amount')),
+        manual: SplitBills.$convertermanual.fromSql(row.read<int>('manual')),
+      ),
+    );
+  }
+
+  Selectable<SplitDebt> openDebts() {
+    return customSelect(
+      'SELECT * FROM split_debts WHERE status = \'OPEN\'',
+      variables: [],
+      readsFrom: {this.splitDebts},
+    ).asyncMap(this.splitDebts.mapFromRow);
+  }
+
+  Selectable<SplitPeopleData> people() {
+    return customSelect(
+      'SELECT * FROM split_people WHERE archived = 0 ORDER BY lastUsedAt DESC',
+      variables: [],
+      readsFrom: {this.splitPeople},
+    ).asyncMap(this.splitPeople.mapFromRow);
+  }
+
+  Selectable<SplitPeopleData> allPeopleIncludingArchived() {
+    return customSelect(
+      'SELECT * FROM split_people',
+      variables: [],
+      readsFrom: {this.splitPeople},
+    ).asyncMap(this.splitPeople.mapFromRow);
+  }
+
+  Selectable<SplitPeopleData> allPeople() {
+    return customSelect(
+      'SELECT * FROM split_people WHERE archived = 0 ORDER BY name COLLATE NOCASE',
+      variables: [],
+      readsFrom: {this.splitPeople},
+    ).asyncMap(this.splitPeople.mapFromRow);
+  }
+
+  Selectable<SplitPeopleData> person(String id) {
+    return customSelect(
+      'SELECT * FROM split_people WHERE id = ?1',
+      variables: [Variable<String>(id)],
+      readsFrom: {this.splitPeople},
+    ).asyncMap(this.splitPeople.mapFromRow);
+  }
+
+  Selectable<SplitDebt> openDebtsFor(String personId) {
+    return customSelect(
+      'SELECT * FROM split_debts WHERE status = \'OPEN\' AND personId = ?1',
+      variables: [Variable<String>(personId)],
+      readsFrom: {this.splitDebts},
+    ).asyncMap(this.splitDebts.mapFromRow);
+  }
+
+  Future<int> deleteOwedItem(String id) {
+    return customUpdate(
+      'DELETE FROM owed_items WHERE id = ?1',
+      variables: [Variable<String>(id)],
+      updates: {this.owedItems},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Selectable<OwedItem> owedItem(String id) {
+    return customSelect(
+      'SELECT * FROM owed_items WHERE id = ?1',
+      variables: [Variable<String>(id)],
+      readsFrom: {this.owedItems},
+    ).asyncMap(this.owedItems.mapFromRow);
+  }
+
+  Selectable<OwedItem> owedItemsOf(String personId) {
+    return customSelect(
+      'SELECT * FROM owed_items WHERE personId = ?1 AND status = \'OPEN\' ORDER BY itemDate',
+      variables: [Variable<String>(personId)],
+      readsFrom: {this.owedItems},
+    ).asyncMap(this.owedItems.mapFromRow);
+  }
+
+  Selectable<OwedItem> openOwedItems(String personId) {
+    return customSelect(
+      'SELECT * FROM owed_items WHERE personId = ?1 AND status = \'OPEN\'',
+      variables: [Variable<String>(personId)],
+      readsFrom: {this.owedItems},
+    ).asyncMap(this.owedItems.mapFromRow);
+  }
+
+  Selectable<OwedItem> allOpenOwedItems() {
+    return customSelect(
+      'SELECT * FROM owed_items WHERE status = \'OPEN\'',
+      variables: [],
+      readsFrom: {this.owedItems},
+    ).asyncMap(this.owedItems.mapFromRow);
+  }
+
+  Future<int> deletePaidOwedItems(String personId) {
+    return customUpdate(
+      'DELETE FROM owed_items WHERE personId = ?1 AND status = \'PAID\'',
+      variables: [Variable<String>(personId)],
+      updates: {this.owedItems},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Future<int> deleteSharesByBill(String billId) {
+    return customUpdate(
+      'DELETE FROM split_item_shares WHERE itemId IN (SELECT id FROM split_items WHERE billId = ?1)',
+      variables: [Variable<String>(billId)],
+      updates: {this.splitItemShares},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Future<int> deleteItemsByBill(String billId) {
+    return customUpdate(
+      'DELETE FROM split_items WHERE billId = ?1',
+      variables: [Variable<String>(billId)],
+      updates: {this.splitItems},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Future<int> deleteDebtsByBill(String billId) {
+    return customUpdate(
+      'DELETE FROM split_debts WHERE billId = ?1',
+      variables: [Variable<String>(billId)],
+      updates: {this.splitDebts},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Future<int> deleteBill(String billId) {
+    return customUpdate(
+      'DELETE FROM split_bills WHERE id = ?1',
+      variables: [Variable<String>(billId)],
+      updates: {this.splitBills},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Selectable<Expense> recentByType(TransactionType type, int since) {
+    return customSelect(
+      'SELECT * FROM expenses WHERE status != \'DISMISSED\' AND transactionType = ?1 AND countedAmount IS NULL AND notificationPostTime >= ?2 ORDER BY notificationPostTime DESC',
+      variables: [
+        Variable<String>(Expenses.$convertertransactionType.toSql(type)),
+        Variable<int>(since),
+      ],
+      readsFrom: {this.expenses},
+    ).asyncMap(this.expenses.mapFromRow);
+  }
+
+  Selectable<Expense> expenseById(String id) {
+    return customSelect(
+      'SELECT * FROM expenses WHERE id = ?1',
+      variables: [Variable<String>(id)],
+      readsFrom: {this.expenses},
+    ).asyncMap(this.expenses.mapFromRow);
+  }
+
   Selectable<Expense> findExpenseByNotificationKey(
     String? notificationKey,
     int postTime,
@@ -5861,16 +6239,16 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     expenses,
-    pendingPayments,
-    droppedNotifications,
     categories,
     merchantCategoryMap,
     splitBills,
     splitItems,
-    splitPeople,
     splitItemShares,
     splitDebts,
+    splitPeople,
     owedItems,
+    pendingPayments,
+    droppedNotifications,
     indexExpensesDedupKey,
     indexOwedItemsPersonId,
     indexPendingPaymentsNotificationKey,
@@ -6333,632 +6711,6 @@ typedef $ExpensesProcessedTableManager =
       $ExpensesUpdateCompanionBuilder,
       (Expense, BaseReferences<_$KobanDatabase, Expenses, Expense>),
       Expense,
-      PrefetchHooks Function()
-    >;
-typedef $PendingPaymentsCreateCompanionBuilder =
-    PendingPaymentsCompanion Function({
-      required String id,
-      required Decimal amount,
-      required String currency,
-      Value<String?> merchant,
-      required TransactionType transactionType,
-      required String sourcePackage,
-      required String rawNotificationText,
-      required int notificationPostTime,
-      Value<String?> notificationKey,
-      required String dedupKey,
-      required CaptureFormat format,
-      Value<String?> categoryId,
-      required bool likelyPromotion,
-      required int createdAt,
-      required bool edited,
-      Value<bool> directionUnclear,
-      Value<int> rowid,
-    });
-typedef $PendingPaymentsUpdateCompanionBuilder =
-    PendingPaymentsCompanion Function({
-      Value<String> id,
-      Value<Decimal> amount,
-      Value<String> currency,
-      Value<String?> merchant,
-      Value<TransactionType> transactionType,
-      Value<String> sourcePackage,
-      Value<String> rawNotificationText,
-      Value<int> notificationPostTime,
-      Value<String?> notificationKey,
-      Value<String> dedupKey,
-      Value<CaptureFormat> format,
-      Value<String?> categoryId,
-      Value<bool> likelyPromotion,
-      Value<int> createdAt,
-      Value<bool> edited,
-      Value<bool> directionUnclear,
-      Value<int> rowid,
-    });
-
-class $PendingPaymentsFilterComposer
-    extends Composer<_$KobanDatabase, PendingPayments> {
-  $PendingPaymentsFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<Decimal, Decimal, String> get amount =>
-      $composableBuilder(
-        column: $table.amount,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
-
-  ColumnFilters<String> get currency => $composableBuilder(
-    column: $table.currency,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get merchant => $composableBuilder(
-    column: $table.merchant,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<TransactionType, TransactionType, String>
-  get transactionType => $composableBuilder(
-    column: $table.transactionType,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
-  );
-
-  ColumnFilters<String> get sourcePackage => $composableBuilder(
-    column: $table.sourcePackage,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get rawNotificationText => $composableBuilder(
-    column: $table.rawNotificationText,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get notificationPostTime => $composableBuilder(
-    column: $table.notificationPostTime,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get notificationKey => $composableBuilder(
-    column: $table.notificationKey,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get dedupKey => $composableBuilder(
-    column: $table.dedupKey,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<CaptureFormat, CaptureFormat, String>
-  get format => $composableBuilder(
-    column: $table.format,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
-  );
-
-  ColumnFilters<String> get categoryId => $composableBuilder(
-    column: $table.categoryId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<bool, bool, int> get likelyPromotion =>
-      $composableBuilder(
-        column: $table.likelyPromotion,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
-
-  ColumnFilters<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<bool, bool, int> get edited =>
-      $composableBuilder(
-        column: $table.edited,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
-
-  ColumnWithTypeConverterFilters<bool, bool, int> get directionUnclear =>
-      $composableBuilder(
-        column: $table.directionUnclear,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
-}
-
-class $PendingPaymentsOrderingComposer
-    extends Composer<_$KobanDatabase, PendingPayments> {
-  $PendingPaymentsOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get amount => $composableBuilder(
-    column: $table.amount,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get currency => $composableBuilder(
-    column: $table.currency,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get merchant => $composableBuilder(
-    column: $table.merchant,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get transactionType => $composableBuilder(
-    column: $table.transactionType,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get sourcePackage => $composableBuilder(
-    column: $table.sourcePackage,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get rawNotificationText => $composableBuilder(
-    column: $table.rawNotificationText,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get notificationPostTime => $composableBuilder(
-    column: $table.notificationPostTime,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get notificationKey => $composableBuilder(
-    column: $table.notificationKey,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get dedupKey => $composableBuilder(
-    column: $table.dedupKey,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get format => $composableBuilder(
-    column: $table.format,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get categoryId => $composableBuilder(
-    column: $table.categoryId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get likelyPromotion => $composableBuilder(
-    column: $table.likelyPromotion,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get edited => $composableBuilder(
-    column: $table.edited,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get directionUnclear => $composableBuilder(
-    column: $table.directionUnclear,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $PendingPaymentsAnnotationComposer
-    extends Composer<_$KobanDatabase, PendingPayments> {
-  $PendingPaymentsAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<Decimal, String> get amount =>
-      $composableBuilder(column: $table.amount, builder: (column) => column);
-
-  GeneratedColumn<String> get currency =>
-      $composableBuilder(column: $table.currency, builder: (column) => column);
-
-  GeneratedColumn<String> get merchant =>
-      $composableBuilder(column: $table.merchant, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<TransactionType, String>
-  get transactionType => $composableBuilder(
-    column: $table.transactionType,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get sourcePackage => $composableBuilder(
-    column: $table.sourcePackage,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get rawNotificationText => $composableBuilder(
-    column: $table.rawNotificationText,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get notificationPostTime => $composableBuilder(
-    column: $table.notificationPostTime,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get notificationKey => $composableBuilder(
-    column: $table.notificationKey,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get dedupKey =>
-      $composableBuilder(column: $table.dedupKey, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<CaptureFormat, String> get format =>
-      $composableBuilder(column: $table.format, builder: (column) => column);
-
-  GeneratedColumn<String> get categoryId => $composableBuilder(
-    column: $table.categoryId,
-    builder: (column) => column,
-  );
-
-  GeneratedColumnWithTypeConverter<bool, int> get likelyPromotion =>
-      $composableBuilder(
-        column: $table.likelyPromotion,
-        builder: (column) => column,
-      );
-
-  GeneratedColumn<int> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<bool, int> get edited =>
-      $composableBuilder(column: $table.edited, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<bool, int> get directionUnclear =>
-      $composableBuilder(
-        column: $table.directionUnclear,
-        builder: (column) => column,
-      );
-}
-
-class $PendingPaymentsTableManager
-    extends
-        RootTableManager<
-          _$KobanDatabase,
-          PendingPayments,
-          PendingPayment,
-          $PendingPaymentsFilterComposer,
-          $PendingPaymentsOrderingComposer,
-          $PendingPaymentsAnnotationComposer,
-          $PendingPaymentsCreateCompanionBuilder,
-          $PendingPaymentsUpdateCompanionBuilder,
-          (
-            PendingPayment,
-            BaseReferences<_$KobanDatabase, PendingPayments, PendingPayment>,
-          ),
-          PendingPayment,
-          PrefetchHooks Function()
-        > {
-  $PendingPaymentsTableManager(_$KobanDatabase db, PendingPayments table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $PendingPaymentsFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $PendingPaymentsOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $PendingPaymentsAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<Decimal> amount = const Value.absent(),
-                Value<String> currency = const Value.absent(),
-                Value<String?> merchant = const Value.absent(),
-                Value<TransactionType> transactionType = const Value.absent(),
-                Value<String> sourcePackage = const Value.absent(),
-                Value<String> rawNotificationText = const Value.absent(),
-                Value<int> notificationPostTime = const Value.absent(),
-                Value<String?> notificationKey = const Value.absent(),
-                Value<String> dedupKey = const Value.absent(),
-                Value<CaptureFormat> format = const Value.absent(),
-                Value<String?> categoryId = const Value.absent(),
-                Value<bool> likelyPromotion = const Value.absent(),
-                Value<int> createdAt = const Value.absent(),
-                Value<bool> edited = const Value.absent(),
-                Value<bool> directionUnclear = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => PendingPaymentsCompanion(
-                id: id,
-                amount: amount,
-                currency: currency,
-                merchant: merchant,
-                transactionType: transactionType,
-                sourcePackage: sourcePackage,
-                rawNotificationText: rawNotificationText,
-                notificationPostTime: notificationPostTime,
-                notificationKey: notificationKey,
-                dedupKey: dedupKey,
-                format: format,
-                categoryId: categoryId,
-                likelyPromotion: likelyPromotion,
-                createdAt: createdAt,
-                edited: edited,
-                directionUnclear: directionUnclear,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required Decimal amount,
-                required String currency,
-                Value<String?> merchant = const Value.absent(),
-                required TransactionType transactionType,
-                required String sourcePackage,
-                required String rawNotificationText,
-                required int notificationPostTime,
-                Value<String?> notificationKey = const Value.absent(),
-                required String dedupKey,
-                required CaptureFormat format,
-                Value<String?> categoryId = const Value.absent(),
-                required bool likelyPromotion,
-                required int createdAt,
-                required bool edited,
-                Value<bool> directionUnclear = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => PendingPaymentsCompanion.insert(
-                id: id,
-                amount: amount,
-                currency: currency,
-                merchant: merchant,
-                transactionType: transactionType,
-                sourcePackage: sourcePackage,
-                rawNotificationText: rawNotificationText,
-                notificationPostTime: notificationPostTime,
-                notificationKey: notificationKey,
-                dedupKey: dedupKey,
-                format: format,
-                categoryId: categoryId,
-                likelyPromotion: likelyPromotion,
-                createdAt: createdAt,
-                edited: edited,
-                directionUnclear: directionUnclear,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable<PendingPayments, PendingPayment>(table),
-                  BaseReferences<
-                    _$KobanDatabase,
-                    PendingPayments,
-                    PendingPayment
-                  >(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $PendingPaymentsProcessedTableManager =
-    ProcessedTableManager<
-      _$KobanDatabase,
-      PendingPayments,
-      PendingPayment,
-      $PendingPaymentsFilterComposer,
-      $PendingPaymentsOrderingComposer,
-      $PendingPaymentsAnnotationComposer,
-      $PendingPaymentsCreateCompanionBuilder,
-      $PendingPaymentsUpdateCompanionBuilder,
-      (
-        PendingPayment,
-        BaseReferences<_$KobanDatabase, PendingPayments, PendingPayment>,
-      ),
-      PendingPayment,
-      PrefetchHooks Function()
-    >;
-typedef $DroppedNotificationsCreateCompanionBuilder =
-    DroppedNotificationsCompanion Function({
-      required String dedupKey,
-      Value<String?> notificationKey,
-      required int droppedAt,
-      Value<int> rowid,
-    });
-typedef $DroppedNotificationsUpdateCompanionBuilder =
-    DroppedNotificationsCompanion Function({
-      Value<String> dedupKey,
-      Value<String?> notificationKey,
-      Value<int> droppedAt,
-      Value<int> rowid,
-    });
-
-class $DroppedNotificationsFilterComposer
-    extends Composer<_$KobanDatabase, DroppedNotifications> {
-  $DroppedNotificationsFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get dedupKey => $composableBuilder(
-    column: $table.dedupKey,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get notificationKey => $composableBuilder(
-    column: $table.notificationKey,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get droppedAt => $composableBuilder(
-    column: $table.droppedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-}
-
-class $DroppedNotificationsOrderingComposer
-    extends Composer<_$KobanDatabase, DroppedNotifications> {
-  $DroppedNotificationsOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get dedupKey => $composableBuilder(
-    column: $table.dedupKey,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get notificationKey => $composableBuilder(
-    column: $table.notificationKey,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get droppedAt => $composableBuilder(
-    column: $table.droppedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $DroppedNotificationsAnnotationComposer
-    extends Composer<_$KobanDatabase, DroppedNotifications> {
-  $DroppedNotificationsAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get dedupKey =>
-      $composableBuilder(column: $table.dedupKey, builder: (column) => column);
-
-  GeneratedColumn<String> get notificationKey => $composableBuilder(
-    column: $table.notificationKey,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get droppedAt =>
-      $composableBuilder(column: $table.droppedAt, builder: (column) => column);
-}
-
-class $DroppedNotificationsTableManager
-    extends
-        RootTableManager<
-          _$KobanDatabase,
-          DroppedNotifications,
-          DroppedNotification,
-          $DroppedNotificationsFilterComposer,
-          $DroppedNotificationsOrderingComposer,
-          $DroppedNotificationsAnnotationComposer,
-          $DroppedNotificationsCreateCompanionBuilder,
-          $DroppedNotificationsUpdateCompanionBuilder,
-          (
-            DroppedNotification,
-            BaseReferences<
-              _$KobanDatabase,
-              DroppedNotifications,
-              DroppedNotification
-            >,
-          ),
-          DroppedNotification,
-          PrefetchHooks Function()
-        > {
-  $DroppedNotificationsTableManager(
-    _$KobanDatabase db,
-    DroppedNotifications table,
-  ) : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $DroppedNotificationsFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $DroppedNotificationsOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $DroppedNotificationsAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> dedupKey = const Value.absent(),
-                Value<String?> notificationKey = const Value.absent(),
-                Value<int> droppedAt = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => DroppedNotificationsCompanion(
-                dedupKey: dedupKey,
-                notificationKey: notificationKey,
-                droppedAt: droppedAt,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String dedupKey,
-                Value<String?> notificationKey = const Value.absent(),
-                required int droppedAt,
-                Value<int> rowid = const Value.absent(),
-              }) => DroppedNotificationsCompanion.insert(
-                dedupKey: dedupKey,
-                notificationKey: notificationKey,
-                droppedAt: droppedAt,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable<DroppedNotifications, DroppedNotification>(table),
-                  BaseReferences<
-                    _$KobanDatabase,
-                    DroppedNotifications,
-                    DroppedNotification
-                  >(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $DroppedNotificationsProcessedTableManager =
-    ProcessedTableManager<
-      _$KobanDatabase,
-      DroppedNotifications,
-      DroppedNotification,
-      $DroppedNotificationsFilterComposer,
-      $DroppedNotificationsOrderingComposer,
-      $DroppedNotificationsAnnotationComposer,
-      $DroppedNotificationsCreateCompanionBuilder,
-      $DroppedNotificationsUpdateCompanionBuilder,
-      (
-        DroppedNotification,
-        BaseReferences<
-          _$KobanDatabase,
-          DroppedNotifications,
-          DroppedNotification
-        >,
-      ),
-      DroppedNotification,
       PrefetchHooks Function()
     >;
 typedef $CategoriesCreateCompanionBuilder = CategoriesCompanion Function({
@@ -7918,237 +7670,6 @@ typedef $SplitItemsProcessedTableManager =
       SplitItem,
       PrefetchHooks Function()
     >;
-typedef $SplitPeopleCreateCompanionBuilder = SplitPeopleCompanion Function({
-  required String id,
-  required String name,
-  required int lastUsedAt,
-  Value<String?> qrPath,
-  Value<bool> archived,
-  Value<String?> suggestedSettleExpenseId,
-  Value<int> rowid,
-});
-typedef $SplitPeopleUpdateCompanionBuilder = SplitPeopleCompanion Function({
-  Value<String> id,
-  Value<String> name,
-  Value<int> lastUsedAt,
-  Value<String?> qrPath,
-  Value<bool> archived,
-  Value<String?> suggestedSettleExpenseId,
-  Value<int> rowid,
-});
-
-class $SplitPeopleFilterComposer
-    extends Composer<_$KobanDatabase, SplitPeople> {
-  $SplitPeopleFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get lastUsedAt => $composableBuilder(
-    column: $table.lastUsedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get qrPath => $composableBuilder(
-    column: $table.qrPath,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<bool, bool, int> get archived =>
-      $composableBuilder(
-        column: $table.archived,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
-
-  ColumnFilters<String> get suggestedSettleExpenseId => $composableBuilder(
-    column: $table.suggestedSettleExpenseId,
-    builder: (column) => ColumnFilters(column),
-  );
-}
-
-class $SplitPeopleOrderingComposer
-    extends Composer<_$KobanDatabase, SplitPeople> {
-  $SplitPeopleOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get lastUsedAt => $composableBuilder(
-    column: $table.lastUsedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get qrPath => $composableBuilder(
-    column: $table.qrPath,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get archived => $composableBuilder(
-    column: $table.archived,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get suggestedSettleExpenseId => $composableBuilder(
-    column: $table.suggestedSettleExpenseId,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $SplitPeopleAnnotationComposer
-    extends Composer<_$KobanDatabase, SplitPeople> {
-  $SplitPeopleAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<int> get lastUsedAt => $composableBuilder(
-    column: $table.lastUsedAt,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get qrPath =>
-      $composableBuilder(column: $table.qrPath, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<bool, int> get archived =>
-      $composableBuilder(column: $table.archived, builder: (column) => column);
-
-  GeneratedColumn<String> get suggestedSettleExpenseId => $composableBuilder(
-    column: $table.suggestedSettleExpenseId,
-    builder: (column) => column,
-  );
-}
-
-class $SplitPeopleTableManager
-    extends
-        RootTableManager<
-          _$KobanDatabase,
-          SplitPeople,
-          SplitPeopleData,
-          $SplitPeopleFilterComposer,
-          $SplitPeopleOrderingComposer,
-          $SplitPeopleAnnotationComposer,
-          $SplitPeopleCreateCompanionBuilder,
-          $SplitPeopleUpdateCompanionBuilder,
-          (
-            SplitPeopleData,
-            BaseReferences<_$KobanDatabase, SplitPeople, SplitPeopleData>,
-          ),
-          SplitPeopleData,
-          PrefetchHooks Function()
-        > {
-  $SplitPeopleTableManager(_$KobanDatabase db, SplitPeople table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $SplitPeopleFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $SplitPeopleOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $SplitPeopleAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<int> lastUsedAt = const Value.absent(),
-                Value<String?> qrPath = const Value.absent(),
-                Value<bool> archived = const Value.absent(),
-                Value<String?> suggestedSettleExpenseId = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => SplitPeopleCompanion(
-                id: id,
-                name: name,
-                lastUsedAt: lastUsedAt,
-                qrPath: qrPath,
-                archived: archived,
-                suggestedSettleExpenseId: suggestedSettleExpenseId,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                required int lastUsedAt,
-                Value<String?> qrPath = const Value.absent(),
-                Value<bool> archived = const Value.absent(),
-                Value<String?> suggestedSettleExpenseId = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => SplitPeopleCompanion.insert(
-                id: id,
-                name: name,
-                lastUsedAt: lastUsedAt,
-                qrPath: qrPath,
-                archived: archived,
-                suggestedSettleExpenseId: suggestedSettleExpenseId,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable<SplitPeople, SplitPeopleData>(table),
-                  BaseReferences<_$KobanDatabase, SplitPeople, SplitPeopleData>(
-                    db,
-                    table,
-                    e,
-                  ),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $SplitPeopleProcessedTableManager =
-    ProcessedTableManager<
-      _$KobanDatabase,
-      SplitPeople,
-      SplitPeopleData,
-      $SplitPeopleFilterComposer,
-      $SplitPeopleOrderingComposer,
-      $SplitPeopleAnnotationComposer,
-      $SplitPeopleCreateCompanionBuilder,
-      $SplitPeopleUpdateCompanionBuilder,
-      (
-        SplitPeopleData,
-        BaseReferences<_$KobanDatabase, SplitPeople, SplitPeopleData>,
-      ),
-      SplitPeopleData,
-      PrefetchHooks Function()
-    >;
 typedef $SplitItemSharesCreateCompanionBuilder =
     SplitItemSharesCompanion Function({
       required String itemId,
@@ -8566,6 +8087,237 @@ typedef $SplitDebtsProcessedTableManager =
       SplitDebt,
       PrefetchHooks Function()
     >;
+typedef $SplitPeopleCreateCompanionBuilder = SplitPeopleCompanion Function({
+  required String id,
+  required String name,
+  required int lastUsedAt,
+  Value<String?> qrPath,
+  Value<bool> archived,
+  Value<String?> suggestedSettleExpenseId,
+  Value<int> rowid,
+});
+typedef $SplitPeopleUpdateCompanionBuilder = SplitPeopleCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<int> lastUsedAt,
+  Value<String?> qrPath,
+  Value<bool> archived,
+  Value<String?> suggestedSettleExpenseId,
+  Value<int> rowid,
+});
+
+class $SplitPeopleFilterComposer
+    extends Composer<_$KobanDatabase, SplitPeople> {
+  $SplitPeopleFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastUsedAt => $composableBuilder(
+    column: $table.lastUsedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get qrPath => $composableBuilder(
+    column: $table.qrPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<bool, bool, int> get archived =>
+      $composableBuilder(
+        column: $table.archived,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get suggestedSettleExpenseId => $composableBuilder(
+    column: $table.suggestedSettleExpenseId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $SplitPeopleOrderingComposer
+    extends Composer<_$KobanDatabase, SplitPeople> {
+  $SplitPeopleOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastUsedAt => $composableBuilder(
+    column: $table.lastUsedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get qrPath => $composableBuilder(
+    column: $table.qrPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get archived => $composableBuilder(
+    column: $table.archived,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get suggestedSettleExpenseId => $composableBuilder(
+    column: $table.suggestedSettleExpenseId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $SplitPeopleAnnotationComposer
+    extends Composer<_$KobanDatabase, SplitPeople> {
+  $SplitPeopleAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get lastUsedAt => $composableBuilder(
+    column: $table.lastUsedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get qrPath =>
+      $composableBuilder(column: $table.qrPath, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<bool, int> get archived =>
+      $composableBuilder(column: $table.archived, builder: (column) => column);
+
+  GeneratedColumn<String> get suggestedSettleExpenseId => $composableBuilder(
+    column: $table.suggestedSettleExpenseId,
+    builder: (column) => column,
+  );
+}
+
+class $SplitPeopleTableManager
+    extends
+        RootTableManager<
+          _$KobanDatabase,
+          SplitPeople,
+          SplitPeopleData,
+          $SplitPeopleFilterComposer,
+          $SplitPeopleOrderingComposer,
+          $SplitPeopleAnnotationComposer,
+          $SplitPeopleCreateCompanionBuilder,
+          $SplitPeopleUpdateCompanionBuilder,
+          (
+            SplitPeopleData,
+            BaseReferences<_$KobanDatabase, SplitPeople, SplitPeopleData>,
+          ),
+          SplitPeopleData,
+          PrefetchHooks Function()
+        > {
+  $SplitPeopleTableManager(_$KobanDatabase db, SplitPeople table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $SplitPeopleFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $SplitPeopleOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $SplitPeopleAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> lastUsedAt = const Value.absent(),
+                Value<String?> qrPath = const Value.absent(),
+                Value<bool> archived = const Value.absent(),
+                Value<String?> suggestedSettleExpenseId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SplitPeopleCompanion(
+                id: id,
+                name: name,
+                lastUsedAt: lastUsedAt,
+                qrPath: qrPath,
+                archived: archived,
+                suggestedSettleExpenseId: suggestedSettleExpenseId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required int lastUsedAt,
+                Value<String?> qrPath = const Value.absent(),
+                Value<bool> archived = const Value.absent(),
+                Value<String?> suggestedSettleExpenseId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SplitPeopleCompanion.insert(
+                id: id,
+                name: name,
+                lastUsedAt: lastUsedAt,
+                qrPath: qrPath,
+                archived: archived,
+                suggestedSettleExpenseId: suggestedSettleExpenseId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<SplitPeople, SplitPeopleData>(table),
+                  BaseReferences<_$KobanDatabase, SplitPeople, SplitPeopleData>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $SplitPeopleProcessedTableManager =
+    ProcessedTableManager<
+      _$KobanDatabase,
+      SplitPeople,
+      SplitPeopleData,
+      $SplitPeopleFilterComposer,
+      $SplitPeopleOrderingComposer,
+      $SplitPeopleAnnotationComposer,
+      $SplitPeopleCreateCompanionBuilder,
+      $SplitPeopleUpdateCompanionBuilder,
+      (
+        SplitPeopleData,
+        BaseReferences<_$KobanDatabase, SplitPeople, SplitPeopleData>,
+      ),
+      SplitPeopleData,
+      PrefetchHooks Function()
+    >;
 typedef $OwedItemsCreateCompanionBuilder = OwedItemsCompanion Function({
   required String id,
   required String personId,
@@ -8826,16 +8578,638 @@ typedef $OwedItemsProcessedTableManager =
       OwedItem,
       PrefetchHooks Function()
     >;
+typedef $PendingPaymentsCreateCompanionBuilder =
+    PendingPaymentsCompanion Function({
+      required String id,
+      required Decimal amount,
+      required String currency,
+      Value<String?> merchant,
+      required TransactionType transactionType,
+      required String sourcePackage,
+      required String rawNotificationText,
+      required int notificationPostTime,
+      Value<String?> notificationKey,
+      required String dedupKey,
+      required CaptureFormat format,
+      Value<String?> categoryId,
+      required bool likelyPromotion,
+      required int createdAt,
+      required bool edited,
+      Value<bool> directionUnclear,
+      Value<int> rowid,
+    });
+typedef $PendingPaymentsUpdateCompanionBuilder =
+    PendingPaymentsCompanion Function({
+      Value<String> id,
+      Value<Decimal> amount,
+      Value<String> currency,
+      Value<String?> merchant,
+      Value<TransactionType> transactionType,
+      Value<String> sourcePackage,
+      Value<String> rawNotificationText,
+      Value<int> notificationPostTime,
+      Value<String?> notificationKey,
+      Value<String> dedupKey,
+      Value<CaptureFormat> format,
+      Value<String?> categoryId,
+      Value<bool> likelyPromotion,
+      Value<int> createdAt,
+      Value<bool> edited,
+      Value<bool> directionUnclear,
+      Value<int> rowid,
+    });
+
+class $PendingPaymentsFilterComposer
+    extends Composer<_$KobanDatabase, PendingPayments> {
+  $PendingPaymentsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<Decimal, Decimal, String> get amount =>
+      $composableBuilder(
+        column: $table.amount,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get merchant => $composableBuilder(
+    column: $table.merchant,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<TransactionType, TransactionType, String>
+  get transactionType => $composableBuilder(
+    column: $table.transactionType,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get sourcePackage => $composableBuilder(
+    column: $table.sourcePackage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rawNotificationText => $composableBuilder(
+    column: $table.rawNotificationText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get notificationPostTime => $composableBuilder(
+    column: $table.notificationPostTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notificationKey => $composableBuilder(
+    column: $table.notificationKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dedupKey => $composableBuilder(
+    column: $table.dedupKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<CaptureFormat, CaptureFormat, String>
+  get format => $composableBuilder(
+    column: $table.format,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<bool, bool, int> get likelyPromotion =>
+      $composableBuilder(
+        column: $table.likelyPromotion,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<bool, bool, int> get edited =>
+      $composableBuilder(
+        column: $table.edited,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<bool, bool, int> get directionUnclear =>
+      $composableBuilder(
+        column: $table.directionUnclear,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $PendingPaymentsOrderingComposer
+    extends Composer<_$KobanDatabase, PendingPayments> {
+  $PendingPaymentsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get merchant => $composableBuilder(
+    column: $table.merchant,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get transactionType => $composableBuilder(
+    column: $table.transactionType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourcePackage => $composableBuilder(
+    column: $table.sourcePackage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rawNotificationText => $composableBuilder(
+    column: $table.rawNotificationText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get notificationPostTime => $composableBuilder(
+    column: $table.notificationPostTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notificationKey => $composableBuilder(
+    column: $table.notificationKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dedupKey => $composableBuilder(
+    column: $table.dedupKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get format => $composableBuilder(
+    column: $table.format,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get likelyPromotion => $composableBuilder(
+    column: $table.likelyPromotion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get edited => $composableBuilder(
+    column: $table.edited,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get directionUnclear => $composableBuilder(
+    column: $table.directionUnclear,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $PendingPaymentsAnnotationComposer
+    extends Composer<_$KobanDatabase, PendingPayments> {
+  $PendingPaymentsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<Decimal, String> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<String> get currency =>
+      $composableBuilder(column: $table.currency, builder: (column) => column);
+
+  GeneratedColumn<String> get merchant =>
+      $composableBuilder(column: $table.merchant, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<TransactionType, String>
+  get transactionType => $composableBuilder(
+    column: $table.transactionType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourcePackage => $composableBuilder(
+    column: $table.sourcePackage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get rawNotificationText => $composableBuilder(
+    column: $table.rawNotificationText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get notificationPostTime => $composableBuilder(
+    column: $table.notificationPostTime,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notificationKey => $composableBuilder(
+    column: $table.notificationKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get dedupKey =>
+      $composableBuilder(column: $table.dedupKey, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<CaptureFormat, String> get format =>
+      $composableBuilder(column: $table.format, builder: (column) => column);
+
+  GeneratedColumn<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<bool, int> get likelyPromotion =>
+      $composableBuilder(
+        column: $table.likelyPromotion,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<bool, int> get edited =>
+      $composableBuilder(column: $table.edited, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<bool, int> get directionUnclear =>
+      $composableBuilder(
+        column: $table.directionUnclear,
+        builder: (column) => column,
+      );
+}
+
+class $PendingPaymentsTableManager
+    extends
+        RootTableManager<
+          _$KobanDatabase,
+          PendingPayments,
+          PendingPayment,
+          $PendingPaymentsFilterComposer,
+          $PendingPaymentsOrderingComposer,
+          $PendingPaymentsAnnotationComposer,
+          $PendingPaymentsCreateCompanionBuilder,
+          $PendingPaymentsUpdateCompanionBuilder,
+          (
+            PendingPayment,
+            BaseReferences<_$KobanDatabase, PendingPayments, PendingPayment>,
+          ),
+          PendingPayment,
+          PrefetchHooks Function()
+        > {
+  $PendingPaymentsTableManager(_$KobanDatabase db, PendingPayments table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $PendingPaymentsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $PendingPaymentsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $PendingPaymentsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<Decimal> amount = const Value.absent(),
+                Value<String> currency = const Value.absent(),
+                Value<String?> merchant = const Value.absent(),
+                Value<TransactionType> transactionType = const Value.absent(),
+                Value<String> sourcePackage = const Value.absent(),
+                Value<String> rawNotificationText = const Value.absent(),
+                Value<int> notificationPostTime = const Value.absent(),
+                Value<String?> notificationKey = const Value.absent(),
+                Value<String> dedupKey = const Value.absent(),
+                Value<CaptureFormat> format = const Value.absent(),
+                Value<String?> categoryId = const Value.absent(),
+                Value<bool> likelyPromotion = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<bool> edited = const Value.absent(),
+                Value<bool> directionUnclear = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingPaymentsCompanion(
+                id: id,
+                amount: amount,
+                currency: currency,
+                merchant: merchant,
+                transactionType: transactionType,
+                sourcePackage: sourcePackage,
+                rawNotificationText: rawNotificationText,
+                notificationPostTime: notificationPostTime,
+                notificationKey: notificationKey,
+                dedupKey: dedupKey,
+                format: format,
+                categoryId: categoryId,
+                likelyPromotion: likelyPromotion,
+                createdAt: createdAt,
+                edited: edited,
+                directionUnclear: directionUnclear,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required Decimal amount,
+                required String currency,
+                Value<String?> merchant = const Value.absent(),
+                required TransactionType transactionType,
+                required String sourcePackage,
+                required String rawNotificationText,
+                required int notificationPostTime,
+                Value<String?> notificationKey = const Value.absent(),
+                required String dedupKey,
+                required CaptureFormat format,
+                Value<String?> categoryId = const Value.absent(),
+                required bool likelyPromotion,
+                required int createdAt,
+                required bool edited,
+                Value<bool> directionUnclear = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingPaymentsCompanion.insert(
+                id: id,
+                amount: amount,
+                currency: currency,
+                merchant: merchant,
+                transactionType: transactionType,
+                sourcePackage: sourcePackage,
+                rawNotificationText: rawNotificationText,
+                notificationPostTime: notificationPostTime,
+                notificationKey: notificationKey,
+                dedupKey: dedupKey,
+                format: format,
+                categoryId: categoryId,
+                likelyPromotion: likelyPromotion,
+                createdAt: createdAt,
+                edited: edited,
+                directionUnclear: directionUnclear,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<PendingPayments, PendingPayment>(table),
+                  BaseReferences<
+                    _$KobanDatabase,
+                    PendingPayments,
+                    PendingPayment
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $PendingPaymentsProcessedTableManager =
+    ProcessedTableManager<
+      _$KobanDatabase,
+      PendingPayments,
+      PendingPayment,
+      $PendingPaymentsFilterComposer,
+      $PendingPaymentsOrderingComposer,
+      $PendingPaymentsAnnotationComposer,
+      $PendingPaymentsCreateCompanionBuilder,
+      $PendingPaymentsUpdateCompanionBuilder,
+      (
+        PendingPayment,
+        BaseReferences<_$KobanDatabase, PendingPayments, PendingPayment>,
+      ),
+      PendingPayment,
+      PrefetchHooks Function()
+    >;
+typedef $DroppedNotificationsCreateCompanionBuilder =
+    DroppedNotificationsCompanion Function({
+      required String dedupKey,
+      Value<String?> notificationKey,
+      required int droppedAt,
+      Value<int> rowid,
+    });
+typedef $DroppedNotificationsUpdateCompanionBuilder =
+    DroppedNotificationsCompanion Function({
+      Value<String> dedupKey,
+      Value<String?> notificationKey,
+      Value<int> droppedAt,
+      Value<int> rowid,
+    });
+
+class $DroppedNotificationsFilterComposer
+    extends Composer<_$KobanDatabase, DroppedNotifications> {
+  $DroppedNotificationsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get dedupKey => $composableBuilder(
+    column: $table.dedupKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notificationKey => $composableBuilder(
+    column: $table.notificationKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get droppedAt => $composableBuilder(
+    column: $table.droppedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $DroppedNotificationsOrderingComposer
+    extends Composer<_$KobanDatabase, DroppedNotifications> {
+  $DroppedNotificationsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get dedupKey => $composableBuilder(
+    column: $table.dedupKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notificationKey => $composableBuilder(
+    column: $table.notificationKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get droppedAt => $composableBuilder(
+    column: $table.droppedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $DroppedNotificationsAnnotationComposer
+    extends Composer<_$KobanDatabase, DroppedNotifications> {
+  $DroppedNotificationsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get dedupKey =>
+      $composableBuilder(column: $table.dedupKey, builder: (column) => column);
+
+  GeneratedColumn<String> get notificationKey => $composableBuilder(
+    column: $table.notificationKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get droppedAt =>
+      $composableBuilder(column: $table.droppedAt, builder: (column) => column);
+}
+
+class $DroppedNotificationsTableManager
+    extends
+        RootTableManager<
+          _$KobanDatabase,
+          DroppedNotifications,
+          DroppedNotification,
+          $DroppedNotificationsFilterComposer,
+          $DroppedNotificationsOrderingComposer,
+          $DroppedNotificationsAnnotationComposer,
+          $DroppedNotificationsCreateCompanionBuilder,
+          $DroppedNotificationsUpdateCompanionBuilder,
+          (
+            DroppedNotification,
+            BaseReferences<
+              _$KobanDatabase,
+              DroppedNotifications,
+              DroppedNotification
+            >,
+          ),
+          DroppedNotification,
+          PrefetchHooks Function()
+        > {
+  $DroppedNotificationsTableManager(
+    _$KobanDatabase db,
+    DroppedNotifications table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $DroppedNotificationsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $DroppedNotificationsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $DroppedNotificationsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> dedupKey = const Value.absent(),
+                Value<String?> notificationKey = const Value.absent(),
+                Value<int> droppedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DroppedNotificationsCompanion(
+                dedupKey: dedupKey,
+                notificationKey: notificationKey,
+                droppedAt: droppedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String dedupKey,
+                Value<String?> notificationKey = const Value.absent(),
+                required int droppedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => DroppedNotificationsCompanion.insert(
+                dedupKey: dedupKey,
+                notificationKey: notificationKey,
+                droppedAt: droppedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<DroppedNotifications, DroppedNotification>(table),
+                  BaseReferences<
+                    _$KobanDatabase,
+                    DroppedNotifications,
+                    DroppedNotification
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $DroppedNotificationsProcessedTableManager =
+    ProcessedTableManager<
+      _$KobanDatabase,
+      DroppedNotifications,
+      DroppedNotification,
+      $DroppedNotificationsFilterComposer,
+      $DroppedNotificationsOrderingComposer,
+      $DroppedNotificationsAnnotationComposer,
+      $DroppedNotificationsCreateCompanionBuilder,
+      $DroppedNotificationsUpdateCompanionBuilder,
+      (
+        DroppedNotification,
+        BaseReferences<
+          _$KobanDatabase,
+          DroppedNotifications,
+          DroppedNotification
+        >,
+      ),
+      DroppedNotification,
+      PrefetchHooks Function()
+    >;
 
 class $KobanDatabaseManager {
   final _$KobanDatabase _db;
   $KobanDatabaseManager(this._db);
   $ExpensesTableManager get expenses =>
       $ExpensesTableManager(_db, _db.expenses);
-  $PendingPaymentsTableManager get pendingPayments =>
-      $PendingPaymentsTableManager(_db, _db.pendingPayments);
-  $DroppedNotificationsTableManager get droppedNotifications =>
-      $DroppedNotificationsTableManager(_db, _db.droppedNotifications);
   $CategoriesTableManager get categories =>
       $CategoriesTableManager(_db, _db.categories);
   $MerchantCategoryMapTableManager get merchantCategoryMap =>
@@ -8844,12 +9218,54 @@ class $KobanDatabaseManager {
       $SplitBillsTableManager(_db, _db.splitBills);
   $SplitItemsTableManager get splitItems =>
       $SplitItemsTableManager(_db, _db.splitItems);
-  $SplitPeopleTableManager get splitPeople =>
-      $SplitPeopleTableManager(_db, _db.splitPeople);
   $SplitItemSharesTableManager get splitItemShares =>
       $SplitItemSharesTableManager(_db, _db.splitItemShares);
   $SplitDebtsTableManager get splitDebts =>
       $SplitDebtsTableManager(_db, _db.splitDebts);
+  $SplitPeopleTableManager get splitPeople =>
+      $SplitPeopleTableManager(_db, _db.splitPeople);
   $OwedItemsTableManager get owedItems =>
       $OwedItemsTableManager(_db, _db.owedItems);
+  $PendingPaymentsTableManager get pendingPayments =>
+      $PendingPaymentsTableManager(_db, _db.pendingPayments);
+  $DroppedNotificationsTableManager get droppedNotifications =>
+      $DroppedNotificationsTableManager(_db, _db.droppedNotifications);
+}
+
+class TotalsByCategoryResult {
+  final String? categoryId;
+  final Decimal total;
+  TotalsByCategoryResult({this.categoryId, required this.total});
+}
+
+class MonthlyTotalsResult {
+  final int yearMonth;
+  final Decimal total;
+  final Decimal received;
+  MonthlyTotalsResult({
+    required this.yearMonth,
+    required this.total,
+    required this.received,
+  });
+}
+
+class OpenDebtRowsResult {
+  final String debtId;
+  final String billId;
+  final String personId;
+  final String personName;
+  final String? merchant;
+  final int billTime;
+  final Decimal amount;
+  final bool manual;
+  OpenDebtRowsResult({
+    required this.debtId,
+    required this.billId,
+    required this.personId,
+    required this.personName,
+    this.merchant,
+    required this.billTime,
+    required this.amount,
+    required this.manual,
+  });
 }

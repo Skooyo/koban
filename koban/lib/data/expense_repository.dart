@@ -1,0 +1,253 @@
+import 'dart:developer' as developer;
+
+import 'package:decimal/decimal.dart';
+import 'package:drift/drift.dart';
+
+import '../rules/amount_formatter.dart';
+import '../rules/periods.dart';
+import '../rules/types.dart';
+import 'category_repository.dart';
+import 'database.dart';
+import 'ids.dart';
+import 'merchant_category_repository.dart';
+import 'split_repository.dart';
+import 'summaries.dart';
+import 'watch.dart';
+
+const _recentInPeriod = 5;
+
+String? _blankToNull(String? text) {
+  final trimmed = text?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
+/// The payments the owner sees. A port of `ExpenseRepository.kt`.
+class ExpenseRepository {
+  ExpenseRepository(
+    this._db, {
+    required this._categories,
+    required this._merchants,
+    required this._splits,
+    required this._now,
+  });
+
+  static const manualSource = 'manual';
+
+  final KobanDatabase _db;
+  final CategoryRepository _categories;
+  final MerchantCategoryRepository _merchants;
+  final SplitRepository _splits;
+  final DateTime Function() _now;
+
+  /// True when one payment shows in Activity. Dismissed payments do not count.
+  Stream<bool> watchHasAnyPayment() => _db.anyExpense().watchSingle();
+
+  Stream<List<Expense>> watchAllActive() => _db.allActive().watch();
+
+  Stream<Decimal> watchTotalForRange(int start, int end) =>
+      _db.totalForRange(start, end).watchSingle();
+
+  /// Money received in the range. It shows beside spending and is never subtracted from it.
+  Stream<Decimal> watchReceivedForRange(int start, int end) =>
+      _db.receivedForRange(start, end).watchSingle();
+
+  Stream<List<Expense>> watchInRange(int start, int end) =>
+      _db.inRange(start, end).watch();
+
+  Stream<List<MonthSummary>> watchMonthlySummaries() =>
+      _db.monthlyTotals().watch().map((rows) {
+        return [
+          for (final row in rows)
+            _monthSummary(row.yearMonth, row.total, row.received),
+        ];
+      });
+
+  MonthSummary _monthSummary(int yearMonth, Decimal total, Decimal received) {
+    final (year, month0) = PeriodCalculator.decodeYearMonth(yearMonth);
+    return MonthSummary(
+      year: year,
+      month0: month0,
+      label: PeriodCalculator.monthLabel(year, month0),
+      total: total,
+      received: received,
+    );
+  }
+
+  /// The Monday-to-Sunday weeks of a month with their totals. [month0] is 0-based.
+  Future<List<WeekSummary>> weekSummariesForMonth(int year, int month0) async {
+    final weeks = <WeekSummary>[];
+    for (final (start, end) in PeriodCalculator.weeksInMonth(year, month0)) {
+      weeks.add(
+        WeekSummary(
+          startMs: start,
+          endMs: end,
+          label: PeriodCalculator.weekLabel(start, end),
+          total: await _db.totalForRangeOnce(start, end).getSingle(),
+        ),
+      );
+    }
+    return weeks;
+  }
+
+  /// The day, week or month that holds the time of `now` when this method runs.
+  Stream<PeriodSummary> watchPeriodSummary(SpendingPeriod period) {
+    final anchor = _now();
+    final (start, end) = PeriodCalculator.range(period, anchor: anchor);
+    return watchTables(_db, {_db.expenses, _db.categories}, () async {
+      final expenses = await _db.inRange(start, end).get();
+      return PeriodSummary(
+        title: PeriodCalculator.title(period),
+        subtitle: PeriodCalculator.label(period, anchor: anchor),
+        total: await _db.totalForRange(start, end).getSingle(),
+        breakdown: await _breakdown(start, end),
+        recentExpenses: expenses.take(_recentInPeriod).toList(),
+        periodStart: start,
+        periodEnd: end,
+        received: await _db.receivedForRange(start, end).getSingle(),
+      );
+    });
+  }
+
+  Stream<List<CategoryBreakdown>> watchCategoryBreakdown(int start, int end) =>
+      watchTables(_db, {
+        _db.expenses,
+        _db.categories,
+      }, () => _breakdown(start, end));
+
+  Future<List<CategoryBreakdown>> _breakdown(int start, int end) async {
+    final rows = await _db.totalsByCategory(start, end).get();
+    final byId = {for (final c in await _categories.getAll()) c.id: c};
+    final absSum = rows.fold(Decimal.zero, (sum, r) => sum + r.total.abs());
+    return [
+      for (final row in rows)
+        CategoryBreakdown(
+          categoryId: row.categoryId,
+          name:
+              byId[row.categoryId]?.name ??
+              CategoryRepository.uncategorizedName,
+          colorHex:
+              byId[row.categoryId]?.colorHex ??
+              CategoryRepository.uncategorizedColor,
+          total: row.total,
+          // Round half up to 4 decimals, as Kotlin divide(absSum, 4, HALF_UP).
+          fraction: absSum > Decimal.zero
+              ? (row.total.abs() * Decimal.fromInt(10000) / absSum)
+                        .round()
+                        .toInt() /
+                    10000
+              : 0,
+        ),
+    ];
+  }
+
+  Future<Expense?> getById(String id) => _db.expenseById(id).getSingleOrNull();
+
+  Future<void> updateExpense(
+    String id, {
+    required Decimal amount,
+    String? merchant,
+    required int postTime,
+    String? categoryId,
+    String? notes,
+    required TransactionType type,
+    bool privateToGroups = false,
+  }) async {
+    final existing = await getById(id);
+    if (existing == null) return;
+    await _merchants.saveMapping(merchant, categoryId);
+    // A new category applies to every payment from this shop in the same direction, past ones included.
+    if (categoryId != null && categoryId != existing.categoryId) {
+      await _applyToShop(merchant, type, categoryId);
+    }
+    await _db
+        .update(_db.expenses)
+        .replace(
+          existing.copyWith(
+            amount: AmountFormatter.toMoney(amount),
+            merchant: Value(merchant),
+            notificationPostTime: postTime,
+            categoryId: Value(categoryId),
+            notes: Value(_blankToNull(notes)),
+            transactionType: type,
+            privateToGroups: privateToGroups,
+            status: ExpenseStatus.edited,
+          ),
+        );
+    try {
+      await _splits.onExpenseEdited(id);
+    } catch (e, s) {
+      developer.log(
+        'Split recompute failed',
+        name: 'ExpenseRepository',
+        error: e,
+        stackTrace: s,
+      );
+    }
+  }
+
+  /// A payment that the owner types in, for one that came without a readable notification.
+  Future<void> addManualExpense({
+    required Decimal amount,
+    String? merchant,
+    required int postTime,
+    String? categoryId,
+    String? notes,
+    required TransactionType type,
+    bool privateToGroups = false,
+  }) async {
+    await _merchants.saveMapping(merchant, categoryId);
+    if (categoryId != null) await _applyToShop(merchant, type, categoryId);
+    final id = newId();
+    final expense = Expense(
+      id: id,
+      amount: AmountFormatter.toMoney(amount),
+      currency: 'MYR',
+      merchant: _blankToNull(merchant),
+      rawNotificationText: '',
+      sourcePackage: manualSource,
+      notificationPostTime: postTime,
+      createdAt: _now().millisecondsSinceEpoch,
+      dedupKey: 'manual:$id',
+      status: ExpenseStatus.edited,
+      confidence: ParseConfidence.high,
+      categoryId: categoryId,
+      notes: _blankToNull(notes),
+      transactionType: type,
+      privateToGroups: privateToGroups,
+    );
+    await _db
+        .into(_db.expenses)
+        .insert(expense, mode: InsertMode.insertOrIgnore);
+    if (type == TransactionType.receive) {
+      try {
+        await _splits.suggestRepayment(expense);
+      } catch (e, s) {
+        developer.log(
+          'Repayment suggestion failed',
+          name: 'ExpenseRepository',
+          error: e,
+          stackTrace: s,
+        );
+      }
+    }
+  }
+
+  Future<void> dismissExpense(String id) async {
+    final existing = await getById(id);
+    if (existing == null) return;
+    await _db
+        .update(_db.expenses)
+        .replace(existing.copyWith(status: ExpenseStatus.dismissed));
+  }
+
+  // ponytail: SQLite lower() folds ASCII letters only, so a shop with non-ASCII capitals can be missed.
+  // Upgrade: store the normalized key in its own column.
+  Future<void> _applyToShop(
+    String? merchant,
+    TransactionType type,
+    String categoryId,
+  ) async {
+    final key = _merchants.normalizeKey(merchant);
+    if (key != null) await _db.setCategoryForMerchant(categoryId, key, type);
+  }
+}

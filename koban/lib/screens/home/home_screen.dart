@@ -1,0 +1,382 @@
+import 'package:decimal/decimal.dart';
+import 'package:intl/intl.dart';
+import 'package:material_ui/material_ui.dart';
+
+import '../../app/app_services.dart';
+import '../../app/home_shell.dart';
+import '../../app/routes.dart';
+import '../../data/category_repository.dart';
+import '../../data/database.dart';
+import '../../data/legacy_import.dart';
+import '../../data/summaries.dart';
+import '../../theme/koban_theme.dart';
+import '../../theme/mon.dart';
+import '../../ui/kit.dart';
+import '../../ui/listener_status_banner.dart';
+import '../../ui/money.dart';
+import '../../ui/payment_row.dart';
+import '../payment/payment_view_model.dart';
+import 'home_view_model.dart';
+
+/// The Home tab: today's spending, the week and the month, and the latest payments.
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  HomeViewModel? _vm;
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: () => _vm?.refresh());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_vm == null) {
+      _vm = HomeViewModel(AppScope.of(context));
+      _vm!.refresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    _vm?.dispose();
+    super.dispose();
+  }
+
+  void _openActivity({required bool withWeek}) {
+    _vm!.selectActivity(withWeek: withWeek);
+    HomeShell.of(context).select(KobanTab.activity);
+  }
+
+  /// Shows the message that the payment page gives back.
+  Future<void> _show(Future<PaymentResult?> page) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await page;
+    if (result is PaymentClosed && result.message != null) {
+      messenger.showSnackBar(SnackBar(content: Text(result.message!)));
+    }
+  }
+
+  void _add() => _show(openPaymentNew(context));
+
+  void _edit(String id) => _show(openPaymentEdit(context, id));
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = _vm!;
+    final s = AppScope.of(context);
+    final theme = Theme.of(context);
+    return ListenableBuilder(
+      listenable: vm,
+      builder: (context, _) {
+        final today = vm.today;
+        final week = vm.week;
+        final month = vm.month;
+        final recent = week?.recentExpenses ?? const <Expense>[];
+        return Stack(
+          children: [
+            Column(
+              children: [
+                LargeTopBar(
+                  title: 'Today',
+                  subtitle: DateFormat('EEE, d MMM', 'en_US').format(s.now()),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 112),
+                    children: [
+                      if (vm.importFailed) ...[
+                        const _ImportFailedRow(),
+                        const SizedBox(height: 12),
+                      ],
+                      ListenerStatusBanner(
+                        isAccessGranted: vm.isAccessGranted,
+                        onEnable: vm.openNotificationSettings,
+                      ),
+                      const SizedBox(height: 12),
+                      if (vm.isAccessGranted && !vm.hasAnyPayment) ...[
+                        _FirstPaymentCard(onAdd: _add),
+                        const SizedBox(height: 12),
+                      ],
+                      if (today != null) ...[
+                        _SpentTodayCard(
+                          summary: today,
+                          onOpen: () => _openActivity(withWeek: true),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (week != null && month != null) ...[
+                        ListGroup(
+                          children: [
+                            _PeriodRow(
+                              week,
+                              () => _openActivity(withWeek: true),
+                            ),
+                            _PeriodRow(
+                              month,
+                              () => _openActivity(withWeek: false),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (recent.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.only(top: 12),
+                          child: SectionHeading('Latest this week'),
+                        ),
+                        ListGroup(
+                          children: [
+                            for (final e in recent)
+                              ExpenseListCard(
+                                key: ValueKey(e.id),
+                                expense: e,
+                                categoryName:
+                                    vm.categoryNames[e.categoryId] ??
+                                    CategoryRepository.uncategorizedName,
+                                timePattern: 'EEE HH:mm',
+                                onEdit: () => _edit(e.id),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: FloatingActionButton.extended(
+                heroTag: null,
+                onPressed: _add,
+                icon: const Icon(Icons.add),
+                label: Text(
+                  'Add payment',
+                  style: weighted(theme.textTheme.titleMedium!, 700),
+                ),
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// The row that says the 0.1.1 data did not move and is safe.
+class _ImportFailedRow extends StatelessWidget {
+  const _ImportFailedRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListGroup(
+      children: [
+        KobanRow(
+          title: importFailedMessage,
+          leading: Icon(Icons.warning, color: scheme.error),
+        ),
+      ],
+    );
+  }
+}
+
+/// Today's total, the money received, and the split by category. A tap opens the Activity tab.
+class _SpentTodayCard extends StatelessWidget {
+  const _SpentTodayCard({required this.summary, required this.onOpen});
+
+  final PeriodSummary summary;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final muted = scheme.onSurfaceVariant;
+    final noReceived = summary.received <= Decimal.zero;
+    return Material(
+      color: scheme.surfaceContainer,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: Semantics(
+        button: true,
+        onTapHint: 'Open Activity',
+        child: InkWell(
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Spent today',
+                  style: text.bodyMedium!.copyWith(color: muted),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: MoneyText(
+                    rm(summary.total),
+                    style: text.displayLarge,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                if (!noReceived)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: MoneyText(
+                      '+ ${rm(summary.received)} received',
+                      style: text.bodyMedium,
+                      color: MoneyColors.of(context).received,
+                    ),
+                  ),
+                if (summary.breakdown.isEmpty && noReceived)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'No payments yet today.',
+                      style: text.bodyMedium!.copyWith(color: muted),
+                    ),
+                  ),
+                if (summary.breakdown.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: NoteStrip(breakdown: summary.breakdown, height: 8),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      children: [
+                        for (final item in summary.breakdown)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                CategoryDot(
+                                  categoryColor(context, item.categoryId),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    child: Text(
+                                      item.name,
+                                      style: text.bodyLarge!.copyWith(
+                                        color: scheme.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                MoneyText(
+                                  rm(item.total),
+                                  style: text.bodyLarge,
+                                  color: scheme.onSurface,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// This week or this month: the total on the right, the money received under it.
+class _PeriodRow extends StatelessWidget {
+  const _PeriodRow(this.summary, this.onTap);
+
+  final PeriodSummary summary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return KobanRow(
+      title: summary.title,
+      subtitle: summary.subtitle,
+      trailing: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MoneyText(
+            rm(summary.total),
+            style: weighted(text.titleMedium!, 700),
+            color: scheme.onSurface,
+          ),
+          if (summary.received > Decimal.zero)
+            MoneyText(
+              '+ ${rm(summary.received)}',
+              style: text.bodySmall,
+              color: MoneyColors.of(context).received,
+            ),
+        ],
+      ),
+      showChevron: true,
+      onTap: onTap,
+    );
+  }
+}
+
+/// The empty Home after setup: Mon waits.
+class _FirstPaymentCard extends StatelessWidget {
+  const _FirstPaymentCard({required this.onAdd});
+
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const Mon(MonFace.idle, size: 56),
+          const SizedBox(height: 12),
+          Text(
+            'Waiting for your first payment',
+            style: text.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 16),
+            child: Text(
+              'Pay for anything. It shows up here.',
+              style: text.bodyMedium!.copyWith(color: scheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: TonalButton('Add one by hand', onAdd),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,0 +1,88 @@
+import 'schema.drift';
+
+-- Copies of the Room @Query text of ExpenseDao, CategoryDao and MerchantCategoryDao.
+-- observeX and getX with the same text share one query, except totalForRangeOnce.
+-- Each money total is CAST(<Room expression> AS TEXT), so MoneyConverter reads text, not a REAL.
+-- HAVING and ORDER BY keep the number expression: the text of the alias would sort as text.
+-- recentByType and expenseById are in split_queries.drift.
+
+anyExpense:
+SELECT EXISTS(SELECT 1 FROM expenses WHERE status != 'DISMISSED') AS anyExpense;
+
+allActive:
+SELECT * FROM expenses WHERE status != 'DISMISSED' ORDER BY notificationPostTime DESC;
+
+totalForRange:
+SELECT CAST(COALESCE(SUM(
+    CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
+), 0) AS TEXT) MAPPED BY `const MoneyConverter()` AS total
+FROM expenses
+WHERE status != 'DISMISSED'
+AND notificationPostTime >= :start AND notificationPostTime < :end;
+
+receivedForRange:
+SELECT CAST(COALESCE(SUM(amount), 0) AS TEXT) MAPPED BY `const MoneyConverter()` AS total
+FROM expenses
+WHERE status != 'DISMISSED' AND transactionType = 'RECEIVE'
+AND notificationPostTime >= :start AND notificationPostTime < :end;
+
+inRange:
+SELECT * FROM expenses WHERE status != 'DISMISSED'
+AND notificationPostTime >= :start AND notificationPostTime < :end
+ORDER BY notificationPostTime DESC;
+
+totalsByCategory:
+SELECT categoryId,
+CAST(COALESCE(SUM(
+    CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
+), 0) AS TEXT) MAPPED BY `const MoneyConverter()` AS total
+FROM expenses
+WHERE status != 'DISMISSED'
+AND notificationPostTime >= :start AND notificationPostTime < :end
+GROUP BY categoryId
+HAVING COALESCE(SUM(
+    CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
+), 0) != 0
+ORDER BY COALESCE(SUM(
+    CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
+), 0) DESC;
+
+setCategoryForMerchant:
+UPDATE expenses SET categoryId = :categoryId
+WHERE lower(trim(merchant)) = :merchantKey AND transactionType = :type;
+
+monthlyTotals:
+SELECT
+    (CAST(strftime('%Y', notificationPostTime / 1000, 'unixepoch', 'localtime') AS INTEGER) * 100
+    + CAST(strftime('%m', notificationPostTime / 1000, 'unixepoch', 'localtime') AS INTEGER)) AS yearMonth,
+    CAST(COALESCE(SUM(
+        CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
+    ), 0) AS TEXT) MAPPED BY `const MoneyConverter()` AS total,
+    CAST(COALESCE(SUM(CASE WHEN transactionType = 'RECEIVE' THEN amount ELSE 0 END), 0) AS TEXT) MAPPED BY `const MoneyConverter()` AS received
+FROM expenses
+WHERE status != 'DISMISSED'
+GROUP BY yearMonth
+ORDER BY yearMonth DESC;
+
+totalForRangeOnce:
+SELECT CAST(COALESCE(SUM(
+    CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
+), 0) AS TEXT) MAPPED BY `const MoneyConverter()` AS total
+FROM expenses
+WHERE status != 'DISMISSED'
+AND notificationPostTime >= :start AND notificationPostTime < :end;
+
+allCategories:
+SELECT * FROM categories ORDER BY name ASC;
+
+categoryCount:
+SELECT COUNT(*) FROM categories;
+
+categoryById:
+SELECT * FROM categories WHERE id = :id;
+
+deleteCustomCategory:
+DELETE FROM categories WHERE id = :id AND isDefault = 0;
+
+merchantMappingByKey:
+SELECT * FROM merchant_category_map WHERE merchantKey = :key LIMIT 1;
