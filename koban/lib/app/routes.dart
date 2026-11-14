@@ -1,7 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../screens/check/check_payments_screen.dart';
+import '../screens/notification_log/notification_log_screen.dart';
+import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/payment/payment_screen.dart';
 import '../screens/payment/payment_view_model.dart';
+import '../screens/payment_apps/payment_apps_screen.dart';
+import '../screens/settings/settings_screen.dart';
 
 // Screen motion of 0.1.1 (`ExpenseTrackerNavHost.kt`): an opened page slides in
 // across the full width while the page below moves 30% left and darkens. Back
@@ -191,6 +196,26 @@ Future<T?> pushSheet<T>(BuildContext context, Widget page) =>
         animate: !MediaQuery.disableAnimationsOf(context),
       ),
     );
+
+/// Opens Check payments.
+Future<void> openCheckPayments(BuildContext context) =>
+    pushPage<void>(context, const CheckPaymentsScreen());
+
+/// Opens the payment apps picker.
+Future<void> openPaymentApps(BuildContext context) =>
+    pushPage<void>(context, const PaymentAppsScreen());
+
+/// Opens onboarding. It closes itself and shows the first page when it ends.
+Future<void> openOnboarding(BuildContext context) =>
+    pushPage<void>(context, const OnboardingScreen());
+
+/// Opens the notification log.
+Future<void> openNotificationLog(BuildContext context) =>
+    pushPage<void>(context, const NotificationLogScreen());
+
+/// Opens Settings.
+Future<void> openSettings(BuildContext context) =>
+    pushPage<void>(context, const SettingsScreen());
 
 /// Opens the sheet that adds a payment.
 Future<PaymentResult?> openPaymentNew(BuildContext context) =>

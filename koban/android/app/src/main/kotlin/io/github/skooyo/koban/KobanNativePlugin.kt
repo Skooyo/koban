@@ -13,9 +13,12 @@ import com.expensetracker.app.listener.PaymentAppsMirror
 import com.expensetracker.app.listener.QueuedNotification
 import com.expensetracker.app.listener.RecentNotificationsStore
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
 import java.io.File
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -26,9 +29,34 @@ import java.util.concurrent.RejectedExecutionException
  * The native channels for one Flutter engine. The app engine and the capture engine both add it.
  * Disk work runs on [executor]. Each reply goes back on the main thread.
  */
-class KobanNativePlugin(private val executor: Executor = Executors.newSingleThreadExecutor()) : FlutterPlugin {
+class KobanNativePlugin(private val executor: Executor = Executors.newSingleThreadExecutor()) : FlutterPlugin, ActivityAware, PluginRegistry.RequestPermissionsResultListener {
     private val main = Handler(Looper.getMainLooper())
     private var capture: MethodChannel? = null
+    private var device: DeviceChannel? = null
+    private var activityBinding: ActivityPluginBinding? = null
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activityBinding = binding
+        binding.addRequestPermissionsResultListener(this)
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() = unlinkActivity()
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) = onAttachedToActivity(binding)
+
+    override fun onDetachedFromActivity() {
+        unlinkActivity()
+        // A real detach: the dialog result will not come, so answer the open calls.
+        device?.cancelPending()
+    }
+
+    private fun unlinkActivity() {
+        activityBinding?.removeRequestPermissionsResultListener(this)
+        activityBinding = null
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray): Boolean =
+        device?.onPermissionResult(requestCode, grantResults) ?: false
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) =
         register(binding.applicationContext, binding.binaryMessenger)
@@ -39,10 +67,12 @@ class KobanNativePlugin(private val executor: Executor = Executors.newSingleThre
     internal fun detach() {
         ImportGate.forget(this)
         capture = null
+        device?.cancelPending()
+        device = null
         (executor as? ExecutorService)?.shutdown()
     }
 
-    /** Adds the three channels. [onAttachedToEngine] calls it. Tests call it with a fake messenger. */
+    /** Adds the four channels. [onAttachedToEngine] calls it. Tests call it with a fake messenger. */
     fun register(context: Context, messenger: BinaryMessenger) {
         val app = context.applicationContext
         MethodChannel(messenger, LEGACY).setMethodCallHandler { call, result ->
@@ -58,6 +88,9 @@ class KobanNativePlugin(private val executor: Executor = Executors.newSingleThre
             channel.setMethodCallHandler { call, result -> onCapture(app, call, result) }
         }
         MethodChannel(messenger, LISTENER).setMethodCallHandler { call, result -> onListener(app, call, result) }
+        val deviceChannel = DeviceChannel(app, { result, code, block -> work(result, code, block) }) { activityBinding?.activity }
+        device = deviceChannel
+        MethodChannel(messenger, DEVICE).setMethodCallHandler { call, result -> deviceChannel.onCall(call, result) }
     }
 
     /** Tells the Dart side to read the queue. Call it on the main thread. */
@@ -185,5 +218,6 @@ class KobanNativePlugin(private val executor: Executor = Executors.newSingleThre
         const val LEGACY = "io.github.skooyo.koban/legacy"
         const val CAPTURE = "io.github.skooyo.koban/capture"
         const val LISTENER = "io.github.skooyo.koban/listener"
+        const val DEVICE = "io.github.skooyo.koban/device"
     }
 }

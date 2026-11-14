@@ -13,6 +13,10 @@ class KobanSettings {
   static const _onlineFeaturesKey = 'online_features';
   static const _deviceTokenKey = 'device_token';
 
+  // Flutter only: 0.1.1 kept these two values in a SavedStateHandle.
+  static const _onboardingStepKey = 'flutter_onboarding_step';
+  static const _onboardingOpenedKey = 'flutter_onboarding_opened_settings';
+
   final SharedPreferencesAsync _prefs;
 
   final _darkMode = ValueNotifier<bool>(true);
@@ -21,6 +25,8 @@ class KobanSettings {
   final _paymentApps = ValueNotifier<Set<String>>(const {});
   final _onlineFeatures = ValueNotifier<bool>(true);
   final _hasDeviceToken = ValueNotifier<bool>(false);
+  String? _onboardingStep;
+  var _onboardingOpenedSettings = false;
 
   static Future<KobanSettings> load(SharedPreferencesAsync prefs) async {
     final settings = KobanSettings._(prefs);
@@ -41,14 +47,37 @@ class KobanSettings {
   ValueListenable<bool> get onlineFeatures => _onlineFeatures;
   ValueListenable<bool> get hasDeviceToken => _hasDeviceToken;
 
+  /// The name of the onboarding step that showed last. Null before the first step change
+  /// and after onboarding is done. It brings onboarding back after Android stops the app.
+  String? get onboardingStep => _onboardingStep;
+
+  /// True when the friend opened the access settings from onboarding and did not come back yet.
+  bool get onboardingOpenedSettings => _onboardingOpenedSettings;
+
   Future<void> setDarkMode(bool on) async {
     await _prefs.setBool(_darkModeKey, on);
     _darkMode.value = on;
   }
 
+  /// Stores the onboarding step and the access settings flag.
+  Future<void> setOnboardingProgress(
+    String step, {
+    required bool openedSettings,
+  }) async {
+    _onboardingStep = step;
+    _onboardingOpenedSettings = openedSettings;
+    await _prefs.setString(_onboardingStepKey, step);
+    await _prefs.setBool(_onboardingOpenedKey, openedSettings);
+  }
+
+  /// Stores onboarding as done and removes the stored step.
   Future<void> setOnboardingDone() async {
     await _prefs.setBool(_onboardingDoneKey, true);
     _onboardingDone.value = true;
+    _onboardingStep = null;
+    _onboardingOpenedSettings = false;
+    await _prefs.remove(_onboardingStepKey);
+    await _prefs.remove(_onboardingOpenedKey);
   }
 
   Future<void> setOnlineFeatures(bool on) async {
@@ -70,6 +99,9 @@ class KobanSettings {
         await _prefs.getBool(_chosenKey) ?? list.isNotEmpty;
     _darkMode.value = await _prefs.getBool(_darkModeKey) ?? true;
     _onboardingDone.value = await _prefs.getBool(_onboardingDoneKey) ?? false;
+    _onboardingStep = await _prefs.getString(_onboardingStepKey);
+    _onboardingOpenedSettings =
+        await _prefs.getBool(_onboardingOpenedKey) ?? false;
     _onlineFeatures.value = await _prefs.getBool(_onlineFeaturesKey) ?? true;
     _hasDeviceToken.value =
         (await _prefs.getString(_deviceTokenKey) ?? '').isNotEmpty;

@@ -8,6 +8,7 @@ import '../rules/periods.dart';
 import '../rules/types.dart';
 import 'category_repository.dart';
 import 'database.dart';
+import 'expense_dedup.dart';
 import 'ids.dart';
 import 'merchant_category_repository.dart';
 import 'split_repository.dart';
@@ -141,6 +142,62 @@ class ExpenseRepository {
   }
 
   Future<Expense?> getById(String id) => _db.expenseById(id).getSingleOrNull();
+
+  /// Saves a waiting payment that the owner confirmed, with the values of the card.
+  /// Returns false when a payment already covers it. One transaction, so a
+  /// capture of another connection cannot race the duplicate check.
+  Future<bool> saveConfirmed(PendingPayment p) => _db.transaction(() async {
+    final amount = AmountFormatter.toMoney(p.amount);
+    final duplicate =
+        !p.dedupKey.startsWith(forcedDedupPrefix) &&
+        await _db.hasExpenseFor(
+          amount: amount,
+          transactionType: p.transactionType,
+          merchant: p.merchant,
+          postTime: p.notificationPostTime,
+          dedupKey: p.dedupKey,
+          notificationKey: p.notificationKey,
+        );
+    if (duplicate) return false;
+
+    // The category of the card wins over the merchant memory.
+    final categoryId =
+        p.categoryId ?? await _merchants.categoryIdForMerchant(p.merchant);
+    final expense = Expense(
+      id: newId(),
+      amount: amount,
+      currency: p.currency,
+      merchant: p.merchant,
+      rawNotificationText: p.rawNotificationText,
+      sourcePackage: p.sourcePackage,
+      notificationPostTime: p.notificationPostTime,
+      createdAt: _now().millisecondsSinceEpoch,
+      dedupKey: p.dedupKey,
+      status: p.edited ? ExpenseStatus.edited : ExpenseStatus.autoSaved,
+      // The owner checked this payment.
+      confidence: ParseConfidence.high,
+      notificationKey: p.notificationKey,
+      categoryId: categoryId,
+      transactionType: p.transactionType,
+      privateToGroups: false,
+    );
+    // A new id cannot conflict, so the insert always adds the row.
+    await _db.into(_db.expenses).insert(expense);
+    if (p.edited) await _merchants.saveMapping(p.merchant, categoryId);
+    if (expense.transactionType == TransactionType.receive) {
+      try {
+        await _splits.suggestRepayment(expense);
+      } catch (e, s) {
+        developer.log(
+          'Repayment suggestion failed',
+          name: 'ExpenseRepository',
+          error: e,
+          stackTrace: s,
+        );
+      }
+    }
+    return true;
+  });
 
   Future<void> updateExpense(
     String id, {

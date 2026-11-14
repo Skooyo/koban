@@ -39,12 +39,19 @@ class FakeCaptureHost implements CaptureHost {
     finished.add((row.id, d.dbName, detail));
   }
 
+  /// When set, `updateLog` records the call and then throws it.
+  Object? updateLogError;
+
   @override
   Future<void> updateLog(
     String logId,
     NotificationDisposition d,
     String detail,
-  ) async => logUpdates.add((logId, d.dbName, detail));
+  ) async {
+    logUpdates.add((logId, d.dbName, detail));
+    final error = updateLogError;
+    if (error != null) throw error;
+  }
 
   @override
   Future<void> appendLog(

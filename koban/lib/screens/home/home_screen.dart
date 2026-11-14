@@ -89,6 +89,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 LargeTopBar(
                   title: 'Today',
                   subtitle: DateFormat('EEE, d MMM', 'en_US').format(s.now()),
+                  actions: [
+                    IconButton(
+                      onPressed: () => openSettings(context),
+                      tooltip: 'Settings',
+                      icon: const Icon(Icons.settings),
+                    ),
+                  ],
                 ),
                 Expanded(
                   child: ListView(
@@ -103,8 +110,44 @@ class _HomeScreenState extends State<HomeScreen> {
                         onEnable: vm.openNotificationSettings,
                       ),
                       const SizedBox(height: 12),
-                      if (vm.isAccessGranted && !vm.hasAnyPayment) ...[
-                        _FirstPaymentCard(onAdd: _add),
+                      if (vm.listensToNoApp) ...[
+                        ListGroup(
+                          children: [
+                            KobanRow(
+                              title: 'Koban listens to no app. Choose your payment apps.',
+                              showChevron: true,
+                              onTap: () => openPaymentApps(context),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (vm.waitingCount > 0) ...[
+                        ListGroup(
+                          children: [
+                            KobanRow(
+                              title: vm.waitingCount == 1
+                                  ? '1 payment to check'
+                                  : '${vm.waitingCount} payments to check',
+                              leading: Icon(
+                                Icons.receipt,
+                                color: MoneyColors.of(context).goldText,
+                              ),
+                              showChevron: true,
+                              onTap: () => openCheckPayments(context),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (vm.isAccessGranted &&
+                          !vm.hasAnyPayment &&
+                          vm.waitingCount == 0 &&
+                          !vm.listensToNoApp) ...[
+                        _FirstPaymentCard(
+                          onAdd: _add,
+                          onOpenSettings: () => openSettings(context),
+                        ),
                         const SizedBox(height: 12),
                       ],
                       if (today != null) ...[
@@ -340,15 +383,16 @@ class _PeriodRow extends StatelessWidget {
 
 /// The empty Home after setup: Mon waits.
 class _FirstPaymentCard extends StatelessWidget {
-  const _FirstPaymentCard({required this.onAdd});
+  const _FirstPaymentCard({required this.onAdd, required this.onOpenSettings});
 
   final VoidCallback onAdd;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: scheme.surfaceContainer,
@@ -377,6 +421,26 @@ class _FirstPaymentCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        card,
+        const Padding(
+          padding: EdgeInsets.only(top: 24),
+          child: SectionHeading('Set up later'),
+        ),
+        ListGroup(
+          children: [
+            KobanRow(
+              title: 'Online features',
+              subtitle: 'Read receipts, join groups',
+              showChevron: true,
+              onTap: onOpenSettings,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

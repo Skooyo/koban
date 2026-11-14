@@ -398,6 +398,9 @@ class _GatedServices extends AppServices {
         settings: base.settings,
         importResult: base.importResult,
         listener: base.listener,
+        paymentApps: base.paymentApps,
+        captureHost: base.captureHost,
+        device: base.device,
         now: base.now,
       );
 

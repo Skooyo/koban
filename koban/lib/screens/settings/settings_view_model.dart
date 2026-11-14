@@ -1,0 +1,205 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+
+import 'package:flutter/foundation.dart' hide Category;
+
+import '../../app/app_services.dart';
+import '../../capture/listener_control.dart';
+import '../../data/database.dart';
+import '../../rules/amount_formatter.dart';
+import '../../rules/payment_rules.dart';
+
+/// The Xiaomi background steps of 0.1.1 (`OemBatteryHelper.xiaomiChecklist`).
+const xiaomiChecklist = <String>[
+  'Security app → Autostart → turn ON for Koban',
+  'Settings → Apps → Koban → App permissions → Background autostart → Allow',
+  'Settings → Apps → Koban → Battery saver → No restrictions',
+  'Settings → Apps → Koban → turn OFF “Restrict background activity” if shown',
+  'Recent apps → long-press Koban → tap the lock icon (do not “Clear all”)',
+  'Keep the persistent “Tracking payment notifications” notification visible',
+  'If notification access keeps turning off, disable MIUI optimizations in Developer options',
+];
+
+/// The color of a category that the friend adds.
+const _newCategoryColor = '#5C6BC0';
+
+/// The state of Settings: the listener status, the switches, the categories and the parser tool.
+class SettingsViewModel extends ChangeNotifier {
+  /// [reconnectWait] is the time between the reconnect and its result. 0.1.1 waits 65 s.
+  SettingsViewModel(
+    this._s, {
+    this.reconnectWait = const Duration(seconds: 65),
+  }) {
+    _subs.add(
+      _s.categories.watchAll().listen((list) {
+        _categories = list;
+        notifyListeners();
+      }),
+    );
+    for (final l in _listenables) {
+      l.addListener(notifyListeners);
+    }
+  }
+
+  final AppServices _s;
+  final Duration reconnectWait;
+  final List<StreamSubscription<Object?>> _subs = [];
+  Timer? _reconnectTimer;
+  var _disposed = false;
+  var _reconnectPending = false;
+
+  Iterable<Listenable> get _listenables => [
+    _s.settings.darkMode,
+    _s.settings.onlineFeatures,
+    _s.settings.hasDeviceToken,
+    _s.settings.paymentApps,
+  ];
+
+  bool _isAccessGranted = false;
+  bool _isBatteryOptimizationIgnored = true;
+  bool _isXiaomi = false;
+  int _capturedCount = 0;
+  String _versionName = '';
+  List<Category> _categories = const [];
+  String? _reconnectMessage;
+  String? _parserResult;
+
+  bool get isAccessGranted => _isAccessGranted;
+  bool get isBatteryOptimizationIgnored => _isBatteryOptimizationIgnored;
+  bool get isXiaomi => _isXiaomi;
+  bool get onlineFeatures => _s.settings.onlineFeatures.value;
+  bool get hasDeviceToken => _s.settings.hasDeviceToken.value;
+  bool get darkMode => _s.settings.darkMode.value;
+  int get paymentAppCount => _s.settings.paymentApps.value.length;
+  int get capturedCount => _capturedCount;
+  String get versionName => _versionName;
+  List<Category> get categories => _categories;
+  String? get reconnectMessage => _reconnectMessage;
+  String? get parserResult => _parserResult;
+
+  /// Reads the phone state again and starts the listener. The screen calls it at the start and at each resume.
+  Future<void> refresh() async {
+    try {
+      final l = _s.listener;
+      final granted = await l.isAccessGranted();
+      await l.ensureActive();
+      final ignored = await l.isBatteryOptimizationIgnored();
+      final xiaomi = await l.isXiaomiFamily();
+      final log = await l.recentNotifications();
+      final version = await _s.device.versionName();
+      if (_disposed) return;
+      _isAccessGranted = granted;
+      _isBatteryOptimizationIgnored = ignored;
+      _isXiaomi = xiaomi;
+      _capturedCount = log.length;
+      _versionName = version;
+      notifyListeners();
+    } catch (e, s) {
+      _log('Refresh failed', e, s);
+    }
+  }
+
+  static void _log(String message, Object e, StackTrace s) =>
+      developer.log(message, name: 'Settings', error: e, stackTrace: s);
+
+  void _setReconnect(String? message) {
+    if (_disposed) return;
+    _reconnectMessage = message;
+    notifyListeners();
+  }
+
+  /// Asks the native listener to reconnect. After a good attempt, the result shows [reconnectWait] later.
+  /// A tap while an attempt waits does nothing.
+  Future<void> reconnect() async {
+    if (_reconnectPending) return;
+    _reconnectPending = true;
+    _setReconnect('Reconnecting…');
+    try {
+      final result = await _s.listener.reconnect();
+      switch (result) {
+        case ReconnectResult.accessNotGranted:
+          _setReconnect(
+            'Notification access was removed — re-enable it in system settings. '
+            'On Xiaomi, enable Autostart and avoid clearing the app from recents.',
+          );
+        case ReconnectResult.throttled:
+          _setReconnect(
+            'Reconnect already attempted recently — wait a moment and try again.',
+          );
+        case ReconnectResult.failed:
+          _setReconnect(
+            'Reconnect failed — open notification access settings.',
+          );
+        case ReconnectResult.attempted:
+          if (_disposed) return;
+          _reconnectTimer = Timer(reconnectWait, _showReconnectResult);
+          return;
+      }
+    } catch (e, s) {
+      _log('Reconnect failed', e, s);
+      _setReconnect('Reconnect failed — open notification access settings.');
+    }
+    _reconnectPending = false;
+  }
+
+  Future<void> _showReconnectResult() async {
+    try {
+      final connected = await _s.listener.isConnected();
+      _setReconnect(
+        connected ? 'Listener connected.' : 'Still disconnected after 60s — tap the alert notification or open notification access settings.',
+      );
+    } catch (e, s) {
+      _log('Reconnect check failed', e, s);
+    } finally {
+      _reconnectPending = false;
+    }
+  }
+
+  Future<void> openNotificationSettings() => _s.listener.openAccessSettings();
+
+  Future<void> openBatterySettings() =>
+      _s.listener.openBatteryOptimizationSettings();
+
+  Future<void> openBackgroundSettings() async {
+    await _s.listener.openBackgroundSettings();
+  }
+
+  Future<void> setDarkMode(bool on) => _s.settings.setDarkMode(on);
+
+  Future<void> setOnlineFeatures(bool on) => _s.settings.setOnlineFeatures(on);
+
+  Future<void> removeDeviceToken() => _s.settings.removeDeviceToken();
+
+  /// Reads [text] with the payment rules, as the capture engine does, and shows the result.
+  void runParserTest(String text) {
+    _parserResult = switch (PaymentRules.match('', text.trim())) {
+      Matched(:final expense, :final format) =>
+        'Amount: ${expense.currency} ${AmountFormatter.formatDisplay(expense.amount)}\n'
+            'Merchant: ${expense.merchant ?? '—'}\n'
+            'Type: ${expense.transactionType.name}\n'
+            'Format: ${format.name}',
+      NoMatch() => 'No rule matched this text',
+    };
+    notifyListeners();
+  }
+
+  Future<void> addCategory(String name) =>
+      _s.categories.addCategory(name, _newCategoryColor);
+
+  Future<void> deleteCategory(String id) async {
+    await _s.categories.deleteCategory(id);
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _reconnectTimer?.cancel();
+    for (final sub in _subs) {
+      sub.cancel();
+    }
+    for (final l in _listenables) {
+      l.removeListener(notifyListeners);
+    }
+    super.dispose();
+  }
+}

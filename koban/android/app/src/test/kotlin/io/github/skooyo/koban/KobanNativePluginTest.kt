@@ -94,9 +94,9 @@ class KobanNativePluginTest {
         )
     }
 
-    @Test fun registersTheThreeChannelsOnAnyEngine() {
+    @Test fun registersTheFourChannelsOnAnyEngine() {
         assertEquals(
-            setOf("io.github.skooyo.koban/legacy", capture, "io.github.skooyo.koban/listener"),
+            setOf("io.github.skooyo.koban/legacy", capture, "io.github.skooyo.koban/listener", "io.github.skooyo.koban/device"),
             messenger.handlers.keys,
         )
     }

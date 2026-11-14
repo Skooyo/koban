@@ -18,6 +18,15 @@ class HomeViewModel extends ChangeNotifier {
       }),
     );
     _subs.add(
+      _s.paymentChecks.watchVisibleCount().listen((v) {
+        _waitingCount = v;
+        notifyListeners();
+      }),
+    );
+    // The settings notify after the payment apps picker saves.
+    _s.settings.paymentAppsChosen.addListener(notifyListeners);
+    _s.settings.paymentApps.addListener(notifyListeners);
+    _subs.add(
       _s.expenses.watchHasAnyPayment().listen((v) {
         _hasAnyPayment = v;
         notifyListeners();
@@ -37,12 +46,21 @@ class HomeViewModel extends ChangeNotifier {
   PeriodSummary? _month;
   Map<String, String> _categoryNames = const {};
   bool _hasAnyPayment = true;
+  int _waitingCount = 0;
 
   bool get isAccessGranted => _isAccessGranted;
   PeriodSummary? get today => _today;
   PeriodSummary? get week => _week;
   PeriodSummary? get month => _month;
   Map<String, String> get categoryNames => _categoryNames;
+
+  /// Waiting payments. Home shows a row when there is one or more.
+  int get waitingCount => _waitingCount;
+
+  /// True when the owner chose the payment apps and chose none.
+  bool get listensToNoApp =>
+      _s.settings.paymentAppsChosen.value &&
+      _s.settings.paymentApps.value.isEmpty;
 
   /// True while loading, so the first-payment card stays hidden until the database answers.
   bool get hasAnyPayment => _hasAnyPayment;
@@ -101,6 +119,8 @@ class HomeViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _s.settings.paymentAppsChosen.removeListener(notifyListeners);
+    _s.settings.paymentApps.removeListener(notifyListeners);
     for (final sub in [..._subs, ..._periodSubs]) {
       sub.cancel();
     }

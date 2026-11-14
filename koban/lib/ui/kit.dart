@@ -548,6 +548,7 @@ class DialogTextField extends StatefulWidget {
     this.isError = false,
     this.supportingText,
     this.keyboardType,
+    this.textCapitalization = TextCapitalization.none,
     this.inputFormatters,
   });
 
@@ -557,6 +558,7 @@ class DialogTextField extends StatefulWidget {
   final bool isError;
   final String? supportingText;
   final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
   final List<TextInputFormatter>? inputFormatters;
 
   @override
@@ -594,6 +596,7 @@ class _DialogTextFieldState extends State<DialogTextField> {
       controller: _controller,
       onChanged: widget.onChanged,
       keyboardType: widget.keyboardType,
+      textCapitalization: widget.textCapitalization,
       inputFormatters: widget.inputFormatters,
       decoration: InputDecoration(
         labelText: widget.label,
