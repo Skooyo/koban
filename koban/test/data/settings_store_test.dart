@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/data/settings_store.dart';
+import 'package:koban/online/secret_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -13,10 +14,20 @@ void main() {
     prefs = SharedPreferencesAsync();
   }
 
+  /// Loads the settings of [prefs] with an empty secrets store.
+  Future<KobanSettings> load() {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.withData({});
+    return KobanSettings.load(
+      prefs,
+      secrets: SecretStore(SharedPreferencesAsync()),
+    );
+  }
+
   test('settings have the 0.1.1 defaults', () async {
     store({});
 
-    final s = await KobanSettings.load(prefs);
+    final s = await load();
 
     expect(s.darkMode.value, isTrue);
     expect(s.onboardingDone.value, isFalse);
@@ -31,7 +42,7 @@ void main() {
       'payment_app_allowlist': ['com.maybank2u.life'],
     });
 
-    final s = await KobanSettings.load(prefs);
+    final s = await load();
 
     expect(s.paymentAppsChosen.value, isTrue);
     expect(s.paymentApps.value, {'com.maybank2u.life'});
@@ -40,7 +51,7 @@ void main() {
   test('a stored chosen flag wins over the list', () async {
     store({'payment_apps_chosen': false, 'onboarding_done': true});
 
-    final s = await KobanSettings.load(prefs);
+    final s = await load();
 
     expect(s.paymentAppsChosen.value, isFalse);
     expect(s.onboardingDone.value, isTrue);
@@ -48,7 +59,7 @@ void main() {
 
   test('dark mode is stored under dark_mode', () async {
     store({});
-    final s = await KobanSettings.load(prefs);
+    final s = await load();
 
     await s.setDarkMode(false);
 
@@ -58,7 +69,7 @@ void main() {
 
   test('onboarding and online features are stored under their keys', () async {
     store({});
-    final s = await KobanSettings.load(prefs);
+    final s = await load();
 
     await s.setOnboardingDone();
     await s.setOnlineFeatures(false);
@@ -68,20 +79,9 @@ void main() {
     expect((s.onboardingDone.value, s.onlineFeatures.value), (true, false));
   });
 
-  test('remove device token deletes the key', () async {
-    store({'device_token': 'secret-token'});
-    final s = await KobanSettings.load(prefs);
-    expect(s.hasDeviceToken.value, isTrue);
-
-    await s.removeDeviceToken();
-
-    expect(await prefs.containsKey('device_token'), isFalse);
-    expect(s.hasDeviceToken.value, isFalse);
-  });
-
   test('reload reads values that another writer stored', () async {
     store({});
-    final s = await KobanSettings.load(prefs);
+    final s = await load();
 
     await prefs.setStringList('payment_app_allowlist', [
       'my.com.tngdigital.ewallet',

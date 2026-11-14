@@ -8,11 +8,13 @@ import 'package:koban/capture/payment_apps.dart';
 import 'package:koban/data/database.dart';
 import 'package:koban/data/legacy_import.dart';
 import 'package:koban/data/open_database.dart';
+import 'package:koban/online/secret_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
-import '../data/legacy_import_test.dart' show FakeLegacySource;
+import '../data/legacy_import_test.dart'
+    show FakeLegacySource, groupSessionJson;
 import '../data/test_db.dart';
 import 'fake_capture_host.dart';
 
@@ -37,6 +39,7 @@ void main() {
   late KobanDatabase db;
   late FakeCaptureHost host;
   late SharedPreferencesAsync prefs;
+  late SecretStore secrets;
 
   setUp(() async {
     tmp = await Directory.systemTemp.createTemp('koban_capture_main_');
@@ -44,6 +47,10 @@ void main() {
       NativeDatabase(File('${tmp.path}/koban.sqlite'), setup: configureConnection),
     );
     host = FakeCaptureHost();
+    // Each SharedPreferencesAsync keeps the store that is current when it is made.
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    secrets = SecretStore(SharedPreferencesAsync());
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
     prefs = SharedPreferencesAsync();
@@ -67,6 +74,8 @@ void main() {
       ),
       host: host,
       paymentApps: PaymentApps(prefs, host),
+      secrets: secrets,
+      settings: prefs,
     );
     return (db, result);
   }
@@ -120,5 +129,14 @@ void main() {
     expect(opens, 2);
     expect(host.finished, [(1, 'WAITING', 'RESTORAN CONTOH · RM 15.00')]);
     expect(host.queue, isEmpty);
+  });
+
+  test('the capture engine moves the imported secrets out of the main settings', () async {
+    await runCapture(host: host, open: openWithImport, prefs: prefs);
+
+    expect(await prefs.getString('device_token'), isNull);
+    expect(await prefs.getString('group_session'), isNull);
+    expect(secrets.deviceToken.value, 'test-device-token-0001');
+    expect(await secrets.groupSession(), groupSessionJson);
   });
 }

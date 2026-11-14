@@ -5741,6 +5741,32 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
     'index_split_items_billId',
     'CREATE INDEX index_split_items_billId ON split_items (billId)',
   );
+  Selectable<GroupTotalsResult> groupTotals(
+    String? uncategorized,
+    String currency,
+    int start,
+    int end,
+  ) {
+    return customSelect(
+      'SELECT COALESCE(c.name, ?1) AS category, CAST(SUM(COALESCE(e.countedAmount, e.amount)) AS TEXT) AS total FROM expenses AS e LEFT JOIN categories AS c ON c.id = e.categoryId WHERE e.status != \'DISMISSED\' AND e.transactionType != \'RECEIVE\' AND e.privateToGroups = 0 AND e.currency = ?2 AND e.notificationPostTime >= ?3 AND e.notificationPostTime < ?4 GROUP BY category HAVING SUM(COALESCE(e.countedAmount, e.amount)) > 0',
+      variables: [
+        Variable<String>(uncategorized),
+        Variable<String>(currency),
+        Variable<int>(start),
+        Variable<int>(end),
+      ],
+      readsFrom: {this.categories, this.expenses},
+    ).map(
+      (QueryRow row) => GroupTotalsResult(
+        category: row.read<String>('category'),
+        total: NullAwareTypeConverter.wrapFromSql(
+          const MoneyConverter(),
+          row.readNullable<String>('total'),
+        ),
+      ),
+    );
+  }
+
   Selectable<bool> anyExpense() {
     return customSelect(
       'SELECT EXISTS (SELECT 1 AS _c0 FROM expenses WHERE status != \'DISMISSED\') AS anyExpense',
@@ -9230,6 +9256,12 @@ class $KobanDatabaseManager {
       $PendingPaymentsTableManager(_db, _db.pendingPayments);
   $DroppedNotificationsTableManager get droppedNotifications =>
       $DroppedNotificationsTableManager(_db, _db.droppedNotifications);
+}
+
+class GroupTotalsResult {
+  final String category;
+  final Decimal? total;
+  GroupTotalsResult({required this.category, this.total});
 }
 
 class TotalsByCategoryResult {

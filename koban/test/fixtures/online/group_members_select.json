@@ -1,0 +1,17 @@
+[
+  {
+    "user_id": "user-1",
+    "joined_at": "2026-11-10T01:00:00+00:00",
+    "profiles": {"alias": "Ali", "totals_updated_at": "2026-11-12T05:59:05.867657+00:00"}
+  },
+  {
+    "user_id": "user-2",
+    "joined_at": "2026-11-11T02:30:00.5+00:00",
+    "profiles": {"alias": "Mei", "totals_updated_at": null}
+  },
+  {
+    "user_id": "user-3",
+    "joined_at": "2026-11-12T03:00:00+00:00",
+    "profiles": null
+  }
+]

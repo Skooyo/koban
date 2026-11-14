@@ -124,6 +124,8 @@ void main() {
     await visit(tester, openSettings, 'Settings');
     await visit(tester, openPaymentApps, 'Payment apps');
     await visit(tester, openNotificationLog, 'Notification log');
+    // The group is not loaded here: the page shows its loading title.
+    await visit(tester, (c) => openGroup(c, 'g1'), 'Group');
     await visit(tester, openOnboarding, 'Koban counts your spending for you.');
   });
 

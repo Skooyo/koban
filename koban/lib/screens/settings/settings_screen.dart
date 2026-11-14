@@ -273,22 +273,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     textCapitalization:
                                         TextCapitalization.characters,
                                     inputFormatters: const [_UpperCase()],
-                                    decoration: const InputDecoration(
+                                    decoration: InputDecoration(
                                       labelText: 'XXXX-XXXX',
-                                      border: OutlineInputBorder(),
+                                      errorText: vm.inviteMessage,
+                                      border: const OutlineInputBorder(),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   Align(
                                     alignment: Alignment.centerLeft,
                                     child: TonalButton(
-                                      'Use code',
-                                      _code.text.trim().isEmpty
+                                      vm.inviteBusy ? 'Checking…' : 'Use code',
+                                      _code.text.trim().isEmpty || vm.inviteBusy
                                           ? null
-                                          : () => openOnlinePlaceholder(
-                                              context,
-                                              OnlineFeature.inviteCode,
-                                            ),
+                                          : () => vm.enterInviteCode(_code.text),
                                     ),
                                   ),
                                 ],

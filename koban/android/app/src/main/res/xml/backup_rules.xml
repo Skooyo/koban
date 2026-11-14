@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The secrets files (device token and group session) stay out of cloud backup:
+     the Koban file and the 0.1.1 file, which stays on disk after the update. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="koban_secrets.xml" />
+    <exclude domain="file" path="datastore/secrets.preferences_pb" />
+</full-backup-content>

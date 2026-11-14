@@ -29,6 +29,7 @@ const legacyTableOrder = <String>[
     'capture_queries.drift',
     'split_queries.drift',
     'expense_queries.drift',
+    'group_queries.drift',
   },
 )
 class KobanDatabase extends _$KobanDatabase {

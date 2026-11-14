@@ -1,15 +1,16 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/rules/types.dart';
+import 'package:koban/screens/groups/groups_screen.dart';
 import 'package:koban/screens/home/home_screen.dart';
 import 'package:koban/app/home_shell.dart';
-import 'package:koban/app/online_placeholder.dart';
 import 'package:koban/ui/kit.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
 
-const placeholderLine = 'Comes with the online features in milestone 5.';
+/// A line of the Groups tab when signed out.
+const groupsLine = 'Compare spending with friends';
 
 int shownTab(WidgetTester tester) =>
     tester.widget<IndexedStack>(find.byType(IndexedStack)).index!;
@@ -78,8 +79,8 @@ void main() {
       await tester.tap(find.text('Groups'));
       await tester.pump();
       expect(shownTab(tester), 3);
-      expect(find.text(placeholderLine), findsOneWidget);
-      final groups = tester.element(find.byType(OnlinePlaceholder));
+      expect(find.text(groupsLine), findsOneWidget);
+      final groups = tester.element(find.byType(GroupsScreen));
 
       await tester.tap(find.text('Activity'));
       await tester.pump();
@@ -97,9 +98,9 @@ void main() {
         findsOneWidget,
       );
       // The Groups tab stays in the tree, hidden, with the same element.
-      expect(find.text(placeholderLine), findsNothing);
+      expect(find.text(groupsLine), findsNothing);
       expect(
-        tester.element(find.byType(OnlinePlaceholder, skipOffstage: false)),
+        tester.element(find.byType(GroupsScreen, skipOffstage: false)),
         same(groups),
       );
 
@@ -107,7 +108,7 @@ void main() {
           .select(KobanTab.groups);
       await tester.pump();
       expect(shownTab(tester), 3);
-      expect(tester.element(find.byType(OnlinePlaceholder)), same(groups));
+      expect(tester.element(find.byType(GroupsScreen)), same(groups));
 
       await tester.tap(find.text('Home'));
       await tester.pump();
@@ -140,7 +141,7 @@ void main() {
     await tester.pump();
     // 'Groups' is the tab label and the placeholder title.
     expect(find.text('Groups'), findsNWidgets(2));
-    expect(find.text(placeholderLine), findsOneWidget);
+    expect(find.text(groupsLine), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

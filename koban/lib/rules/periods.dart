@@ -146,11 +146,23 @@ enum Period {
 class GroupPeriodMath {
   GroupPeriodMath._();
 
+  static const _offset = Duration(hours: 8);
+
   /// Today's date in Malaysia.
-  static DateTime todayInMalaysia() {
-    final t = DateTime.now().toUtc().add(const Duration(hours: 8));
+  static DateTime todayInMalaysia() => malaysiaDay(DateTime.now());
+
+  /// The date in Malaysia at [instant], as a UTC DateTime at 00:00.
+  static DateTime malaysiaDay(DateTime instant) {
+    final t = instant.toUtc().add(_offset);
     return DateTime.utc(t.year, t.month, t.day);
   }
+
+  /// The start of [day] (a date) in Malaysia, in ms since the epoch.
+  static int malaysiaDayStartMs(DateTime day) => DateTime.utc(
+    day.year,
+    day.month,
+    day.day,
+  ).subtract(_offset).millisecondsSinceEpoch;
 
   /// First day of the period that holds [day]. Week starts on Monday.
   static DateTime start(DateTime day, Period period) => period == Period.week

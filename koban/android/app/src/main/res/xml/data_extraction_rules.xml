@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The secrets files (device token and group session) stay out of cloud backup and device
+     transfer: the Koban file and the 0.1.1 file, which stays on disk after the update. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="koban_secrets.xml" />
+        <exclude domain="file" path="datastore/secrets.preferences_pb" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="koban_secrets.xml" />
+        <exclude domain="file" path="datastore/secrets.preferences_pb" />
+    </device-transfer>
+</data-extraction-rules>

@@ -120,5 +120,21 @@ void main() {
         1,
       );
     });
+
+    // Review Focus 4: Malaysia time is UTC+8 on every phone.
+    test('Malaysia day starts at 16:00 UTC of the day before', () {
+      expect(
+        GroupPeriodMath.malaysiaDay(DateTime.utc(2026, 11, 8, 15, 59)),
+        DateTime.utc(2026, 11, 8),
+      );
+      expect(
+        GroupPeriodMath.malaysiaDay(DateTime.utc(2026, 11, 8, 16)),
+        DateTime.utc(2026, 11, 9),
+      );
+      expect(
+        GroupPeriodMath.malaysiaDayStartMs(DateTime.utc(2026, 11, 9)),
+        DateTime.utc(2026, 11, 8, 16).millisecondsSinceEpoch,
+      );
+    });
   });
 }

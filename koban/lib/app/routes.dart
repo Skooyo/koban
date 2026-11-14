@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../screens/check/check_payments_screen.dart';
+import '../screens/groups/group_screen.dart';
 import '../screens/notification_log/notification_log_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/payment/payment_screen.dart';
@@ -251,3 +252,7 @@ Future<void> openSplitEdit(BuildContext context, String billId) =>
 /// Opens the page of the person [personId].
 Future<void> openPerson(BuildContext context, String personId) =>
     pushPage<void>(context, PersonScreen(personId));
+
+/// Opens the page of the group [groupId].
+Future<void> openGroup(BuildContext context, String groupId) =>
+    pushPage<void>(context, GroupScreen(groupId));

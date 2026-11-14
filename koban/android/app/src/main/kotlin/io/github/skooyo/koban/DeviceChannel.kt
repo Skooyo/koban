@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.Settings
+import android.text.format.DateUtils
 import androidx.core.graphics.drawable.toBitmap
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -25,7 +26,7 @@ import java.io.IOException
 import java.io.OutputStream
 
 /**
- * The device channel: launcher apps, permissions, gallery and share.
+ * The device channel: launcher apps, permissions, gallery, share, the online build values and relative times.
  * [work] runs a block on the plugin executor and replies on the main thread.
  * [activity] gives the attached activity, or null.
  */
@@ -42,6 +43,21 @@ internal class DeviceChannel(
             "installedApps" -> work(result, "NATIVE_ERROR") { loadApps() }
             "appLabels" -> work(result, "NATIVE_ERROR") { labels(call.argument<List<String>>("packages")!!) }
             "sdkInt" -> result.success(Build.VERSION.SDK_INT)
+            "onlineConfig" -> result.success(
+                mapOf(
+                    "supabaseUrl" to BuildConfig.SUPABASE_URL,
+                    "supabaseKey" to BuildConfig.SUPABASE_KEY,
+                    "googleWebClientId" to BuildConfig.GOOGLE_WEB_CLIENT_ID,
+                ),
+            )
+            // The 0.1.1 text, for example "3 hours ago". Small numbers come over the channel as Int.
+            "relativeTime" -> result.success(
+                DateUtils.getRelativeTimeSpanString(
+                    call.argument<Number>("time")!!.toLong(),
+                    call.argument<Number>("now")!!.toLong(),
+                    DateUtils.MINUTE_IN_MILLIS,
+                ).toString(),
+            )
             "versionName" -> work(result, "NATIVE_ERROR") { app.packageManager.getPackageInfo(app.packageName, 0).versionName }
             "notificationsAllowed" -> result.success(notificationsAllowed())
             "shouldShowNotificationRationale" -> result.success(

@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Looper
+import android.text.format.DateUtils
+import org.xmlpull.v1.XmlPullParser
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.StandardMethodCodec
@@ -225,5 +227,62 @@ class DeviceChannelTest {
         assertEquals(Intent.ACTION_SEND, inner.action)
         assertEquals("text/plain", inner.type)
         assertEquals("Kedai Contoh, 13 Nov 2026", inner.getStringExtra(Intent.EXTRA_TEXT))
+    }
+
+    @Test fun onlineConfigGivesTheThreeBuildValues() {
+        @Suppress("UNCHECKED_CAST")
+        val m = messenger.call(device, "onlineConfig") as Map<String, Any?>
+        assertEquals(setOf("supabaseUrl", "supabaseKey", "googleWebClientId"), m.keys)
+        assertEquals(BuildConfig.SUPABASE_URL, m["supabaseUrl"])
+        assertEquals(BuildConfig.SUPABASE_KEY, m["supabaseKey"])
+        assertEquals(BuildConfig.GOOGLE_WEB_CLIENT_ID, m["googleWebClientId"])
+        assertTrue((m["supabaseUrl"] as String).startsWith("https://"))
+        assertTrue((m["googleWebClientId"] as String).endsWith(".apps.googleusercontent.com"))
+    }
+
+    @Test fun relativeTimeIsTheAndroidText() {
+        val now = 1_762_000_000_000L
+        val t = now - 3 * 3_600_000L
+        val expected = DateUtils.getRelativeTimeSpanString(t, now, DateUtils.MINUTE_IN_MILLIS).toString()
+        assertEquals("3 hours ago", expected)
+        assertEquals(expected, messenger.call(device, "relativeTime", mapOf("time" to t, "now" to now)))
+        // Small numbers come over the channel as Int, not Long.
+        assertEquals("1 minute ago", messenger.call(device, "relativeTime", mapOf("time" to 0, "now" to 60_000)))
+    }
+
+    /** Each <exclude> of an XML resource as "parent:domain:path". */
+    private fun excludes(id: Int): List<String> {
+        val xml = context.resources.getXml(id)
+        val found = mutableListOf<String>()
+        var parent = ""
+        while (xml.next() != XmlPullParser.END_DOCUMENT) {
+            if (xml.eventType != XmlPullParser.START_TAG) continue
+            if (xml.name == "exclude") {
+                found += "$parent:${xml.getAttributeValue(null, "domain")}:${xml.getAttributeValue(null, "path")}"
+            } else {
+                parent = xml.name
+            }
+        }
+        return found
+    }
+
+    @Test fun backupLeavesOutTheSecretsFile() {
+        assertEquals(
+            listOf(
+                "full-backup-content:sharedpref:koban_secrets.xml",
+                "full-backup-content:file:datastore/secrets.preferences_pb",
+            ),
+            excludes(R.xml.backup_rules),
+        )
+        // The 0.1.1 secrets file stays on disk after the update: it stays out too.
+        assertEquals(
+            listOf(
+                "cloud-backup:sharedpref:koban_secrets.xml",
+                "cloud-backup:file:datastore/secrets.preferences_pb",
+                "device-transfer:sharedpref:koban_secrets.xml",
+                "device-transfer:file:datastore/secrets.preferences_pb",
+            ),
+            excludes(R.xml.data_extraction_rules),
+        )
     }
 }

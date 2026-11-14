@@ -3,11 +3,11 @@ import 'dart:developer' as developer;
 import 'package:material_ui/material_ui.dart';
 
 import '../screens/activity/activity_screen.dart';
+import '../screens/groups/groups_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/people/people_screen.dart';
 import 'app_services.dart';
 import 'auto_open.dart';
-import 'online_placeholder.dart';
 import 'routes.dart';
 
 /// The 4 tabs of the tab bar, in the bar order.
@@ -41,6 +41,11 @@ class HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    // The group sign-in, the reads and the shared totals sync. The repository starts one time.
+    final services = context
+        .getInheritedWidgetOfExactType<AppScope>()!
+        .services;
+    services.online.groups.start();
     if (!widget.autoOpen) return;
     // As 0.1.1 on each activity start. A rotation does not restart the activity in Flutter.
     _lifecycle = AppLifecycleListener(onShow: _autoOpen);
@@ -116,7 +121,7 @@ class HomeShellState extends State<HomeShell> {
               HomeScreen(),
               ActivityScreen(),
               PeopleScreen(),
-              OnlinePlaceholder(OnlineFeature.groups),
+              GroupsScreen(),
             ],
           ),
         ),

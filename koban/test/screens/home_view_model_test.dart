@@ -54,6 +54,7 @@ void main() {
       paymentApps: s.paymentApps,
       captureHost: s.captureHost,
       device: s.device,
+      online: s.online,
       now: () => time,
     );
     await pay(moving, '12.50', DateTime(2026, 11, 13, 9));
@@ -81,6 +82,7 @@ void main() {
       paymentApps: s.paymentApps,
       captureHost: s.captureHost,
       device: s.device,
+      online: s.online,
       now: () => time,
     );
     await pay(moving, '12.50', DateTime(2026, 11, 13, 9));

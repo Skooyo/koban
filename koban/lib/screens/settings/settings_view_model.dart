@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' hide Category;
 import '../../app/app_services.dart';
 import '../../capture/listener_control.dart';
 import '../../data/database.dart';
+import '../../online/receipt_cloud_client.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/payment_rules.dart';
 
@@ -63,6 +64,8 @@ class SettingsViewModel extends ChangeNotifier {
   List<Category> _categories = const [];
   String? _reconnectMessage;
   String? _parserResult;
+  var _inviteBusy = false;
+  String? _inviteMessage;
 
   bool get isAccessGranted => _isAccessGranted;
   bool get isBatteryOptimizationIgnored => _isBatteryOptimizationIgnored;
@@ -76,6 +79,8 @@ class SettingsViewModel extends ChangeNotifier {
   List<Category> get categories => _categories;
   String? get reconnectMessage => _reconnectMessage;
   String? get parserResult => _parserResult;
+  bool get inviteBusy => _inviteBusy;
+  String? get inviteMessage => _inviteMessage;
 
   /// Reads the phone state again and starts the listener. The screen calls it at the start and at each resume.
   Future<void> refresh() async {
@@ -167,6 +172,34 @@ class SettingsViewModel extends ChangeNotifier {
   Future<void> setDarkMode(bool on) => _s.settings.setDarkMode(on);
 
   Future<void> setOnlineFeatures(bool on) => _s.settings.setOnlineFeatures(on);
+
+  /// Trades the invite code for a device token. It stores only the token, never the code.
+  /// A call while a check runs does nothing.
+  Future<void> enterInviteCode(String code) async {
+    if (_inviteBusy) return;
+    _inviteBusy = true;
+    _inviteMessage = null;
+    notifyListeners();
+    String? message;
+    try {
+      switch (await _s.online.receiptCloud.register(code)) {
+        case RegistrationOk(:final deviceToken):
+          await _s.online.secrets.setDeviceToken(deviceToken);
+        case RegistrationFailed(:final message):
+          _inviteMessage = message;
+      }
+    } catch (e) {
+      // Log only the type: the message of a body error can hold the token.
+      developer.log(
+        'Invite code check failed: ${e.runtimeType}',
+        name: 'Settings',
+      );
+      message = "Koban's server had a problem. Try again later.";
+    }
+    _inviteBusy = false;
+    if (message != null) _inviteMessage = message;
+    if (!_disposed) notifyListeners();
+  }
 
   Future<void> removeDeviceToken() => _s.settings.removeDeviceToken();
 

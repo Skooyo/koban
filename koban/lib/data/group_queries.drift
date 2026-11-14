@@ -1,0 +1,15 @@
+import 'schema.drift';
+
+-- Copy of the Room @Query text of ExpenseDao.groupTotals.
+-- Shared totals for groups: money out, not dismissed, not private, one account, by category name.
+-- The total is CAST(<Room expression> AS TEXT), so MoneyConverter reads text, not a REAL.
+-- HAVING keeps the number expression: SQLite puts any TEXT above any number.
+
+groupTotals(:start AS INT, :end AS INT, :currency AS TEXT, :uncategorized AS TEXT):
+SELECT COALESCE(c.name, :uncategorized) AS category,
+CAST(SUM(COALESCE(e.countedAmount, e.amount)) AS TEXT) MAPPED BY `const MoneyConverter()` AS total
+FROM expenses e LEFT JOIN categories c ON c.id = e.categoryId
+WHERE e.status != 'DISMISSED' AND e.transactionType != 'RECEIVE' AND e.privateToGroups = 0
+AND e.currency = :currency AND e.notificationPostTime >= :start AND e.notificationPostTime < :end
+GROUP BY category
+HAVING SUM(COALESCE(e.countedAmount, e.amount)) > 0;

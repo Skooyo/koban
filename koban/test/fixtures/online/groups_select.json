@@ -1,0 +1,16 @@
+[
+  {
+    "id": "g1",
+    "name": "Makan Group",
+    "code": "GRP-AB12",
+    "owner_id": "user-1",
+    "group_members": [{"user_id": "user-1"}, {"user_id": "user-2"}, {"user_id": "user-3"}]
+  },
+  {
+    "id": "g2",
+    "name": "Trip",
+    "code": "GRP-CD34",
+    "owner_id": null,
+    "group_members": [{"user_id": "user-1"}]
+  }
+]

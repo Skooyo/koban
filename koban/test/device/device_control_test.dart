@@ -110,4 +110,31 @@ void main() {
       ),
     );
   });
+
+  test('online config comes back typed', () async {
+    answer(
+      (_) => {
+        'supabaseUrl': 'https://test.supabase.co',
+        'supabaseKey': 'test-key',
+        'googleWebClientId': 'test-client',
+      },
+    );
+    final c = await DeviceControl().onlineConfig();
+    expect(calls.single.method, 'onlineConfig');
+    expect(
+      (c.supabaseUrl, c.supabaseKey, c.googleWebClientId),
+      ('https://test.supabase.co', 'test-key', 'test-client'),
+    );
+    expect(
+      c.function('register'),
+      Uri.parse('https://test.supabase.co/functions/v1/register'),
+    );
+  });
+
+  test('relative time sends the time and now', () async {
+    answer((_) => '3 hours ago');
+    expect(await DeviceControl().relativeTime(1, 2), '3 hours ago');
+    expect(calls.single.method, 'relativeTime');
+    expect(calls.single.arguments, {'time': 1, 'now': 2});
+  });
 }

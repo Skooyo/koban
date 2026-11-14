@@ -7,6 +7,7 @@ import 'package:sqlite3/common.dart' show CommonDatabase;
 
 import '../capture/capture_host.dart';
 import '../capture/payment_apps.dart';
+import '../online/secret_store.dart';
 import 'database.dart';
 import 'legacy_import.dart';
 import 'legacy_source.dart';
@@ -44,6 +45,8 @@ Future<(KobanDatabase, ImportResult)> _open() async {
       ),
       host: host,
       paymentApps: PaymentApps(prefs, host),
+      secrets: SecretStore.forPhone(),
+      settings: prefs,
     );
     return (db, result);
   } catch (_) {
@@ -57,6 +60,10 @@ Future<(KobanDatabase, ImportResult)> _open() async {
 /// Opens [db] and runs [runImport] while this engine holds the import gate,
 /// so only one engine at a time imports. The gate opens again on every path.
 ///
+/// Inside the gate, the device token and the group session move from the main
+/// [settings] (where the import puts them) to [secrets], so both engines move them.
+/// This also runs with no import: an earlier import can have left them there.
+///
 /// A problem with the import goes to the notification log. Then the saved
 /// payment apps go to the native listener. An error of the log or of the
 /// native copy does not stop the open: the rows are safe and the result tells
@@ -66,6 +73,8 @@ Future<ImportResult> openAndImport({
   required Future<ImportResult> Function() runImport,
   required CaptureHost host,
   required PaymentApps paymentApps,
+  required SecretStore secrets,
+  required SharedPreferencesAsync settings,
 }) async {
   final ImportResult result;
   await host.acquireImportGate();
@@ -73,6 +82,12 @@ Future<ImportResult> openAndImport({
     // The first query opens the file and makes the schema.
     await db.customSelect('SELECT 1').get();
     result = await runImport();
+    try {
+      await secrets.migrate(settings);
+    } catch (e, s) {
+      // The copy comes before the removal, so no value is lost. The next open tries again.
+      debugPrint('Koban: ${describeError(e)}\n$s');
+    }
   } finally {
     await host.releaseImportGate();
   }

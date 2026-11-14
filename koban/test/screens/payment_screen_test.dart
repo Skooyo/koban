@@ -10,6 +10,9 @@ import 'package:koban/rules/types.dart';
 import 'package:koban/screens/payment/payment_view_model.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../online/group_repository_test.dart' show jsonReply;
+import '../online/group_session_test.dart' show storedSession, tokenReply;
+import '../support/fake_backend.dart';
 import '../support/harness.dart';
 
 /// A page with one button. The button opens the payment sheet and keeps what it gives back.
@@ -305,6 +308,69 @@ void main() {
   });
 
   testWidgets(
+    'Count in group totals shows for a spend when the person is in a group',
+    (tester) async {
+      final backend = FakeBackend();
+      backend.on('POST', '/auth/v1/token', tokenReply);
+      backend.on(
+        'GET',
+        '/rest/v1/profiles',
+        (r) => jsonReply([
+          {'alias': 'Ali'},
+        ]),
+      );
+      backend.on('GET', '/rest/v1/join_requests', (r) => jsonReply([]));
+      backend.on(
+        'GET',
+        '/rest/v1/groups',
+        (r) => jsonReply([
+          {
+            'id': 'g1',
+            'name': 'Makan Group',
+            'code': 'GRP-AB12',
+            'owner_id': 'user-1',
+            'group_members': [
+              {'user_id': 'user-1'},
+            ],
+          },
+        ]),
+      );
+      backend.on('GET', '/rest/v1/removed_notices', (r) => jsonReply([]));
+      final s = await testServices(
+        http: backend.client,
+        secrets: {
+          'device_token': 'test-device-token',
+          'group_session': storedSession,
+        },
+      );
+      await s.online.groups.refresh();
+      expect(s.inGroups.value, true);
+
+      await openSheet(tester, s);
+      await tapKeys(tester, '8');
+      final row = find.text('Count in group totals');
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      expect(row, findsOneWidget);
+      expect(
+        find.text('Group members see this in your totals'),
+        findsOneWidget,
+      );
+      await tester.tap(row);
+      await tester.pump();
+      expect(
+        find.text('Group members do not see this payment'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Save payment'));
+      await tester.pumpAndSettle();
+
+      final saved = (await s.db.select(s.db.expenses).get()).single;
+      expect(saved.privateToGroups, true);
+    },
+  );
+
+  testWidgets(
     'the payment sheet meets the tap target guidelines and works at text scale 1.3',
     (tester) async {
       final handle = tester.ensureSemantics();
@@ -401,6 +467,7 @@ class _GatedServices extends AppServices {
         paymentApps: base.paymentApps,
         captureHost: base.captureHost,
         device: base.device,
+        online: base.online,
         now: base.now,
       );
 

@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/capture/listener_control.dart';
 import 'package:koban/screens/settings/settings_screen.dart';
@@ -50,10 +55,12 @@ FakeChannel deviceChannel() =>
 Future<AppServices> settingsServices({
   FakeChannel? listener,
   Map<String, Object> prefs = const {},
+  Map<String, Object> secrets = const {},
 }) => testServices(
   listener: listener ?? listenerChannel(),
   device: deviceChannel(),
   prefs: prefs,
+  secrets: secrets,
 );
 
 Future<void> pumpSettings(
@@ -253,24 +260,119 @@ void main() {
     expect(find.text('No rule matched this text'), findsOneWidget);
   });
 
-  testWidgets('Use code and Check for updates open the online placeholder', (
+  testWidgets('Use code checks the code and then shows Accepted', (
     tester,
   ) async {
-    await pumpSettings(tester, await settingsServices());
+    final gate = Completer<http.Response>();
+    final seen = <http.Request>[];
+    final s = await testServices(
+      listener: listenerChannel(),
+      device: deviceChannel(),
+      http: MockClient((r) {
+        seen.add(r);
+        return gate.future;
+      }),
+    );
+    await pumpSettings(tester, s);
     final use = find.widgetWithText(FilledButton, 'Use code');
     expect(tester.widget<FilledButton>(use).onPressed, isNull);
-    await tester.enterText(field('XXXX-XXXX'), 'ab12-cd34');
+    await tester.enterText(field('XXXX-XXXX'), 'k7qx-m2pa');
     await tester.pump();
     expect(
       tester.widget<TextField>(field('XXXX-XXXX')).controller!.text,
-      'AB12-CD34',
+      'K7QX-M2PA',
     );
+
     await tester.tap(use);
+    await tester.pump();
+    final busy = find.widgetWithText(FilledButton, 'Checking…');
+    expect(busy, findsOneWidget);
+    expect(tester.widget<FilledButton>(busy).onPressed, isNull);
+    expect(seen, hasLength(1));
+
+    gate.complete(http.Response('{"deviceToken":"test-device-token"}', 200));
     await tester.pumpAndSettle();
-    expect(find.text(placeholder), findsOneWidget);
-    await tester.pageBack();
+    expect(find.text(accepted), findsOneWidget);
+    expect(seen, hasLength(1));
+    expect(jsonDecode(seen.single.body), {'inviteCode': 'K7QX-M2PA'});
+    expect(s.online.secrets.deviceToken.value, 'test-device-token');
+  });
+
+  testWidgets('a refused code shows the message under the field', (
+    tester,
+  ) async {
+    final s = await testServices(
+      listener: listenerChannel(),
+      device: deviceChannel(),
+      http: MockClient((r) async => http.Response('{}', 403)),
+    );
+    await pumpSettings(tester, s);
+    await tester.enterText(field('XXXX-XXXX'), 'k7qx-m2pa');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Use code'));
     await tester.pumpAndSettle();
-    expect(find.text(placeholder), findsNothing);
+    expect(find.text('Invite code not accepted.'), findsOneWidget);
+    expect(find.text(accepted), findsNothing);
+    expect(s.online.secrets.deviceToken.value, '');
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Use code'))
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('a second tap while the check runs sends no second request', (
+    tester,
+  ) async {
+    final gate = Completer<http.Response>();
+    var requests = 0;
+    final s = await testServices(
+      listener: listenerChannel(),
+      device: deviceChannel(),
+      http: MockClient((r) {
+        requests++;
+        return gate.future;
+      }),
+    );
+    await pumpSettings(tester, s);
+    final vm = SettingsViewModel(s);
+    addTearDown(vm.dispose);
+
+    final first = vm.enterInviteCode('K7QX-M2PA');
+    final second = vm.enterInviteCode('K7QX-M2PA');
+    await tester.pump();
+    gate.complete(http.Response('{"deviceToken":"test-device-token"}', 200));
+    await Future.wait([first, second]);
+
+    expect(requests, 1);
+  });
+
+  testWidgets('a malformed good answer shows the server problem text', (
+    tester,
+  ) async {
+    final s = await testServices(
+      listener: listenerChannel(),
+      device: deviceChannel(),
+      http: MockClient(
+        (r) async => http.Response('{"deviceToken":"test-device-tok', 200),
+      ),
+    );
+    await pumpSettings(tester, s);
+    await tester.enterText(field('XXXX-XXXX'), 'k7qx-m2pa');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Use code'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text("Koban's server had a problem. Try again later."),
+      findsOneWidget,
+    );
+    expect(s.online.secrets.deviceToken.value, '');
+  });
+
+  testWidgets('Check for updates opens the online placeholder', (tester) async {
+    await pumpSettings(tester, await settingsServices());
     await tester.tap(find.text('Check for updates'));
     await tester.pumpAndSettle();
     expect(find.text(placeholder), findsOneWidget);
@@ -318,17 +420,17 @@ void main() {
   testWidgets('a stored invite code shows Accepted and Remove deletes it', (
     tester,
   ) async {
-    await pumpSettings(
-      tester,
-      await settingsServices(prefs: {'device_token': 'token-1'}),
+    final s = await settingsServices(
+      secrets: {'device_token': 'test-device-token'},
     );
+    await pumpSettings(tester, s);
     expect(find.text(accepted), findsOneWidget);
     expect(field('XXXX-XXXX'), findsNothing);
     await tester.tap(find.widgetWithText(TextButton, 'Remove'));
     await tester.pumpAndSettle();
     expect(find.text(accepted), findsNothing);
     expect(field('XXXX-XXXX'), findsOneWidget);
-    expect(await SharedPreferencesAsync().getString('device_token'), isNull);
+    expect(s.online.secrets.deviceToken.value, '');
   });
 
   testWidgets('on a Xiaomi phone the autostart row and the 7 steps show', (

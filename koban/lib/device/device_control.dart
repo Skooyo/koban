@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 
 import '../data/user_error.dart';
+import '../online/online_config.dart';
 
 /// One launcher app on the phone.
 class InstalledApp {
@@ -92,6 +93,20 @@ class DeviceControl {
       rethrow;
     }
   }
+
+  /// The build-time online settings of the Android build.
+  Future<OnlineConfig> onlineConfig() async {
+    final m = (await _channel.invokeMapMethod<String, String>('onlineConfig'))!;
+    return OnlineConfig(
+      supabaseUrl: m['supabaseUrl']!,
+      supabaseKey: m['supabaseKey']!,
+      googleWebClientId: m['googleWebClientId']!,
+    );
+  }
+
+  /// The Android text for [time] as seen at [now] (epoch ms), for example "3 hours ago".
+  Future<String> relativeTime(int time, int now) async => (await _channel
+      .invokeMethod<String>('relativeTime', {'time': time, 'now': now}))!;
 
   /// Opens the system share chooser with [text].
   Future<void> shareText(String text, {String chooserTitle = 'Share summary'}) =>

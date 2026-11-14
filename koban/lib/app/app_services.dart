@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:image_picker_android/image_picker_android.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
@@ -26,6 +27,8 @@ import '../data/qr_store.dart';
 import '../data/settings_store.dart';
 import '../data/split_repository.dart';
 import '../device/device_control.dart';
+import '../online/online_services.dart';
+import '../online/secret_store.dart';
 import '../rules/periods.dart';
 
 /// Makes the picker open the Android photo picker, as 0.1.1 did.
@@ -46,6 +49,7 @@ class AppServices {
     required this.paymentApps,
     required this.captureHost,
     required this.device,
+    required this.online,
     this.now = DateTime.now,
     Future<Directory> Function() filesDir = getApplicationSupportDirectory,
     this.cacheDir = getTemporaryDirectory,
@@ -88,6 +92,9 @@ class AppServices {
   final CaptureHost captureHost;
   final DeviceControl device;
 
+  /// The online settings, the shared HTTP client, the secrets and Supabase.
+  final OnlineServices online;
+
   /// The clock. Every time in the app comes from here.
   final DateTime Function() now;
 
@@ -111,26 +118,44 @@ class AppServices {
   late final ExternalWrites externalWrites;
   late final ActivitySelection activitySelection;
 
-  /// True when the owner is in a group. Milestone 5 sets it. Until then it is always false.
-  final ValueListenable<bool> inGroups = ValueNotifier(false);
+  /// True when the owner is in a group.
+  ValueListenable<bool> get inGroups => online.groups.inGroups;
 
   static Future<String?> _pickFromGallery() async =>
       (await ImagePicker().pickImage(source: ImageSource.gallery))?.path;
 
-  /// Opens the database (and imports the 0.1.1 data one time), loads the settings
-  /// and adds the default categories to an empty database.
+  /// Opens the database (imports the 0.1.1 data one time and moves the secrets out of
+  /// the main settings), loads the settings and adds the default categories to an empty database.
   static Future<AppServices> start() async {
     useAndroidPhotoPicker();
     final (db, importResult) = await openKobanDatabase();
+    // openKobanDatabase moved the secrets out of the main settings.
+    final secrets = SecretStore.forPhone();
+    await secrets.load();
+    final settings = await KobanSettings.load(
+      SharedPreferencesAsync(),
+      secrets: secrets,
+    );
+    final device = DeviceControl();
     final captureHost = ChannelCaptureHost();
+    const now = DateTime.now;
     final services = AppServices(
       db: db,
-      settings: await KobanSettings.load(SharedPreferencesAsync()),
+      settings: settings,
       importResult: importResult,
       listener: ListenerControl(),
       paymentApps: PaymentApps(SharedPreferencesAsync(), captureHost),
       captureHost: captureHost,
-      device: DeviceControl(),
+      device: device,
+      online: OnlineServices(
+        config: await device.onlineConfig(),
+        http: http.Client(),
+        secrets: secrets,
+        settings: settings,
+        db: db,
+        now: now,
+      ),
+      now: now,
     );
     await services.categories.seedIfEmpty();
     return services;

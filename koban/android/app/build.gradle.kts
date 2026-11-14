@@ -4,6 +4,35 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Copied from the 0.1.1 app/build.gradle.kts.
+fun loadDotEnv(file: java.io.File): Map<String, String> {
+    if (!file.exists()) return emptyMap()
+    return file.readLines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+        .associate { line ->
+            val idx = line.indexOf('=')
+            val key = line.substring(0, idx).trim()
+            var value = line.substring(idx + 1).trim()
+            if ((value.startsWith("\"") && value.endsWith("\"")) ||
+                (value.startsWith("'") && value.endsWith("'"))
+            ) {
+                value = value.substring(1, value.length - 1)
+            }
+            key to value
+        }
+}
+
+fun escapeBuildConfig(value: String): String =
+    value.replace("\\", "\\\\").replace("\"", "\\\"")
+
+// The publishable Supabase key comes from the git-ignored .env at the repository root.
+val rootEnv = loadDotEnv(rootProject.file("../../.env"))
+val supabaseKey = rootEnv["SUPABASE_KEY"].orEmpty()
+if (supabaseKey.isEmpty()) {
+    logger.warn("SUPABASE_KEY is missing in .env: groups and receipt reading will not work.")
+}
+
 android {
     namespace = "io.github.skooyo.koban"
     compileSdk = flutter.compileSdkVersion
@@ -30,6 +59,9 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        buildConfigField("String", "SUPABASE_URL", "\"https://ydrlxhqdalomlkqkdjyb.supabase.co\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"${escapeBuildConfig(supabaseKey)}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"221621530092-1n4jia2b9v4ctjue56d1gilej11q9l8h.apps.googleusercontent.com\"")
     }
 
     buildTypes {

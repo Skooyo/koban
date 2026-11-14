@@ -7,6 +7,7 @@ import 'package:koban/capture/payment_apps.dart';
 import 'package:koban/data/database.dart';
 import 'package:koban/data/legacy_import.dart';
 import 'package:koban/data/open_database.dart';
+import 'package:koban/online/secret_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -22,6 +23,7 @@ void main() {
   late KobanDatabase db;
   late FakeCaptureHost host;
   late SharedPreferencesAsync prefs;
+  late SharedPreferencesAsync secretPrefs;
 
   KobanDatabase openFile() => KobanDatabase(
     NativeDatabase(File('${tmp.path}/koban.sqlite'), setup: configureConnection),
@@ -33,12 +35,18 @@ void main() {
         runImport: runImport,
         host: host,
         paymentApps: PaymentApps(prefs, host),
+        secrets: SecretStore(secretPrefs),
+        settings: prefs,
       );
 
   setUp(() async {
     tmp = await Directory.systemTemp.createTemp('koban_open_');
     db = openFile();
     host = FakeCaptureHost();
+    // Each SharedPreferencesAsync keeps the store that is current when it is made.
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    secretPrefs = SharedPreferencesAsync();
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
     prefs = SharedPreferencesAsync();
@@ -108,6 +116,8 @@ void main() {
       runImport: () => importLegacyData(db: d, legacy: legacy, prefs: prefs),
       host: host,
       paymentApps: PaymentApps(prefs, host),
+      secrets: SecretStore(secretPrefs),
+      settings: prefs,
     );
 
     final results = await Future.wait([openOne(a), openOne(b)]);
@@ -117,5 +127,17 @@ void main() {
     expect(await rowCountsOf(b), fixtureCounts);
     expect(host.gateHeld, false);
     expect(host.appended, isEmpty);
+  });
+
+  test('an open with no import moves the secrets of an earlier import', () async {
+    await prefs.setString('device_token', 'test-device-token');
+    await prefs.setString('group_session', '{"refresh_token":"r1"}');
+
+    await run(() async => const ImportSkipped());
+
+    expect(await prefs.getString('device_token'), isNull);
+    expect(await prefs.getString('group_session'), isNull);
+    expect(await secretPrefs.getString('device_token'), 'test-device-token');
+    expect(await secretPrefs.getString('group_session'), '{"refresh_token":"r1"}');
   });
 }

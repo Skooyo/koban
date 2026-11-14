@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/app/home_shell.dart';
 import 'package:koban/app/koban_app.dart';
@@ -13,6 +15,10 @@ import 'package:koban/data/legacy_import.dart';
 import 'package:koban/data/open_database.dart';
 import 'package:koban/data/settings_store.dart';
 import 'package:koban/device/device_control.dart';
+import 'package:koban/online/google_accounts.dart';
+import 'package:koban/online/online_config.dart';
+import 'package:koban/online/online_services.dart';
+import 'package:koban/online/secret_store.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -47,6 +53,11 @@ const deviceChannelName = 'io.github.skooyo.koban/device';
 /// [filesDir] is the folder for the QR pictures (default: a new temp folder that the test deletes).
 /// [pickImage] is the photo picker (default: the user cancels).
 /// [cacheDir] is the app cache folder where the picker copies pictures (default: [filesDir]).
+/// [secrets] fills the secrets store (a second in-memory store).
+/// [http] is the HTTP client. The default client records each request, and the tear-down
+/// fails the test when it recorded one: no test may reach the network. A test that expects
+/// requests gives its own client.
+/// [google] is the Google sign-in (default: the phone sign-in, which no test may start).
 /// The database closes after the widget tree is gone.
 Future<AppServices> testServices({
   DateTime? now,
@@ -58,10 +69,18 @@ Future<AppServices> testServices({
   Directory? filesDir,
   Future<String?> Function()? pickImage,
   Directory? cacheDir,
+  http.Client? http,
+  Map<String, Object> secrets = const {},
+  GoogleAccounts? google,
 }) async {
   final time = now ?? DateTime(2026, 11, 13, 12);
   final previous = SharedPreferencesAsyncPlatform.instance;
   addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+  // Each SharedPreferencesAsync keeps the store that is current when it is made.
+  SharedPreferencesAsyncPlatform.instance =
+      InMemorySharedPreferencesAsync.withData(secrets);
+  final secretStore = SecretStore(SharedPreferencesAsync());
+  await secretStore.load();
   SharedPreferencesAsyncPlatform.instance =
       InMemorySharedPreferencesAsync.withData(prefs);
   listener ??= FakeChannel(ListenerControl.channelName, {
@@ -80,14 +99,39 @@ Future<AppServices> testServices({
   }
   final root = filesDir;
   final host = FakeCaptureHost();
+  final settings = await KobanSettings.load(
+    SharedPreferencesAsync(),
+    secrets: secretStore,
+  );
+  final unexpected = <String>[];
+  if (http == null) {
+    // An app catch can hide the failure in the request. The tear-down cannot be hidden.
+    addTearDown(
+      () => expect(unexpected, isEmpty, reason: 'unexpected requests'),
+    );
+  }
   final s = AppServices(
     db: db,
-    settings: await KobanSettings.load(SharedPreferencesAsync()),
+    settings: settings,
     importResult: importResult,
     listener: ListenerControl(),
     paymentApps: PaymentApps(SharedPreferencesAsync(), host),
     captureHost: host,
     device: DeviceControl(),
+    online: OnlineServices(
+      config: OnlineConfig.test,
+      http:
+          http ??
+          MockClient((r) async {
+            unexpected.add('${r.method} ${r.url.path}');
+            fail('unexpected request ${r.method} ${r.url.path}');
+          }),
+      secrets: secretStore,
+      settings: settings,
+      db: db,
+      now: () => time,
+      google: google,
+    ),
     now: () => time,
     checkHold: checkHold,
     filesDir: () async => root,
@@ -112,6 +156,20 @@ Future<void> pumpKoban(
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));
+    // The Supabase client, when the test made one, stops with its JSON isolate.
+    // The isolate starts and stops on real time: wait for it 5 s at most.
+    var stopped = false;
+    s.online.dispose().whenComplete(() => stopped = true).ignore();
+    // With no client the dispose ends here, and no real time runs: a file
+    // read of the test stays where it is.
+    await tester.pump();
+    for (var i = 0; i < 250 && !stopped; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    expect(stopped, isTrue, reason: 'the Supabase client did not stop in 5 s');
   });
   await tester.pumpWidget(
     MediaQuery(
