@@ -1,15 +1,25 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/app/routes.dart';
 import 'package:koban/data/database.dart';
 import 'package:koban/data/split_repository.dart';
+import 'package:koban/receipts/receipt_photos.dart';
+import 'package:koban/rules/receipt_rules.dart';
 import 'package:koban/rules/split_math.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/split/split_editor_screen.dart';
 import 'package:koban/screens/split/split_editor_view_model.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:path/path.dart' as p;
 
+import '../support/fake_backend.dart';
 import '../support/harness.dart';
 
 Decimal d(String v) => Decimal.parse(v);
@@ -166,6 +176,96 @@ Future<void> typeToAssign(WidgetTester tester) async {
 Finder chip(String name, int at) =>
     find.widgetWithText(FilterChip, name).at(at);
 
+// Receipt reading
+
+List<OcrLine> _row(String name, String price, int top) => [
+  OcrLine(name, 10, top, 200, top + 20),
+  OcrLine(price, 300, top, 360, top + 20),
+];
+
+/// The OCR lines of a receipt: Nasi lemak 20.00, Teh ais 4.00, and the total [total].
+List<OcrLine> ocrLines(String total) => [
+  OcrLine('Kedai Contoh', 100, 10, 260, 30),
+  ..._row('Nasi lemak', '20.00', 60),
+  ..._row('Teh ais', '4.00', 100),
+  ..._row('TOTAL', total, 160),
+];
+
+/// The reply of Claude for the same receipt, with the total 24.00. Seven reads are left today.
+const claudeReply =
+    '{"merchant":"Kedai Contoh","date":null,'
+    '"items":[{"name":"Nasi lemak","quantity":1,"price":20.00},'
+    '{"name":"Teh ais","quantity":1,"price":4.00}],'
+    '"total":24.00,"readsLeftToday":7}';
+
+/// A photo source that waits until the test completes its answer.
+class HeldPhotos implements ReceiptPhotos {
+  final answer = Completer<String?>();
+  int scans = 0;
+
+  @override
+  Future<String?> scan() {
+    scans++;
+    return answer.future;
+  }
+}
+
+/// A cache folder with a photo `scan.jpg` in it. The test deletes the folder.
+String cachePhoto() {
+  final cache = Directory.systemTemp.createTempSync('koban_cache');
+  addTearDown(() {
+    if (cache.existsSync()) cache.deleteSync(recursive: true);
+  });
+  final path = p.join(cache.path, 'scan.jpg');
+  File(path).writeAsBytesSync([1, 2, 3]);
+  return path;
+}
+
+/// Services that read the photo [path] with the phone and, with [token], with Claude.
+/// [claude] is the status of the fake server reply.
+Future<({AppServices s, FakeBackend backend})> readServices(
+  String path, {
+  required String total,
+  ReceiptPhotos? photos,
+  Future<String?> Function()? pickImage,
+  bool token = true,
+  int claude = 200,
+  Completer<List<OcrLine>>? hold,
+  http.Client? client,
+}) async {
+  final backend = FakeBackend()
+    ..on(
+      'POST',
+      '/functions/v1/read-receipt',
+      (r) => http.Response(claudeReply, claude),
+    );
+  final s = await testServices(
+    cacheDir: File(path).parent,
+    http: client ?? backend.client,
+    secrets: token ? {'device_token': 'test-token'} : const {},
+    device: FakeChannel(deviceChannelName, {
+      'shrinkReceipt': Uint8List.fromList([1, 2, 3]),
+    }),
+    ocr: FakeReceiptOcr({path: ocrLines(total)}, later: {path: ?hold}),
+    photos: photos,
+    pickImage: pickImage,
+  );
+  return (s: s, backend: backend);
+}
+
+/// Lets the file reads of the editor end. They run outside the fake clock of the test.
+Future<void> settleReads(WidgetTester tester) async {
+  for (var i = 0; i < 5; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+  }
+}
+
+OutlinedButton galleryButton(WidgetTester tester) =>
+    tester.widget(find.widgetWithText(OutlinedButton, 'Choose from gallery'));
+
 void main() {
   testWidgets('the receipt step offers the photo buttons and typing', (
     tester,
@@ -182,16 +282,6 @@ void main() {
     );
     expect(find.text('Choose from gallery'), findsOneWidget);
     expect(find.text('Next'), findsNothing);
-    await tester.tap(find.text('Take photo'));
-    await tester.pumpAndSettle();
-    expect(find.text('Receipt reading'), findsOneWidget);
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Choose from gallery'));
-    await tester.pumpAndSettle();
-    expect(find.text('Receipt reading'), findsOneWidget);
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Type items instead'));
     await tester.pumpAndSettle();
     expect(find.text('Step 2 of 6 · Items'), findsOneWidget);
@@ -209,6 +299,298 @@ void main() {
     );
     expect(find.text('Check the amounts'), findsOneWidget);
     expect(bottomOn(tester, 'Next'), false);
+  });
+
+  testWidgets('Take photo reads the scanned receipt and shows the items', (
+    tester,
+  ) async {
+    final path = cachePhoto();
+    final hold = Completer<List<OcrLine>>();
+    final r = await readServices(
+      path,
+      total: '24.00',
+      token: false,
+      photos: FakeReceiptPhotos([path]),
+      hold: hold,
+    );
+    await openEditor(tester, r.s);
+    await tester.tap(find.text('Take photo'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Reading the receipt…'), findsOneWidget);
+    expect(find.text('Step 1 of 6 · Receipt'), findsOneWidget);
+    hold.complete(ocrLines('24.00'));
+    await settleReads(tester);
+    expect(find.text('Step 2 of 6 · Items'), findsOneWidget);
+    expect(find.text('Matches the receipt total of RM 24.00.'), findsOneWidget);
+    expect(find.text('Nasi lemak'), findsOneWidget);
+    expect(r.backend.requests, isEmpty);
+  });
+
+  testWidgets('Choose from gallery reads the picked photo', (tester) async {
+    final path = cachePhoto();
+    final r = await readServices(
+      path,
+      total: '24.00',
+      token: false,
+      pickImage: () async => path,
+    );
+    await openEditor(tester, r.s);
+    await tester.tap(find.text('Choose from gallery'));
+    await settleReads(tester);
+    expect(find.text('Step 2 of 6 · Items'), findsOneWidget);
+    expect(find.text('Teh ais'), findsOneWidget);
+  });
+
+  testWidgets('a cancelled scan stays on the receipt step', (tester) async {
+    final photos = FakeReceiptPhotos([null, null]);
+    final s = await testServices(photos: photos);
+    await openEditor(tester, s);
+    await tester.tap(find.text('Take photo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Start with the receipt'), findsOneWidget);
+    // The buttons work again: a second scan opens.
+    await tester.tap(find.text('Take photo'));
+    await tester.pumpAndSettle();
+    expect(photos.scans, 2);
+    expect(find.text('Start with the receipt'), findsOneWidget);
+    expect(find.text('Reading the receipt…'), findsNothing);
+  });
+
+  testWidgets('a failed pick shows nothing and the buttons work again', (
+    tester,
+  ) async {
+    var calls = 0;
+    final s = await testServices(
+      pickImage: () async {
+        calls++;
+        throw StateError('no gallery');
+      },
+    );
+    await openEditor(tester, s);
+    await tester.tap(find.text('Choose from gallery'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Choose from gallery'));
+    await tester.pumpAndSettle();
+    expect(calls, 2);
+    expect(find.text('Start with the receipt'), findsOneWidget);
+  });
+
+  testWidgets('two fast taps on Take photo open one scanner', (tester) async {
+    final held = HeldPhotos();
+    final s = await testServices(photos: held);
+    await openEditor(tester, s);
+    await tester.tap(find.text('Take photo'));
+    await tester.tap(find.text('Take photo'));
+    await tester.pump();
+    expect(held.scans, 1);
+    expect(galleryButton(tester).onPressed, isNull);
+    held.answer.complete(null);
+    await tester.pumpAndSettle();
+    expect(galleryButton(tester).onPressed, isNotNull);
+  });
+
+  testWidgets('a photo that arrives after the editor closed is deleted', (
+    tester,
+  ) async {
+    final path = cachePhoto();
+    final held = HeldPhotos();
+    final r = await readServices(path, total: '24.00', photos: held);
+    await openEditor(tester, r.s);
+    await tester.tap(find.text('Take photo'));
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Open editor'), findsOneWidget);
+    held.answer.complete(path);
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    expect(File(path).existsSync(), false);
+    expect(r.backend.requests, isEmpty);
+  });
+
+  testWidgets('the Claude line shows above the items', (tester) async {
+    final path = cachePhoto();
+    final r = await readServices(
+      path,
+      total: '24.00',
+      photos: FakeReceiptPhotos([path]),
+    );
+    await openEditor(tester, r.s);
+    await tester.tap(find.text('Take photo'));
+    await settleReads(tester);
+    const line = '✓ Read by Claude · 7 reads left today';
+    expect(find.text(line), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text(line)).dy,
+      lessThan(tester.getTopLeft(find.text('Place')).dy),
+    );
+  });
+
+  testWidgets(
+    'the fix sheet offers Read again with Claude and shows the wait',
+    (tester) async {
+      final path = cachePhoto();
+      // The first Claude read fails. The second waits for the test.
+      final gate = Completer<void>();
+      var calls = 0;
+      final client = MockClient((request) async {
+        if (++calls == 1) return http.Response('{}', 500);
+        await gate.future;
+        return http.Response(claudeReply, 200);
+      });
+      final r = await readServices(
+        path,
+        total: '24.50',
+        photos: FakeReceiptPhotos([path]),
+        client: client,
+      );
+      await openEditor(tester, r.s);
+      await tester.tap(find.text('Take photo'));
+      await settleReads(tester);
+      await tester.tap(find.text('Fix'));
+      await tester.pumpAndSettle();
+      expect(find.text('Read again with Claude'), findsOneWidget);
+      expect(find.text("Sends the photo to Koban's server"), findsOneWidget);
+      await tester.tap(find.text('Read again with Claude'));
+      await tester.pump();
+      expect(
+        find.text('Reading with Claude… about 10 seconds'),
+        findsOneWidget,
+      );
+      expect(find.text('Read again with Claude'), findsNothing);
+      gate.complete();
+      await settleReads(tester);
+      // Claude matches the total: no mismatch is left and the sheet closes.
+      expect(find.text('Reading with Claude… about 10 seconds'), findsNothing);
+      expect(find.text('Fix'), findsNothing);
+      expect(
+        find.text('✓ Read by Claude · 7 reads left today'),
+        findsOneWidget,
+      );
+      expect(find.text('Step 2 of 6 · Items'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a read that ends while the fix sheet closes keeps the editor open',
+    (tester) async {
+      final path = cachePhoto();
+      final gate = Completer<void>();
+      var calls = 0;
+      final client = MockClient((request) async {
+        if (++calls == 1) return http.Response('{}', 500);
+        await gate.future;
+        return http.Response(claudeReply, 200);
+      });
+      final r = await readServices(
+        path,
+        total: '24.50',
+        photos: FakeReceiptPhotos([path]),
+        client: client,
+      );
+      await openEditor(tester, r.s);
+      await tester.tap(find.text('Take photo'));
+      await settleReads(tester);
+      await tester.tap(find.text('Fix'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Read again with Claude'));
+      await tester.pump();
+      expect(
+        find.text('Reading with Claude… about 10 seconds'),
+        findsOneWidget,
+      );
+      // Tap outside: the sheet starts to close while the read runs.
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pump(const Duration(milliseconds: 50));
+      // The read ends and clears the gap while the sheet leaves.
+      gate.complete();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+      await settleReads(tester);
+      expect(find.text('Step 2 of 6 · Items'), findsOneWidget);
+    },
+  );
+
+  for (final button in ['Add RM 0.50 as rounding', 'Edit by hand']) {
+    testWidgets('the fix sheet button "$button" closes only the sheet', (
+      tester,
+    ) async {
+      final path = cachePhoto();
+      final r = await readServices(
+        path,
+        total: '24.50',
+        token: false,
+        photos: FakeReceiptPhotos([path]),
+      );
+      await openEditor(tester, r.s);
+      await tester.tap(find.text('Take photo'));
+      await settleReads(tester);
+      await tester.tap(find.text('Fix'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(button));
+      await tester.pumpAndSettle();
+      expect(find.text('Step 2 of 6 · Items'), findsOneWidget);
+      expect(
+        find.text('Differs from the receipt total by RM 0.50'),
+        findsNothing,
+      );
+    });
+  }
+
+  testWidgets(
+    'the fix sheet with Read again with Claude fits at text scale 1.3',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      final path = cachePhoto();
+      final r = await readServices(
+        path,
+        total: '24.50',
+        claude: 500,
+        photos: FakeReceiptPhotos([path]),
+      );
+      await openEditor(tester, r.s, textScale: 1.3);
+      await tester.tap(find.text('Take photo'));
+      await settleReads(tester);
+      await tester.tap(find.text('Fix'));
+      await tester.pumpAndSettle();
+      expect(find.text('Read again with Claude'), findsOneWidget);
+      expect(find.text("Sends the photo to Koban's server"), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      handle.dispose();
+    },
+  );
+
+  testWidgets('Back on the reading step returns to the receipt step', (
+    tester,
+  ) async {
+    final path = cachePhoto();
+    final hold = Completer<List<OcrLine>>();
+    final r = await readServices(
+      path,
+      total: '24.00',
+      token: false,
+      photos: FakeReceiptPhotos([path]),
+      hold: hold,
+    );
+    await openEditor(tester, r.s);
+    await tester.tap(find.text('Take photo'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Reading the receipt…'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    // The late read of the phone shows nothing.
+    hold.complete(ocrLines('24.00'));
+    await settleReads(tester);
+    expect(find.text('Start with the receipt'), findsOneWidget);
+    expect(find.text('Step 2 of 6 · Items'), findsNothing);
   });
 
   testWidgets('a full split from typed items ends on Split done', (

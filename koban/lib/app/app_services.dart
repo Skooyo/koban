@@ -29,6 +29,8 @@ import '../data/split_repository.dart';
 import '../device/device_control.dart';
 import '../online/online_services.dart';
 import '../online/secret_store.dart';
+import '../receipts/receipt_photos.dart';
+import '../receipts/receipt_reader.dart';
 import '../rules/periods.dart';
 
 /// Makes the picker open the Android photo picker, as 0.1.1 did.
@@ -54,9 +56,13 @@ class AppServices {
     Future<Directory> Function() filesDir = getApplicationSupportDirectory,
     this.cacheDir = getTemporaryDirectory,
     this.pickImage = _pickFromGallery,
+    ReceiptOcr? ocr,
+    ReceiptPhotos? photos,
     Duration checkHold = const Duration(milliseconds: 4000),
   }) {
     int nowMs() => now().millisecondsSinceEpoch;
+    receiptReader = ReceiptReader(ocr ?? MlKitReceiptOcr(), now: nowMs);
+    receiptPhotos = photos ?? PhoneReceiptPhotos();
     categories = CategoryRepository(db);
     merchants = MerchantCategoryRepository(db, now: nowMs);
     splits = SplitRepository(db, now: nowMs);
@@ -104,6 +110,12 @@ class AppServices {
   /// Opens the system photo picker. It gives the path of the picked picture, or null when the user cancels.
   /// A test gives a function that returns a file path.
   final Future<String?> Function() pickImage;
+
+  /// Reads a receipt photo on the phone.
+  late final ReceiptReader receiptReader;
+
+  /// Takes a photo of a receipt.
+  late final ReceiptPhotos receiptPhotos;
 
   late final CategoryRepository categories;
   late final MerchantCategoryRepository merchants;

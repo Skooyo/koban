@@ -10,11 +10,16 @@ import '../../data/database.dart';
 import '../../data/ids.dart';
 import '../../data/split_repository.dart';
 import '../../data/user_error.dart';
+import '../../online/receipt_cloud_client.dart' show ReceiptCloudClient;
+import '../../receipts/receipt_photos.dart';
 import '../../rules/amount_formatter.dart';
+import '../../rules/receipt_cloud.dart'
+    show CloudRead, CloudReadFailed, CloudReadOk, chooseReceiptRead;
+import '../../rules/receipt_rules.dart' show ReceiptRead;
 import '../../rules/split_math.dart';
 
-/// The steps of the split editor. 0.1.1 also had a reading step; milestone 5 adds it.
-enum SplitStep { photo, items, people, assign, link, summary }
+/// The steps of the split editor.
+enum SplitStep { photo, reading, items, people, assign, link, summary }
 
 const _loadFailed = 'Something went wrong. Try again.';
 const _saveFailed = "Couldn't save the split. Try again.";
@@ -52,7 +57,7 @@ class ItemRow {
   );
 }
 
-/// What the split editor shows. A port of `SplitEditorState` of 0.1.1 without the receipt reading fields.
+/// What the split editor shows. A port of `SplitEditorState` of 0.1.1.
 @immutable
 class SplitEditorState {
   const SplitEditorState({
@@ -75,6 +80,11 @@ class SplitEditorState {
     this.selectedExpenseId,
     this.message,
     this.onlineAccess = false,
+    this.readNote,
+    this.readSource,
+    this.readsLeft,
+    this.canReadAgain = false,
+    this.readingAgain = false,
     this.error,
     this.saving = false,
     this.finished = false,
@@ -109,6 +119,19 @@ class SplitEditorState {
 
   /// A device token is stored.
   final bool onlineAccess;
+
+  /// The line under the items that says the read matches the receipt total.
+  final String? readNote;
+
+  /// Who read the receipt, or why Claude did not.
+  final String? readSource;
+
+  /// The Claude reads left today, when the server said.
+  final int? readsLeft;
+
+  /// "Read again with Claude" shows: online access, a kept photo and no Claude run for it.
+  final bool canReadAgain;
+  final bool readingAgain;
   final String? error;
   final bool saving;
   final bool finished;
@@ -133,6 +156,11 @@ class SplitEditorState {
     Object? selectedExpenseId = _keep,
     Object? message = _keep,
     bool? onlineAccess,
+    Object? readNote = _keep,
+    Object? readSource = _keep,
+    Object? readsLeft = _keep,
+    bool? canReadAgain,
+    bool? readingAgain,
     Object? error = _keep,
     bool? saving,
     bool? finished,
@@ -160,6 +188,13 @@ class SplitEditorState {
         : selectedExpenseId as String?,
     message: identical(message, _keep) ? this.message : message as String?,
     onlineAccess: onlineAccess ?? this.onlineAccess,
+    readNote: identical(readNote, _keep) ? this.readNote : readNote as String?,
+    readSource: identical(readSource, _keep)
+        ? this.readSource
+        : readSource as String?,
+    readsLeft: identical(readsLeft, _keep) ? this.readsLeft : readsLeft as int?,
+    canReadAgain: canReadAgain ?? this.canReadAgain,
+    readingAgain: readingAgain ?? this.readingAgain,
     error: identical(error, _keep) ? this.error : error as String?,
     saving: saving ?? this.saving,
     finished: finished ?? this.finished,
@@ -176,7 +211,7 @@ String _chargeText(Decimal v) =>
 // Kotlin Int.MAX_VALUE: a bigger quantity did not parse in 0.1.1.
 const _maxInt = 2147483647;
 
-/// The rules of the split editor. A port of `SplitEditorViewModel.kt` without the receipt reading.
+/// The rules of the split editor. A port of `SplitEditorViewModel.kt`.
 class SplitEditorViewModel extends ChangeNotifier {
   SplitEditorViewModel(this._s, {String? billId, String? expenseId})
     : _state = SplitEditorState(
@@ -209,6 +244,15 @@ class SplitEditorViewModel extends ChangeNotifier {
   int _nextKey = 0;
   bool _disposed = false;
 
+  /// The receipt photo that "Read again with Claude" needs. Null when none is kept.
+  String? _photo;
+
+  /// True when Claude read [_photo], or used a read of the day on it.
+  bool _claudeRan = false;
+
+  /// The number of the last read. A read that ends with an older number shows nothing.
+  int _reads = 0;
+
   /// Completes when a saved bill or the linked payment has loaded.
   late final Future<void> ready;
 
@@ -227,9 +271,25 @@ class SplitEditorViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _onToken() => _update(
-    (s) => s.copyWith(onlineAccess: _s.settings.hasDeviceToken.value),
-  );
+  void _onToken() => _update((s) {
+    final online = _s.settings.hasDeviceToken.value;
+    return s.copyWith(
+      onlineAccess: online,
+      canReadAgain: _canReadAgain(online),
+    );
+  });
+
+  /// Removes the cancelled device token. A failed removal must not stop the read from showing.
+  Future<void> _removeToken() async {
+    try {
+      await _s.online.secrets.setDeviceToken('');
+    } catch (e) {
+      developer.log(
+        'Remove device token failed (${e.runtimeType})',
+        name: 'SplitEditorViewModel',
+      );
+    }
+  }
 
   static void _log(String message, Object e, StackTrace st) => developer.log(
     message,
@@ -298,7 +358,140 @@ class SplitEditorViewModel extends ChangeNotifier {
     );
   }
 
-  // Photo
+  // Photo and reading
+
+  bool _canReadAgain(bool online) => online && _photo != null && !_claudeRan;
+
+  /// Deletes the kept photo when it is in the app cache. A photo of the gallery stays.
+  void _dropPhoto() {
+    final path = _photo;
+    _photo = null;
+    _update((s) => s.copyWith(canReadAgain: false));
+    if (path == null) return;
+    () async {
+      try {
+        await deleteIfCache(path, (await _s.cacheDir()).path);
+      } catch (e) {
+        developer.log(
+          'Delete receipt photo failed (${e.runtimeType})',
+          name: 'SplitEditorViewModel',
+        );
+      }
+    }();
+  }
+
+  /// The Claude read. Null when the call throws: the phone read then shows alone.
+  Future<CloudRead?> _cloudRead(String path, String token) async {
+    try {
+      return await _s.online.receiptCloud.read(path, token);
+    } catch (e) {
+      developer.log(
+        'Claude read failed (${e.runtimeType})',
+        name: 'SplitEditorViewModel',
+      );
+      return null;
+    }
+  }
+
+  /// Reads the photo on the phone and, with a device token, with Claude at the same time.
+  /// The photo stays for "Read again with Claude" until the items step closes.
+  Future<void> readReceipt(String path) async {
+    final run = ++_reads;
+    _dropPhoto();
+    _photo = path;
+    _claudeRan = false;
+    _update(
+      (s) => s.copyWith(
+        step: SplitStep.reading,
+        message: null,
+        readNote: null,
+        readSource: null,
+      ),
+    );
+    final token = _s.online.secrets.deviceToken.value;
+    final (rules, cloud) = await (
+      _s.receiptReader.read(path),
+      token.isEmpty ? Future<CloudRead?>.value() : _cloudRead(path, token),
+    ).wait;
+    if (cloud is CloudReadFailed && cloud.tokenRevoked) {
+      await _removeToken();
+    }
+    // Back or close ended this read: it shows nothing.
+    if (run != _reads) return;
+    _claudeRan =
+        cloud is CloudReadOk || (cloud is CloudReadFailed && cloud.usedRead);
+    final (read, source) = chooseReceiptRead(rules, cloud);
+    _showRead(read, source, cloud is CloudReadOk ? cloud.readsLeft : null);
+  }
+
+  /// Sends the kept photo to Claude and replaces the items with its read.
+  Future<void> readAgainWithClaude() async {
+    final path = _photo;
+    if (path == null || _state.readingAgain) return;
+    _update((s) => s.copyWith(readingAgain: true));
+    final token = _s.online.secrets.deviceToken.value;
+    final cloud = token.isEmpty
+        ? const CloudReadFailed('Enter an invite code in Settings first.')
+        : await _cloudRead(path, token) ??
+              const CloudReadFailed(ReceiptCloudClient.notReachable);
+    if (cloud is CloudReadFailed && cloud.tokenRevoked) {
+      await _removeToken();
+    }
+    _update((s) => s.copyWith(readingAgain: false));
+    // The items step closed while Claude read: the photo is gone and the answer shows nothing.
+    if (_photo != path) return;
+    switch (cloud) {
+      case CloudReadOk():
+        _claudeRan = true;
+        _showRead(
+          cloud.read,
+          chooseReceiptRead(null, cloud).$2,
+          cloud.readsLeft,
+        );
+      case CloudReadFailed():
+        if (cloud.usedRead) _claudeRan = true;
+        _update(
+          (s) => s.copyWith(
+            readSource: cloud.why,
+            canReadAgain: _canReadAgain(s.onlineAccess),
+          ),
+        );
+    }
+  }
+
+  void _showRead(ReceiptRead? read, String? source, int? readsLeft) {
+    final draft = read?.draft;
+    _update(
+      (s) => s.copyWith(
+        step: SplitStep.items,
+        merchant: draft?.merchant ?? '',
+        billTime: draft?.dateMillis ?? s.billTime,
+        printedTotal: draft?.printedTotal,
+        items: [
+          for (final item in draft?.items ?? const [])
+            ItemRow(
+              key: _nextKey++,
+              name: item.name,
+              quantity: '${item.quantity}',
+              price: AmountFormatter.formatDisplay(item.price),
+            ),
+        ],
+        serviceCharge: draft == null ? '' : _chargeText(draft.serviceCharge),
+        tax: draft == null ? '' : _chargeText(draft.tax),
+        discount: draft == null ? '' : _chargeText(draft.discount),
+        rounding: draft == null ? '' : _chargeText(draft.rounding),
+        readNote: read == null ? null : readNote(read),
+        readSource: source,
+        readsLeft: readsLeft ?? s.readsLeft,
+        canReadAgain: _canReadAgain(s.onlineAccess),
+        message: draft == null
+            ? "Couldn't read this receipt. Add the items by hand."
+            : draft.printedTotal == null
+            ? 'No total found on the receipt. Check the items.'
+            : null,
+      ),
+    );
+  }
 
   void typeItemsInstead() {
     _update((s) => s.copyWith(step: SplitStep.items, message: null));
@@ -486,6 +679,7 @@ class SplitEditorViewModel extends ChangeNotifier {
       _ => null,
     };
     if (target == null) return;
+    if (_state.step == SplitStep.items) _dropPhoto();
     _update((s) => s.copyWith(step: target, error: null));
     if (target == SplitStep.link) _loadCandidatesLogged();
   }
@@ -497,12 +691,18 @@ class SplitEditorViewModel extends ChangeNotifier {
     switch (s.step) {
       case SplitStep.photo:
         return false;
+      case SplitStep.reading:
+        // The late result of this read shows nothing.
+        _reads++;
+        _dropPhoto();
+        target = SplitStep.photo;
       case SplitStep.items:
         // ponytail: "editing" counts as changed even with no edit; compare with the saved draft if this asks too often.
         if (s.billId != null && s.editing) {
           _update((st) => st.copyWith(confirmDiscard: true));
           return true;
         }
+        _dropPhoto();
         if (s.billId != null) return false;
         target = SplitStep.photo;
       case SplitStep.people:
@@ -520,7 +720,10 @@ class SplitEditorViewModel extends ChangeNotifier {
   }
 
   /// Clears the question flag. The screen then leaves the editor.
-  void discardEdits() => _update((s) => s.copyWith(confirmDiscard: false));
+  void discardEdits() {
+    _update((s) => s.copyWith(confirmDiscard: false));
+    _dropPhoto();
+  }
 
   void keepEditing() => _update((s) => s.copyWith(confirmDiscard: false));
 
@@ -568,6 +771,8 @@ class SplitEditorViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _reads++;
+    _dropPhoto();
     _disposed = true;
     _s.settings.hasDeviceToken.removeListener(_onToken);
     _recentSub?.cancel();
@@ -575,6 +780,16 @@ class SplitEditorViewModel extends ChangeNotifier {
   }
 
   // Values that the screen shows. They use only the state.
+
+  /// The line for an accepted read. Null otherwise: the mismatch warning or an error text covers it.
+  static String? readNote(ReceiptRead read) {
+    final total = read.draft.printedTotal;
+    if (total == null || !read.accepted) return null;
+    final calculated = read.calculated.isEmpty
+        ? ''
+        : ' with a calculated ${read.calculated.join(' and ')}';
+    return 'Matches the receipt total of RM ${AmountFormatter.formatDisplay(total)}$calculated.';
+  }
 
   /// Null when a row has a bad name, quantity or price.
   static List<DraftItem>? parseItems(SplitEditorState s) {

@@ -5,7 +5,6 @@ import 'routes.dart';
 
 /// The online parts that come in milestone 5. Milestone 5 deletes this file and each caller.
 enum OnlineFeature {
-  receiptReading('Receipt reading'),
   updates('Check for updates');
 
   const OnlineFeature(this.title);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -19,6 +20,9 @@ import 'package:koban/online/google_accounts.dart';
 import 'package:koban/online/online_config.dart';
 import 'package:koban/online/online_services.dart';
 import 'package:koban/online/secret_store.dart';
+import 'package:koban/receipts/receipt_photos.dart';
+import 'package:koban/receipts/receipt_reader.dart';
+import 'package:koban/rules/receipt_rules.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -47,12 +51,45 @@ class FakeChannel {
 /// The name of the device channel of [DeviceControl].
 const deviceChannelName = 'io.github.skooyo.koban/device';
 
+/// A fake receipt OCR. It gives the lines of [byPath] for a path. A path in [failing] throws.
+/// A path in [later] answers when the test completes its completer.
+/// A path in none of them gives no lines.
+class FakeReceiptOcr implements ReceiptOcr {
+  FakeReceiptOcr(this.byPath, {this.failing = const {}, this.later = const {}});
+
+  final Map<String, List<OcrLine>> byPath;
+  final Set<String> failing;
+  final Map<String, Completer<List<OcrLine>>> later;
+
+  @override
+  Future<List<OcrLine>> lines(String path) async {
+    if (failing.contains(path)) throw StateError('OCR failed');
+    final wait = later[path];
+    if (wait != null) return wait.future;
+    return byPath[path] ?? const [];
+  }
+}
+
+/// A fake photo source. Each call to [scan] gives the next of [answers] (null is a cancel).
+class FakeReceiptPhotos implements ReceiptPhotos {
+  FakeReceiptPhotos(this.answers);
+
+  final List<String?> answers;
+
+  /// How many times [scan] ran.
+  int scans = 0;
+
+  @override
+  Future<String?> scan() async => answers[scans++];
+}
+
 /// App services on an in-memory database with the categories seeded.
 /// The clock stops at [now] (default: Friday 13 Nov 2026, 12:00).
 /// [checkHold] is the Undo window of Check payments.
 /// [filesDir] is the folder for the QR pictures (default: a new temp folder that the test deletes).
 /// [pickImage] is the photo picker (default: the user cancels).
 /// [cacheDir] is the app cache folder where the picker copies pictures (default: [filesDir]).
+/// [ocr] reads receipt photos (default: no lines). [photos] takes receipt photos (default: the user cancels).
 /// [secrets] fills the secrets store (a second in-memory store).
 /// [http] is the HTTP client. The default client records each request, and the tear-down
 /// fails the test when it recorded one: no test may reach the network. A test that expects
@@ -72,6 +109,8 @@ Future<AppServices> testServices({
   http.Client? http,
   Map<String, Object> secrets = const {},
   GoogleAccounts? google,
+  ReceiptOcr? ocr,
+  ReceiptPhotos? photos,
 }) async {
   final time = now ?? DateTime(2026, 11, 13, 12);
   final previous = SharedPreferencesAsyncPlatform.instance;
@@ -137,6 +176,8 @@ Future<AppServices> testServices({
     filesDir: () async => root,
     cacheDir: () async => cacheDir ?? root,
     pickImage: pickImage ?? () async => null,
+    ocr: ocr ?? FakeReceiptOcr(const {}),
+    photos: photos ?? FakeReceiptPhotos([null]),
   );
   await s.categories.seedIfEmpty();
   return s;

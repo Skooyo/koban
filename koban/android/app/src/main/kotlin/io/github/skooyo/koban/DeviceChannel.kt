@@ -11,6 +11,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -26,7 +28,7 @@ import java.io.IOException
 import java.io.OutputStream
 
 /**
- * The device channel: launcher apps, permissions, gallery, share, the online build values and relative times.
+ * The device channel: launcher apps, permissions, gallery, receipt photo shrink, share, the online build values and relative times.
  * [work] runs a block on the plugin executor and replies on the main thread.
  * [activity] gives the attached activity, or null.
  */
@@ -84,6 +86,7 @@ internal class DeviceChannel(
                 open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", app.packageName, null)))
                 result.success(null)
             }
+            "shrinkReceipt" -> work(result, "NATIVE_ERROR") { shrinkReceipt(call.argument<String>("path")!!) }
             "storageAllowed" -> result.success(storageAllowed())
             "requestStoragePermission" -> {
                 val host = activity()
@@ -215,6 +218,40 @@ internal class DeviceChannel(
         }
     }
 
+    /**
+     * Port of 0.1.1 `ReceiptCloudClient.shrink`: longest side 1600 px, JPEG quality 85, upright.
+     * Keeps the upload well under the 2 MB limit. Null when the file is not an image.
+     */
+    private fun shrinkReceipt(path: String): ByteArray? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds) // returns null: it fills only bounds
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_SIDE) sample *= 2
+        var bitmap = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+        val scale = MAX_SIDE.toFloat() / maxOf(bitmap.width, bitmap.height)
+        try {
+            val degrees = when (ExifInterface(path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+            if (scale < 1f || degrees != 0f) {
+                val m = Matrix().apply { if (scale < 1f) postScale(scale, scale); postRotate(degrees) }
+                val moved = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, m, true)
+                if (moved !== bitmap) bitmap.recycle()
+                bitmap = moved
+            }
+            return ByteArrayOutputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                out.toByteArray()
+            }
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
     private fun writeJpeg(bitmap: Bitmap, out: OutputStream) {
         // JPEG has no alpha: put a transparent QR on white, or its background turns black.
         val opaque = if (bitmap.hasAlpha()) {
@@ -234,5 +271,6 @@ internal class DeviceChannel(
     companion object {
         const val ALERTS_CODE = 4201
         const val STORAGE_CODE = 4202
+        private const val MAX_SIDE = 1600
     }
 }

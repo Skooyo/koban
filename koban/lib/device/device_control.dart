@@ -94,6 +94,11 @@ class DeviceControl {
     }
   }
 
+  /// The photo at [path] as JPEG bytes: 1600 px on the long side at most, upright, quality 85.
+  /// Null when the file is not an image.
+  Future<Uint8List?> shrinkReceipt(String path) =>
+      _channel.invokeMethod<Uint8List>('shrinkReceipt', {'path': path});
+
   /// The build-time online settings of the Android build.
   Future<OnlineConfig> onlineConfig() async {
     final m = (await _channel.invokeMapMethod<String, String>('onlineConfig'))!;

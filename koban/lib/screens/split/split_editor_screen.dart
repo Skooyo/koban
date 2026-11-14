@@ -1,10 +1,12 @@
+import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:decimal/decimal.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
-import '../../app/online_placeholder.dart';
+import '../../receipts/receipt_photos.dart';
 import '../../rules/amount_formatter.dart';
 import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
@@ -23,7 +25,7 @@ const _stepNames = [
 ];
 
 /// The split editor: a new split, a split of a payment, or a saved split.
-/// A port of `SplitEditorScreen.kt` without the receipt reading.
+/// A port of `SplitEditorScreen.kt`.
 class SplitEditorScreen extends StatefulWidget {
   const SplitEditorScreen({super.key, this.billId, this.expenseId});
 
@@ -97,6 +99,10 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
       builder: (context, _) {
         final state = vm.state;
         final action = _bottomAction(state, vm);
+        // The step bar shows the reading step as the photo step.
+        final barStep = state.step == SplitStep.reading
+            ? 0
+            : state.step.index - (state.step.index > 1 ? 1 : 0);
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, _) {
@@ -134,9 +140,9 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: StepProgress(
-                        number: state.step.index + 1,
+                        number: barStep + 1,
                         total: _stepNames.length,
-                        name: _stepNames[state.step.index],
+                        name: _stepNames[barStep],
                       ),
                     ),
                   Expanded(child: _content(state, vm)),
@@ -191,6 +197,19 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
     }
     return switch (state.step) {
       SplitStep.photo => _PhotoStep(online: state.onlineAccess, vm: vm),
+      SplitStep.reading => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Reading the receipt…',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
+        ),
+      ),
       SplitStep.items => _ItemsStep(state: state, vm: vm),
       SplitStep.people => PeopleStep(state: state, vm: vm),
       SplitStep.assign => AssignStep(state: state, vm: vm),
@@ -218,7 +237,7 @@ typedef _BottomAction = ({String label, bool enabled, VoidCallback onPressed});
 _BottomAction? _bottomAction(SplitEditorState s, SplitEditorViewModel vm) {
   if (s.loading) return null;
   return switch (s.step) {
-    SplitStep.photo => null,
+    SplitStep.photo || SplitStep.reading => null,
     SplitStep.items => (
       label: 'Next',
       enabled:
@@ -262,14 +281,45 @@ class _PhotoStep extends StatefulWidget {
 }
 
 class _PhotoStepState extends State<_PhotoStep> {
-  bool _opening = false;
+  bool _picking = false;
 
-  /// Receipt reading comes in milestone 5. Both photo buttons open its placeholder.
-  Future<void> _openReading() async {
-    if (_opening) return;
-    _opening = true;
-    await openOnlinePlaceholder(context, OnlineFeature.receiptReading);
-    _opening = false;
+  /// Opens a photo source and reads the photo it gives. A cancel gives null and changes nothing.
+  /// As in 0.1.1, a failed photo shows nothing: the editor stays on the receipt step.
+  Future<void> _pick(Future<String?> Function() source) async {
+    if (_picking) return;
+    // Read before the await: a closed editor has no context.
+    final cacheDir = AppScope.of(context).cacheDir;
+    setState(() => _picking = true);
+    String? path;
+    try {
+      path = await source();
+    } catch (e) {
+      developer.log(
+        'Photo source failed: ${e.runtimeType}',
+        name: 'SplitEditorScreen',
+      );
+    }
+    if (!mounted) {
+      // The editor closed: nobody reads this photo. Delete it when it is in the cache.
+      if (path != null) unawaited(_deleteCached(path, cacheDir));
+      return;
+    }
+    setState(() => _picking = false);
+    if (path != null) unawaited(widget.vm.readReceipt(path));
+  }
+
+  Future<void> _deleteCached(
+    String path,
+    Future<Directory> Function() cacheDir,
+  ) async {
+    try {
+      await deleteIfCache(path, (await cacheDir()).path);
+    } catch (e) {
+      developer.log(
+        'Photo delete failed: ${e.runtimeType}',
+        name: 'SplitEditorScreen',
+      );
+    }
   }
 
   @override
@@ -311,7 +361,9 @@ class _PhotoStepState extends State<_PhotoStep> {
           const SizedBox(height: 8),
           _WideButton(
             FilledButton.icon(
-              onPressed: _openReading,
+              onPressed: _picking
+                  ? null
+                  : () => _pick(AppScope.of(context).receiptPhotos.scan),
               icon: const Icon(Icons.camera_alt, size: 18),
               label: const Text('Take photo'),
             ),
@@ -319,7 +371,9 @@ class _PhotoStepState extends State<_PhotoStep> {
           const SizedBox(height: 8),
           _WideButton(
             OutlinedButton.icon(
-              onPressed: _openReading,
+              onPressed: _picking
+                  ? null
+                  : () => _pick(AppScope.of(context).pickImage),
               icon: const Icon(Icons.image, size: 18),
               label: const Text('Choose from gallery'),
             ),
@@ -414,49 +468,133 @@ class MismatchCard extends StatelessWidget {
   }
 }
 
-/// The Fix sheet of 0.1.1 without "Read again with Claude".
-Future<void> showFixSheet(
-  BuildContext context,
-  Decimal diff,
-  SplitEditorViewModel vm,
-) => showModalBottomSheet<void>(
-  context: context,
-  builder: (context) {
+/// The Fix sheet of 0.1.1. It closes when no mismatch is left and Claude does not read.
+Future<void> showFixSheet(BuildContext context, SplitEditorViewModel vm) =>
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => _FixSheet(vm: vm),
+    );
+
+class _FixSheet extends StatefulWidget {
+  const _FixSheet({required this.vm});
+
+  final SplitEditorViewModel vm;
+
+  @override
+  State<_FixSheet> createState() => _FixSheetState();
+}
+
+class _FixSheetState extends State<_FixSheet> {
+  bool _closing = false;
+
+  /// Closes the sheet once, for a button or for a read that removed the gap.
+  /// A second pop would remove the editor.
+  void _close({bool later = false}) {
+    if (_closing) return;
+    _closing = true;
+    // A sheet that already leaves is not the current route: a pop would remove the editor.
+    void pop() {
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        Navigator.of(context).pop();
+      }
+    }
+
+    if (later) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => pop());
+    } else {
+      pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Differs from the receipt total by RM ${AmountFormatter.formatDisplay(diff.abs())}',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () {
-                vm.addRoundingDifference();
-                Navigator.of(context).pop();
-              },
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-              child: Text(
-                'Add RM ${AmountFormatter.formatDisplay(diff)} as rounding',
+    return ListenableBuilder(
+      listenable: widget.vm,
+      builder: (context, _) {
+        final vm = widget.vm;
+        final state = vm.state;
+        final diff = SplitEditorViewModel.difference(state);
+        if (state.readingAgain) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Row(
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Reading with Claude… about 10 seconds',
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-              child: const Text('Edit by hand'),
+          );
+        }
+        if (diff == null) {
+          _close(later: true);
+          return const SizedBox.shrink();
+        }
+        final readsLeft = state.readsLeft;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Differs from the receipt total by RM ${AmountFormatter.formatDisplay(diff.abs())}',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () {
+                    _close();
+                    vm.addRoundingDifference();
+                  },
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+                  child: Text(
+                    'Add RM ${AmountFormatter.formatDisplay(diff)} as rounding',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: _close,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                  ),
+                  child: const Text('Edit by hand'),
+                ),
+                if (state.canReadAgain) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: vm.readAgainWithClaude,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text('Read again with Claude'),
+                        Text(
+                          "Sends the photo to Koban's server${readsLeft == null ? '' : ' · $readsLeft reads left today'}",
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
-  },
-);
+  }
+}
 
 class _ItemsStep extends StatelessWidget {
   const _ItemsStep({required this.state, required this.vm});
@@ -476,19 +614,56 @@ class _ItemsStep extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (diff != null) ...[
-          MismatchCard(
-            diff: diff,
-            total: total,
-            printed: printed,
-            onFix: () => showFixSheet(context, diff, vm),
-          ),
-          gap,
-        ],
-        if (message != null) ...[
-          Text(
-            message,
-            style: theme.textTheme.bodyMedium!.copyWith(color: scheme.error),
+        if (state.readSource != null ||
+            diff != null ||
+            message != null ||
+            (state.readNote != null && diff == null)) ...[
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (state.readSource != null) ...[
+                Row(
+                  children: [
+                    Icon(Icons.check, size: 18, color: scheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        state.readSource!,
+                        style: theme.textTheme.bodyMedium!.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (diff != null) ...[
+                MismatchCard(
+                  diff: diff,
+                  total: total,
+                  printed: printed,
+                  onFix: () => showFixSheet(context, vm),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (message != null) ...[
+                Text(
+                  message,
+                  style: theme.textTheme.bodyMedium!.copyWith(
+                    color: scheme.error,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (state.readNote != null && diff == null)
+                Text(
+                  state.readNote!,
+                  style: theme.textTheme.bodyMedium!.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
           ),
           gap,
         ],

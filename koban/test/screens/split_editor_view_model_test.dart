@@ -1,12 +1,20 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:koban/app/app_services.dart';
 import 'package:koban/data/database.dart';
 import 'package:koban/data/split_repository.dart';
+import 'package:koban/rules/receipt_rules.dart';
 import 'package:koban/rules/split_math.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/split/split_editor_view_model.dart';
+import 'package:path/path.dart' as p;
 
+import '../support/fake_backend.dart';
 import '../support/harness.dart';
 
 Decimal d(String v) => Decimal.parse(v);
@@ -119,6 +127,77 @@ Future<List<(String, Decimal, DebtStatus)>> debts(AppServices s) async {
     for (final x in await s.db.select(s.db.splitDebts).get())
       (names[x.personId]!, x.amount, x.status),
   ];
+}
+
+// Receipt reading
+
+List<OcrLine> _row(String name, String price, int top) => [
+  OcrLine(name, 10, top, 200, top + 20),
+  OcrLine(price, 300, top, 360, top + 20),
+];
+
+/// The OCR lines of an accepted read: Nasi lemak 20.00, Teh ais 4.00, total 24.00.
+final ocrLines = [
+  OcrLine('Kedai Contoh', 100, 10, 260, 30),
+  ..._row('Nasi lemak', '20.00', 60),
+  ..._row('Teh ais', '4.00', 100),
+  ..._row('TOTAL', '24.00', 160),
+];
+
+/// The reply of Claude for the same receipt. Seven reads are left today.
+const claudeReply =
+    '{"merchant":"Kedai Contoh","date":null,'
+    '"items":[{"name":"Nasi lemak","quantity":1,"price":20.00},'
+    '{"name":"Teh ais","quantity":1,"price":4.00}],'
+    '"total":24.00,"readsLeftToday":7}';
+
+/// A cache folder with a photo in it, and a fake server. The test deletes the folder.
+class ReadRig {
+  ReadRig(this.s, this.backend, this.cache)
+    : path = p.join(cache.path, 'scan.jpg');
+
+  final AppServices s;
+  final FakeBackend backend;
+  final Directory cache;
+  final String path;
+}
+
+Future<ReadRig> rig({
+  bool token = true,
+  List<OcrLine> lines = const [],
+  Completer<List<OcrLine>>? late,
+  int status = 200,
+  String body = claudeReply,
+}) async {
+  final cache = Directory.systemTemp.createTempSync('koban_cache');
+  addTearDown(() {
+    if (cache.existsSync()) cache.deleteSync(recursive: true);
+  });
+  final path = p.join(cache.path, 'scan.jpg');
+  File(path).writeAsBytesSync([1, 2, 3]);
+  final backend = FakeBackend()
+    ..on(
+      'POST',
+      '/functions/v1/read-receipt',
+      (r) => http.Response(body, status),
+    );
+  final s = await testServices(
+    cacheDir: cache,
+    http: backend.client,
+    secrets: token ? {'device_token': 'test-token'} : const {},
+    device: FakeChannel(deviceChannelName, {
+      'shrinkReceipt': Uint8List.fromList([1, 2, 3]),
+    }),
+    ocr: FakeReceiptOcr({path: lines}, later: {path: ?late}),
+  );
+  return ReadRig(s, backend, cache);
+}
+
+/// Waits for the delete of a photo, which runs after the call that asked for it.
+Future<void> photoGone(String path) async {
+  for (var i = 0; i < 100 && File(path).existsSync(); i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }
 
 void main() {
@@ -363,5 +442,256 @@ void main() {
     expect(await debts(s), [('Ali', d('14.00'), DebtStatus.paid)]);
     final payment = await s.expenses.getById(id);
     expect(payment!.countedAmount, d('10.00'));
+  });
+
+  group('reading a receipt', () {
+    test('with a token the phone and Claude read together and the Claude read wins', () async {
+      final r = await rig(lines: ocrLines);
+      final vm = await open(r.s);
+
+      await vm.readReceipt(r.path);
+
+      expect(vm.state.step, SplitStep.items);
+      expect(vm.state.items.map((i) => (i.name, i.price)), [
+        ('Nasi lemak', '20.00'),
+        ('Teh ais', '4.00'),
+      ]);
+      expect(vm.state.merchant, 'Kedai Contoh');
+      expect(vm.state.printedTotal, d('24.00'));
+      expect(vm.state.readSource, '✓ Read by Claude · 7 reads left today');
+      expect(vm.state.readsLeft, 7);
+      expect(vm.state.readNote, 'Matches the receipt total of RM 24.00.');
+      expect(vm.state.message, null);
+      expect(vm.state.canReadAgain, false);
+      expect(r.backend.requests, hasLength(1));
+    });
+
+    test(
+      'without a token only the phone reads and no request is sent',
+      () async {
+        final r = await rig(token: false, lines: ocrLines);
+        final vm = await open(r.s);
+
+        await vm.readReceipt(r.path);
+
+        expect(vm.state.step, SplitStep.items);
+        expect(vm.state.items.map((i) => i.name), ['Nasi lemak', 'Teh ais']);
+        expect(vm.state.readNote, 'Matches the receipt total of RM 24.00.');
+        expect(vm.state.readSource, null);
+        expect(vm.state.canReadAgain, false);
+        expect(r.backend.requests, isEmpty);
+      },
+    );
+
+    test('a cancelled token is removed and the phone read is shown', () async {
+      final r = await rig(lines: ocrLines, status: 401, body: '{}');
+      final vm = await open(r.s);
+      expect(vm.state.onlineAccess, true);
+
+      await vm.readReceipt(r.path);
+
+      expect(r.s.online.secrets.deviceToken.value, '');
+      expect(
+        vm.state.readSource,
+        'Read on the phone. Your invite code is no longer active.',
+      );
+      expect(vm.state.items.map((i) => i.name), ['Nasi lemak', 'Teh ais']);
+      expect(vm.state.onlineAccess, false);
+      expect(vm.state.canReadAgain, false);
+    });
+
+    test('a photo with nothing readable asks for the items by hand', () async {
+      final r = await rig(token: false);
+      final vm = await open(r.s);
+
+      await vm.readReceipt(r.path);
+
+      expect(vm.state.step, SplitStep.items);
+      expect(vm.state.items, isEmpty);
+      expect(
+        vm.state.message,
+        "Couldn't read this receipt. Add the items by hand.",
+      );
+    });
+
+    test('a read with no printed total asks to check the items', () async {
+      final r = await rig(
+        token: false,
+        lines: [
+          OcrLine('Kedai Contoh', 100, 10, 260, 30),
+          ..._row('Nasi lemak', '20.00', 60),
+        ],
+      );
+      final vm = await open(r.s);
+
+      await vm.readReceipt(r.path);
+
+      expect(vm.state.printedTotal, null);
+      expect(
+        vm.state.message,
+        'No total found on the receipt. Check the items.',
+      );
+    });
+
+    test('back during reading ignores the late result', () async {
+      final wait = Completer<List<OcrLine>>();
+      final r = await rig(token: false, late: wait);
+      final vm = await open(r.s);
+
+      final reading = vm.readReceipt(r.path);
+      expect(vm.state.step, SplitStep.reading);
+      expect(vm.back(), true);
+      expect(vm.state.step, SplitStep.photo);
+      wait.complete(ocrLines);
+      await reading;
+
+      expect(vm.state.step, SplitStep.photo);
+      expect(vm.state.items, isEmpty);
+      await photoGone(r.path);
+      expect(File(r.path).existsSync(), false);
+    });
+
+    test(
+      'read again is offered only after a phone-only read with online access',
+      () async {
+        final down = await rig(lines: ocrLines, status: 500, body: '{}');
+        final vm = await open(down.s);
+        await vm.readReceipt(down.path);
+        expect(
+          vm.state.readSource,
+          'Read on the phone. Claude was not reachable.',
+        );
+        expect(vm.state.canReadAgain, true);
+
+        down.backend.on(
+          'POST',
+          '/functions/v1/read-receipt',
+          (r) => http.Response(claudeReply, 200),
+        );
+        await vm.readAgainWithClaude();
+
+        expect(vm.state.readSource, '✓ Read by Claude · 7 reads left today');
+        expect(vm.state.items.map((i) => i.name), ['Nasi lemak', 'Teh ais']);
+        expect(vm.state.canReadAgain, false);
+        expect(vm.state.readingAgain, false);
+      },
+    );
+
+    test(
+      'a Claude read that used a read of the day is not offered again',
+      () async {
+        final r = await rig(lines: ocrLines, status: 504, body: '{}');
+        final vm = await open(r.s);
+
+        await vm.readReceipt(r.path);
+
+        expect(
+          vm.state.readSource,
+          "Read on the phone. Claude could not read this receipt. This used 1 of today's reads.",
+        );
+        expect(vm.state.canReadAgain, false);
+      },
+    );
+
+    test('read again without a token asks for an invite code', () async {
+      final r = await rig(lines: ocrLines, status: 500, body: '{}');
+      final vm = await open(r.s);
+      await vm.readReceipt(r.path);
+      await r.s.online.secrets.setDeviceToken('');
+
+      await vm.readAgainWithClaude();
+
+      expect(vm.state.readSource, 'Enter an invite code in Settings first.');
+      expect(vm.state.canReadAgain, false);
+      expect(r.backend.requests, hasLength(1));
+    });
+
+    test('read again follows the device token', () async {
+      final r = await rig(lines: ocrLines, status: 500, body: '{}');
+      final vm = await open(r.s);
+      await vm.readReceipt(r.path);
+      expect(vm.state.canReadAgain, true);
+
+      await r.s.online.secrets.setDeviceToken('');
+      expect(vm.state.canReadAgain, false);
+
+      await r.s.online.secrets.setDeviceToken('test-token-2');
+      expect(vm.state.canReadAgain, true);
+    });
+
+    test(
+      'a second read again while the first runs sends one request',
+      () async {
+        final r = await rig(lines: ocrLines, status: 500, body: '{}');
+        final vm = await open(r.s);
+        await vm.readReceipt(r.path);
+
+        final first = vm.readAgainWithClaude();
+        final second = vm.readAgainWithClaude();
+        await Future.wait([first, second]);
+
+        expect(r.backend.requests, hasLength(2));
+        expect(vm.state.readingAgain, false);
+      },
+    );
+
+    test('a cancelled token in read again is removed and shown', () async {
+      final r = await rig(lines: ocrLines, status: 500, body: '{}');
+      final vm = await open(r.s);
+      await vm.readReceipt(r.path);
+      r.backend.on(
+        'POST',
+        '/functions/v1/read-receipt',
+        (_) => http.Response('{}', 401),
+      );
+
+      await vm.readAgainWithClaude();
+
+      expect(r.s.online.secrets.deviceToken.value, '');
+      expect(vm.state.readSource, 'Your invite code is no longer active.');
+      expect(vm.state.canReadAgain, false);
+      expect(vm.state.readingAgain, false);
+    });
+
+    test('the photo stays while the items show and goes when the items step closes', () async {
+      final r = await rig(token: false, lines: ocrLines);
+      final vm = await open(r.s);
+
+      await vm.readReceipt(r.path);
+      expect(File(r.path).existsSync(), true);
+      vm.next();
+
+      expect(vm.state.step, SplitStep.people);
+      await photoGone(r.path);
+      expect(File(r.path).existsSync(), false);
+    });
+
+    test('closing the editor deletes the kept photo', () async {
+      final r = await rig(token: false, lines: ocrLines);
+      final vm = SplitEditorViewModel(r.s);
+      await vm.readReceipt(r.path);
+      expect(File(r.path).existsSync(), true);
+
+      vm.dispose();
+
+      await photoGone(r.path);
+      expect(File(r.path).existsSync(), false);
+    });
+
+    test('a photo outside the cache is never deleted', () async {
+      final r = await rig(token: false);
+      final other = Directory.systemTemp.createTempSync('koban_gallery');
+      addTearDown(() => other.deleteSync(recursive: true));
+      final outside = p.join(other.path, 'pick.jpg');
+      File(outside).writeAsBytesSync([1, 2, 3]);
+      final vm = SplitEditorViewModel(r.s);
+      await vm.readReceipt(outside);
+
+      vm.next();
+      vm.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(File(outside).existsSync(), true);
+    });
   });
 }
