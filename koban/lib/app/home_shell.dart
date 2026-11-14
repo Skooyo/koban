@@ -6,6 +6,7 @@ import '../screens/activity/activity_screen.dart';
 import '../screens/groups/groups_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/people/people_screen.dart';
+import '../update/update_dialog.dart';
 import 'app_services.dart';
 import 'auto_open.dart';
 import 'routes.dart';
@@ -34,6 +35,7 @@ class HomeShellState extends State<HomeShell> {
   KobanTab _tab = KobanTab.home;
   AppLifecycleListener? _lifecycle;
   var _autoOpening = false;
+  VoidCallback? _stopUpdateWatch;
 
   /// How many people have an open balance. It drives the badge of the People tab.
   Stream<int>? _openPeople;
@@ -46,6 +48,12 @@ class HomeShellState extends State<HomeShell> {
         .getInheritedWidgetOfExactType<AppScope>()!
         .services;
     services.online.groups.start();
+    // After the first frame: the dialog opens over any page, then the start check runs.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _stopUpdateWatch = watchUpdateDialog(context, services.updates);
+      services.updates.check(manual: false);
+    });
     if (!widget.autoOpen) return;
     // As 0.1.1 on each activity start. A rotation does not restart the activity in Flutter.
     _lifecycle = AppLifecycleListener(onShow: _autoOpen);
@@ -63,6 +71,7 @@ class HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _lifecycle?.dispose();
+    _stopUpdateWatch?.call();
     super.dispose();
   }
 

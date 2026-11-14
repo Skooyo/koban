@@ -9,6 +9,7 @@ import '../../data/database.dart';
 import '../../online/receipt_cloud_client.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/payment_rules.dart';
+import '../../update/update_repository.dart';
 
 /// The Xiaomi background steps of 0.1.1 (`OemBatteryHelper.xiaomiChecklist`).
 const xiaomiChecklist = <String>[
@@ -54,6 +55,7 @@ class SettingsViewModel extends ChangeNotifier {
     _s.settings.onlineFeatures,
     _s.settings.hasDeviceToken,
     _s.settings.paymentApps,
+    _s.updates.state,
   ];
 
   bool _isAccessGranted = false;
@@ -71,6 +73,13 @@ class SettingsViewModel extends ChangeNotifier {
   bool get isBatteryOptimizationIgnored => _isBatteryOptimizationIgnored;
   bool get isXiaomi => _isXiaomi;
   bool get onlineFeatures => _s.settings.onlineFeatures.value;
+
+  /// True after a manual check that found nothing new.
+  bool get upToDate => _s.updates.state.value is UpdateUpToDate;
+
+  /// The manual check. The update dialog shows the result.
+  Future<void> checkForUpdates() => _s.updates.check(manual: true);
+
   bool get hasDeviceToken => _s.settings.hasDeviceToken.value;
   bool get darkMode => _s.settings.darkMode.value;
   int get paymentAppCount => _s.settings.paymentApps.value.length;

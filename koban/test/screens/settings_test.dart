@@ -20,7 +20,6 @@ const sample =
 const reconnectHint =
     ' If an alert appears, tap it or open notification access settings.';
 const accepted = "Accepted. Receipts are read by Claude on Koban's server.";
-const placeholder = 'Comes with the online features in milestone 5.';
 
 Map<String, Object?> logRow(String id) => {
   'id': id,
@@ -56,7 +55,9 @@ Future<AppServices> settingsServices({
   FakeChannel? listener,
   Map<String, Object> prefs = const {},
   Map<String, Object> secrets = const {},
+  http.Client? http,
 }) => testServices(
+  http: http,
   listener: listener ?? listenerChannel(),
   device: deviceChannel(),
   prefs: prefs,
@@ -371,11 +372,59 @@ void main() {
     expect(s.online.secrets.deviceToken.value, '');
   });
 
-  testWidgets('Check for updates opens the online placeholder', (tester) async {
-    await pumpSettings(tester, await settingsServices());
+  testWidgets('Check for updates says up to date when nothing is new', (
+    tester,
+  ) async {
+    final s = await settingsServices(
+      http: MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'tag_name': 'v0.1.1',
+            'body': '',
+            'assets': [
+              {
+                'name': 'koban-6.apk',
+                'browser_download_url': 'https://example.test/koban-6.apk',
+                'size': 5,
+              },
+            ],
+          }),
+          200,
+        ),
+      ),
+    );
+    await pumpSettings(tester, s);
+    expect(find.text('Koban is up to date.'), findsNothing);
     await tester.tap(find.text('Check for updates'));
     await tester.pumpAndSettle();
-    expect(find.text(placeholder), findsOneWidget);
+    expect(find.text('Koban is up to date.'), findsOneWidget);
+  });
+
+  testWidgets('a failed manual check shows the message in a dialog', (
+    tester,
+  ) async {
+    final s = await settingsServices(
+      http: MockClient((_) async => http.Response('{}', 500)),
+    );
+    tester.view.physicalSize = const Size(411, 5000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    // The dialog belongs to the tab shell, so Settings opens from Home.
+    await pumpKoban(tester, s);
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Check for updates'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Could not check for updates. Try again later.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Could not check for updates. Try again later.'),
+      findsNothing,
+    );
   });
 
   testWidgets('Check for updates is off when Online features is off', (

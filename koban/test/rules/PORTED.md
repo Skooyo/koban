@@ -31,6 +31,6 @@ The "added beyond Kotlin" count of PeriodMathTest row is the one extra test in `
 
 ## Kotlin tests that move in later milestones
 
-Update (milestone 4 and 5): ReleaseParser 6, UpdateSchedule 5, ApkCheck 4.
+Update (moved in milestones 4 and 5): ReleaseParser 6 and UpdateSchedule 5 in `test/update/`. ApkCheck 4 is the Kotlin `ApkCheckTest` in `koban/android`.
 
-Screen rules (milestone 4 and 5): OnboardingRules 19, AmountInput 11, CacheFile 5, PaymentAppsRules 3, DonutSlices 3, SplitReadNote 1.
+Screen rules (moved in milestones 4 and 5): OnboardingRules 19, AmountInput 11, PaymentAppsRules 3, DonutSlices 3. CacheFile 5 is in `test/receipts/cache_file_test.dart`. SplitReadNote 1 is in `test/screens/split_read_note_test.dart`.

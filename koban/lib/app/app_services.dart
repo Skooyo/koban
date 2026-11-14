@@ -32,6 +32,8 @@ import '../online/secret_store.dart';
 import '../receipts/receipt_photos.dart';
 import '../receipts/receipt_reader.dart';
 import '../rules/periods.dart';
+import '../update/update_installer.dart';
+import '../update/update_repository.dart';
 
 /// Makes the picker open the Android photo picker, as 0.1.1 did.
 /// Without it, Android before 16 opens a file chooser.
@@ -58,6 +60,7 @@ class AppServices {
     this.pickImage = _pickFromGallery,
     ReceiptOcr? ocr,
     ReceiptPhotos? photos,
+    UpdateInstaller? updateInstaller,
     Duration checkHold = const Duration(milliseconds: 4000),
   }) {
     int nowMs() => now().millisecondsSinceEpoch;
@@ -84,6 +87,13 @@ class AppServices {
       hold: checkHold,
     );
     externalWrites = ExternalWrites(db);
+    updates = UpdateRepository(
+      http: online.http,
+      settings: settings,
+      installer: updateInstaller ?? ChannelUpdateInstaller(),
+      cacheDir: cacheDir,
+      now: now,
+    );
     final today = now();
     activitySelection = ActivitySelection(YearMonth(today.year, today.month));
   }
@@ -128,6 +138,9 @@ class AppServices {
 
   /// Shows the cards of the capture engine. The app starts it in front and stops it when hidden.
   late final ExternalWrites externalWrites;
+
+  /// The check, download and install of app updates.
+  late final UpdateRepository updates;
   late final ActivitySelection activitySelection;
 
   /// True when the owner is in a group.

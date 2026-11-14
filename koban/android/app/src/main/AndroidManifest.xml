@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
@@ -73,6 +74,10 @@
 
         <receiver
             android:name="com.expensetracker.app.listener.ListenerWatchdogReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.expensetracker.app.update.UpdateInstallReceiver"
             android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:

@@ -23,6 +23,7 @@ import 'package:koban/online/secret_store.dart';
 import 'package:koban/receipts/receipt_photos.dart';
 import 'package:koban/receipts/receipt_reader.dart';
 import 'package:koban/rules/receipt_rules.dart';
+import 'package:koban/update/update_installer.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -50,6 +51,49 @@ class FakeChannel {
 
 /// The name of the device channel of [DeviceControl].
 const deviceChannelName = 'io.github.skooyo.koban/device';
+
+/// A fake update installer. It records each install and the size of the file at that moment.
+/// A test calls [emit] to send an installer status.
+class FakeUpdateInstaller implements UpdateInstaller {
+  FakeUpdateInstaller({this.code = 6, this.allowed = true});
+
+  final int code;
+  bool allowed;
+
+  /// When set, [canInstall] answers when the test completes it.
+  Completer<bool>? canInstallGate;
+
+  /// An error that [install] throws. Null means success.
+  Object? installError;
+
+  /// Each call to [install]: the path, the version code and the file size (-1 when there is no file).
+  final installs = <(String, int, int)>[];
+  var openedSettings = 0;
+  void Function(InstallStatus, String?)? _handler;
+
+  @override
+  Future<int> versionCode() async => code;
+
+  @override
+  Future<bool> canInstall() async => canInstallGate?.future ?? allowed;
+
+  @override
+  Future<void> openInstallSettings() async => openedSettings++;
+
+  @override
+  Future<void> install(String path, int versionCode) async {
+    final f = File(path);
+    installs.add((path, versionCode, f.existsSync() ? f.lengthSync() : -1));
+    if (installError != null) throw installError!;
+  }
+
+  @override
+  void onStatus(void Function(InstallStatus, String?) handler) =>
+      _handler = handler;
+
+  void emit(InstallStatus status, [String? message]) =>
+      _handler!(status, message);
+}
 
 /// A fake receipt OCR. It gives the lines of [byPath] for a path. A path in [failing] throws.
 /// A path in [later] answers when the test completes its completer.
@@ -111,6 +155,7 @@ Future<AppServices> testServices({
   GoogleAccounts? google,
   ReceiptOcr? ocr,
   ReceiptPhotos? photos,
+  UpdateInstaller? updateInstaller,
 }) async {
   final time = now ?? DateTime(2026, 11, 13, 12);
   final previous = SharedPreferencesAsyncPlatform.instance;
@@ -120,8 +165,13 @@ Future<AppServices> testServices({
       InMemorySharedPreferencesAsync.withData(secrets);
   final secretStore = SecretStore(SharedPreferencesAsync());
   await secretStore.load();
-  SharedPreferencesAsyncPlatform.instance =
-      InMemorySharedPreferencesAsync.withData(prefs);
+  SharedPreferencesAsyncPlatform
+      .instance = InMemorySharedPreferencesAsync.withData({
+    // A check of the same day: the start check of the update sends no request.
+    if (!prefs.containsKey('last_update_check'))
+      'last_update_check': time.millisecondsSinceEpoch,
+    ...prefs,
+  });
   listener ??= FakeChannel(ListenerControl.channelName, {
     'isAccessGranted': true,
     'isConnected': true,
@@ -178,6 +228,7 @@ Future<AppServices> testServices({
     pickImage: pickImage ?? () async => null,
     ocr: ocr ?? FakeReceiptOcr(const {}),
     photos: photos ?? FakeReceiptPhotos([null]),
+    updateInstaller: updateInstaller ?? FakeUpdateInstaller(),
   );
   await s.categories.seedIfEmpty();
   return s;

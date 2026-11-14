@@ -14,6 +14,7 @@ class KobanSettings {
   static const _chosenKey = 'payment_apps_chosen';
   static const _allowlistKey = 'payment_app_allowlist';
   static const _onlineFeaturesKey = 'online_features';
+  static const _lastUpdateCheckKey = 'last_update_check';
 
   // Flutter only: 0.1.1 kept these two values in a SavedStateHandle.
   static const _onboardingStepKey = 'flutter_onboarding_step';
@@ -95,6 +96,13 @@ class KobanSettings {
     await _prefs.setBool(_onlineFeaturesKey, on);
     _onlineFeatures.value = on;
   }
+
+  /// The time of the last update check in ms. 0 when there was none.
+  Future<int> lastUpdateCheck() async =>
+      await _prefs.getInt(_lastUpdateCheckKey) ?? 0;
+
+  Future<void> setLastUpdateCheck(int ms) =>
+      _prefs.setInt(_lastUpdateCheckKey, ms);
 
   Future<void> removeDeviceToken() => _secrets.setDeviceToken('');
 

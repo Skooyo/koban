@@ -39,6 +39,10 @@ class ComponentNamesTest {
         assertFalse(pm.getReceiverInfo(ComponentName(pkg, "com.expensetracker.app.listener.ListenerWatchdogReceiver"), 0).exported)
     }
 
+    @Test fun updateReceiverKeepsItsName() {
+        assertFalse(pm.getReceiverInfo(ComponentName(pkg, "com.expensetracker.app.update.UpdateInstallReceiver"), 0).exported)
+    }
+
     @Test fun bootReceiverGetsBootAndUpdate() {
         for (action in listOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED)) {
             val names = pm.queryBroadcastReceivers(Intent(action).setPackage(pkg), 0).map { it.activityInfo.name }

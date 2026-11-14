@@ -33,6 +33,7 @@ class KobanNativePlugin(private val executor: Executor = Executors.newSingleThre
     private val main = Handler(Looper.getMainLooper())
     private var capture: MethodChannel? = null
     private var device: DeviceChannel? = null
+    private var update: UpdateChannel? = null
     private var activityBinding: ActivityPluginBinding? = null
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
@@ -69,10 +70,12 @@ class KobanNativePlugin(private val executor: Executor = Executors.newSingleThre
         capture = null
         device?.cancelPending()
         device = null
+        update?.release()
+        update = null
         (executor as? ExecutorService)?.shutdown()
     }
 
-    /** Adds the four channels. [onAttachedToEngine] calls it. Tests call it with a fake messenger. */
+    /** Adds the five channels. [onAttachedToEngine] calls it. Tests call it with a fake messenger. */
     fun register(context: Context, messenger: BinaryMessenger) {
         val app = context.applicationContext
         MethodChannel(messenger, LEGACY).setMethodCallHandler { call, result ->
@@ -91,6 +94,10 @@ class KobanNativePlugin(private val executor: Executor = Executors.newSingleThre
         val deviceChannel = DeviceChannel(app, { result, code, block -> work(result, code, block) }) { activityBinding?.activity }
         device = deviceChannel
         MethodChannel(messenger, DEVICE).setMethodCallHandler { call, result -> deviceChannel.onCall(call, result) }
+        val updateMethods = MethodChannel(messenger, UPDATE)
+        val updateChannel = UpdateChannel(app, { result, code, block -> work(result, code, block) }, updateMethods)
+        update = updateChannel
+        updateMethods.setMethodCallHandler { call, result -> updateChannel.onCall(call, result) }
     }
 
     /** Tells the Dart side to read the queue. Call it on the main thread. */
@@ -195,7 +202,7 @@ class KobanNativePlugin(private val executor: Executor = Executors.newSingleThre
                 } catch (e: Throwable) {
                     // Also an Error: an uncaught one on this thread stops the app,
                     // and every start runs the import again.
-                    main.post { result.error(code, e.message, null) }
+                    main.post { result.error((e as? CodedError)?.code ?: code, e.message, null) }
                 }
             }
         } catch (e: RejectedExecutionException) {
@@ -219,5 +226,6 @@ class KobanNativePlugin(private val executor: Executor = Executors.newSingleThre
         const val CAPTURE = "io.github.skooyo.koban/capture"
         const val LISTENER = "io.github.skooyo.koban/listener"
         const val DEVICE = "io.github.skooyo.koban/device"
+        const val UPDATE = "io.github.skooyo.koban/update"
     }
 }

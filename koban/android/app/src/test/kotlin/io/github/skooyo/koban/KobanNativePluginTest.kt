@@ -55,6 +55,15 @@ class FakeMessenger : BinaryMessenger {
         assertNotNull("no reply to $method", reply)
         return StandardMethodCodec.INSTANCE.decodeEnvelope(reply!!.also { it.rewind() })
     }
+
+    /** Returns the [FlutterException] of an error reply. Fails when the call succeeds. */
+    fun callForError(channel: String, method: String, args: Any? = null): FlutterException =
+        try {
+            call(channel, method, args)
+            throw AssertionError("expected an error reply")
+        } catch (e: FlutterException) {
+            e
+        }
 }
 
 @RunWith(RobolectricTestRunner::class)
@@ -94,9 +103,15 @@ class KobanNativePluginTest {
         )
     }
 
-    @Test fun registersTheFourChannelsOnAnyEngine() {
+    @Test fun registersTheFiveChannelsOnAnyEngine() {
         assertEquals(
-            setOf("io.github.skooyo.koban/legacy", capture, "io.github.skooyo.koban/listener", "io.github.skooyo.koban/device"),
+            setOf(
+                "io.github.skooyo.koban/legacy",
+                capture,
+                "io.github.skooyo.koban/listener",
+                "io.github.skooyo.koban/device",
+                "io.github.skooyo.koban/update",
+            ),
             messenger.handlers.keys,
         )
     }

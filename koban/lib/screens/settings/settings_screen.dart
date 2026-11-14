@@ -2,7 +2,6 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
-import '../../app/online_placeholder.dart';
 import '../../app/routes.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/kit.dart';
@@ -286,7 +285,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       vm.inviteBusy ? 'Checking…' : 'Use code',
                                       _code.text.trim().isEmpty || vm.inviteBusy
                                           ? null
-                                          : () => vm.enterInviteCode(_code.text),
+                                          : () =>
+                                                vm.enterInviteCode(_code.text),
                                     ),
                                   ),
                                 ],
@@ -369,7 +369,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           KobanRow(
                             title: 'App version ${vm.versionName}',
-                            subtitle: online ? null : 'Turn on Online features to check for updates.',
+                            subtitle: !online
+                                ? 'Turn on Online features to check for updates.'
+                                : vm.upToDate
+                                ? 'Koban is up to date.'
+                                : null,
                             leading: const Icon(Icons.info),
                           ),
                           Align(
@@ -379,12 +383,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 horizontal: 8,
                               ),
                               child: TextButton(
-                                onPressed: online
-                                    ? () => openOnlinePlaceholder(
-                                        context,
-                                        OnlineFeature.updates,
-                                      )
-                                    : null,
+                                onPressed: online ? vm.checkForUpdates : null,
                                 child: const Text('Check for updates'),
                               ),
                             ),
