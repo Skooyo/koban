@@ -991,656 +991,6 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   }
 }
 
-class Categories extends Table with TableInfo<Categories, Category> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  Categories(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL PRIMARY KEY',
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  static const VerificationMeta _colorHexMeta = const VerificationMeta(
-    'colorHex',
-  );
-  late final GeneratedColumn<String> colorHex = GeneratedColumn<String>(
-    'colorHex',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  late final GeneratedColumnWithTypeConverter<bool, int> isDefault =
-      GeneratedColumn<int>(
-        'isDefault',
-        aliasedName,
-        false,
-        type: DriftSqlType.int,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL',
-      ).withConverter<bool>(Categories.$converterisDefault);
-  @override
-  List<GeneratedColumn> get $columns => [id, name, colorHex, isDefault];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'categories';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<Category> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('colorHex')) {
-      context.handle(
-        _colorHexMeta,
-        colorHex.isAcceptableOrUnknown(data['colorHex']!, _colorHexMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_colorHexMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  Category map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Category(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      colorHex: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}colorHex'],
-      )!,
-      isDefault: Categories.$converterisDefault.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.int,
-          data['${effectivePrefix}isDefault'],
-        )!,
-      ),
-    );
-  }
-
-  @override
-  Categories createAlias(String alias) {
-    return Categories(attachedDatabase, alias);
-  }
-
-  static TypeConverter<bool, int> $converterisDefault = const BoolConverter();
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class Category extends DataClass implements Insertable<Category> {
-  final String id;
-  final String name;
-  final String colorHex;
-  final bool isDefault;
-  const Category({
-    required this.id,
-    required this.name,
-    required this.colorHex,
-    required this.isDefault,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
-    map['colorHex'] = Variable<String>(colorHex);
-    {
-      map['isDefault'] = Variable<int>(
-        Categories.$converterisDefault.toSql(isDefault),
-      );
-    }
-    return map;
-  }
-
-  CategoriesCompanion toCompanion(bool nullToAbsent) {
-    return CategoriesCompanion(
-      id: Value(id),
-      name: Value(name),
-      colorHex: Value(colorHex),
-      isDefault: Value(isDefault),
-    );
-  }
-
-  factory Category.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Category(
-      id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      colorHex: serializer.fromJson<String>(json['colorHex']),
-      isDefault: serializer.fromJson<bool>(json['isDefault']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
-      'colorHex': serializer.toJson<String>(colorHex),
-      'isDefault': serializer.toJson<bool>(isDefault),
-    };
-  }
-
-  Category copyWith({
-    String? id,
-    String? name,
-    String? colorHex,
-    bool? isDefault,
-  }) => Category(
-    id: id ?? this.id,
-    name: name ?? this.name,
-    colorHex: colorHex ?? this.colorHex,
-    isDefault: isDefault ?? this.isDefault,
-  );
-  Category copyWithCompanion(CategoriesCompanion data) {
-    return Category(
-      id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
-      colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
-      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('Category(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('colorHex: $colorHex, ')
-          ..write('isDefault: $isDefault')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(id, name, colorHex, isDefault);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is Category &&
-          other.id == this.id &&
-          other.name == this.name &&
-          other.colorHex == this.colorHex &&
-          other.isDefault == this.isDefault);
-}
-
-class CategoriesCompanion extends UpdateCompanion<Category> {
-  final Value<String> id;
-  final Value<String> name;
-  final Value<String> colorHex;
-  final Value<bool> isDefault;
-  final Value<int> rowid;
-  const CategoriesCompanion({
-    this.id = const Value.absent(),
-    this.name = const Value.absent(),
-    this.colorHex = const Value.absent(),
-    this.isDefault = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  CategoriesCompanion.insert({
-    required String id,
-    required String name,
-    required String colorHex,
-    required bool isDefault,
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       name = Value(name),
-       colorHex = Value(colorHex),
-       isDefault = Value(isDefault);
-  static Insertable<Category> custom({
-    Expression<String>? id,
-    Expression<String>? name,
-    Expression<String>? colorHex,
-    Expression<int>? isDefault,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (name != null) 'name': name,
-      if (colorHex != null) 'colorHex': colorHex,
-      if (isDefault != null) 'isDefault': isDefault,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  CategoriesCompanion copyWith({
-    Value<String>? id,
-    Value<String>? name,
-    Value<String>? colorHex,
-    Value<bool>? isDefault,
-    Value<int>? rowid,
-  }) {
-    return CategoriesCompanion(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      colorHex: colorHex ?? this.colorHex,
-      isDefault: isDefault ?? this.isDefault,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (colorHex.present) {
-      map['colorHex'] = Variable<String>(colorHex.value);
-    }
-    if (isDefault.present) {
-      map['isDefault'] = Variable<int>(
-        Categories.$converterisDefault.toSql(isDefault.value),
-      );
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('CategoriesCompanion(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('colorHex: $colorHex, ')
-          ..write('isDefault: $isDefault, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class MerchantCategoryMap extends Table
-    with TableInfo<MerchantCategoryMap, MerchantCategoryMapData> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  MerchantCategoryMap(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _merchantKeyMeta = const VerificationMeta(
-    'merchantKey',
-  );
-  late final GeneratedColumn<String> merchantKey = GeneratedColumn<String>(
-    'merchantKey',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL PRIMARY KEY',
-  );
-  static const VerificationMeta _displayNameMeta = const VerificationMeta(
-    'displayName',
-  );
-  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
-    'displayName',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
-    'categoryId',
-  );
-  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
-    'categoryId',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
-  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
-    'updatedAt',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    merchantKey,
-    displayName,
-    categoryId,
-    updatedAt,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'merchant_category_map';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<MerchantCategoryMapData> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('merchantKey')) {
-      context.handle(
-        _merchantKeyMeta,
-        merchantKey.isAcceptableOrUnknown(
-          data['merchantKey']!,
-          _merchantKeyMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_merchantKeyMeta);
-    }
-    if (data.containsKey('displayName')) {
-      context.handle(
-        _displayNameMeta,
-        displayName.isAcceptableOrUnknown(
-          data['displayName']!,
-          _displayNameMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_displayNameMeta);
-    }
-    if (data.containsKey('categoryId')) {
-      context.handle(
-        _categoryIdMeta,
-        categoryId.isAcceptableOrUnknown(data['categoryId']!, _categoryIdMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_categoryIdMeta);
-    }
-    if (data.containsKey('updatedAt')) {
-      context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updatedAt']!, _updatedAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_updatedAtMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {merchantKey};
-  @override
-  MerchantCategoryMapData map(
-    Map<String, dynamic> data, {
-    String? tablePrefix,
-  }) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return MerchantCategoryMapData(
-      merchantKey: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}merchantKey'],
-      )!,
-      displayName: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}displayName'],
-      )!,
-      categoryId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}categoryId'],
-      )!,
-      updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}updatedAt'],
-      )!,
-    );
-  }
-
-  @override
-  MerchantCategoryMap createAlias(String alias) {
-    return MerchantCategoryMap(attachedDatabase, alias);
-  }
-
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class MerchantCategoryMapData extends DataClass
-    implements Insertable<MerchantCategoryMapData> {
-  final String merchantKey;
-  final String displayName;
-  final String categoryId;
-  final int updatedAt;
-  const MerchantCategoryMapData({
-    required this.merchantKey,
-    required this.displayName,
-    required this.categoryId,
-    required this.updatedAt,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['merchantKey'] = Variable<String>(merchantKey);
-    map['displayName'] = Variable<String>(displayName);
-    map['categoryId'] = Variable<String>(categoryId);
-    map['updatedAt'] = Variable<int>(updatedAt);
-    return map;
-  }
-
-  MerchantCategoryMapCompanion toCompanion(bool nullToAbsent) {
-    return MerchantCategoryMapCompanion(
-      merchantKey: Value(merchantKey),
-      displayName: Value(displayName),
-      categoryId: Value(categoryId),
-      updatedAt: Value(updatedAt),
-    );
-  }
-
-  factory MerchantCategoryMapData.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return MerchantCategoryMapData(
-      merchantKey: serializer.fromJson<String>(json['merchantKey']),
-      displayName: serializer.fromJson<String>(json['displayName']),
-      categoryId: serializer.fromJson<String>(json['categoryId']),
-      updatedAt: serializer.fromJson<int>(json['updatedAt']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'merchantKey': serializer.toJson<String>(merchantKey),
-      'displayName': serializer.toJson<String>(displayName),
-      'categoryId': serializer.toJson<String>(categoryId),
-      'updatedAt': serializer.toJson<int>(updatedAt),
-    };
-  }
-
-  MerchantCategoryMapData copyWith({
-    String? merchantKey,
-    String? displayName,
-    String? categoryId,
-    int? updatedAt,
-  }) => MerchantCategoryMapData(
-    merchantKey: merchantKey ?? this.merchantKey,
-    displayName: displayName ?? this.displayName,
-    categoryId: categoryId ?? this.categoryId,
-    updatedAt: updatedAt ?? this.updatedAt,
-  );
-  MerchantCategoryMapData copyWithCompanion(MerchantCategoryMapCompanion data) {
-    return MerchantCategoryMapData(
-      merchantKey: data.merchantKey.present
-          ? data.merchantKey.value
-          : this.merchantKey,
-      displayName: data.displayName.present
-          ? data.displayName.value
-          : this.displayName,
-      categoryId: data.categoryId.present
-          ? data.categoryId.value
-          : this.categoryId,
-      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('MerchantCategoryMapData(')
-          ..write('merchantKey: $merchantKey, ')
-          ..write('displayName: $displayName, ')
-          ..write('categoryId: $categoryId, ')
-          ..write('updatedAt: $updatedAt')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(merchantKey, displayName, categoryId, updatedAt);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is MerchantCategoryMapData &&
-          other.merchantKey == this.merchantKey &&
-          other.displayName == this.displayName &&
-          other.categoryId == this.categoryId &&
-          other.updatedAt == this.updatedAt);
-}
-
-class MerchantCategoryMapCompanion
-    extends UpdateCompanion<MerchantCategoryMapData> {
-  final Value<String> merchantKey;
-  final Value<String> displayName;
-  final Value<String> categoryId;
-  final Value<int> updatedAt;
-  final Value<int> rowid;
-  const MerchantCategoryMapCompanion({
-    this.merchantKey = const Value.absent(),
-    this.displayName = const Value.absent(),
-    this.categoryId = const Value.absent(),
-    this.updatedAt = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  MerchantCategoryMapCompanion.insert({
-    required String merchantKey,
-    required String displayName,
-    required String categoryId,
-    required int updatedAt,
-    this.rowid = const Value.absent(),
-  }) : merchantKey = Value(merchantKey),
-       displayName = Value(displayName),
-       categoryId = Value(categoryId),
-       updatedAt = Value(updatedAt);
-  static Insertable<MerchantCategoryMapData> custom({
-    Expression<String>? merchantKey,
-    Expression<String>? displayName,
-    Expression<String>? categoryId,
-    Expression<int>? updatedAt,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (merchantKey != null) 'merchantKey': merchantKey,
-      if (displayName != null) 'displayName': displayName,
-      if (categoryId != null) 'categoryId': categoryId,
-      if (updatedAt != null) 'updatedAt': updatedAt,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  MerchantCategoryMapCompanion copyWith({
-    Value<String>? merchantKey,
-    Value<String>? displayName,
-    Value<String>? categoryId,
-    Value<int>? updatedAt,
-    Value<int>? rowid,
-  }) {
-    return MerchantCategoryMapCompanion(
-      merchantKey: merchantKey ?? this.merchantKey,
-      displayName: displayName ?? this.displayName,
-      categoryId: categoryId ?? this.categoryId,
-      updatedAt: updatedAt ?? this.updatedAt,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (merchantKey.present) {
-      map['merchantKey'] = Variable<String>(merchantKey.value);
-    }
-    if (displayName.present) {
-      map['displayName'] = Variable<String>(displayName.value);
-    }
-    if (categoryId.present) {
-      map['categoryId'] = Variable<String>(categoryId.value);
-    }
-    if (updatedAt.present) {
-      map['updatedAt'] = Variable<int>(updatedAt.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('MerchantCategoryMapCompanion(')
-          ..write('merchantKey: $merchantKey, ')
-          ..write('displayName: $displayName, ')
-          ..write('categoryId: $categoryId, ')
-          ..write('updatedAt: $updatedAt, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
 class PendingPayments extends Table
     with TableInfo<PendingPayments, PendingPayment> {
   @override
@@ -2857,6 +2207,656 @@ class DroppedNotificationsCompanion
           ..write('dedupKey: $dedupKey, ')
           ..write('notificationKey: $notificationKey, ')
           ..write('droppedAt: $droppedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class Categories extends Table with TableInfo<Categories, Category> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  Categories(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _colorHexMeta = const VerificationMeta(
+    'colorHex',
+  );
+  late final GeneratedColumn<String> colorHex = GeneratedColumn<String>(
+    'colorHex',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumnWithTypeConverter<bool, int> isDefault =
+      GeneratedColumn<int>(
+        'isDefault',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL',
+      ).withConverter<bool>(Categories.$converterisDefault);
+  @override
+  List<GeneratedColumn> get $columns => [id, name, colorHex, isDefault];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'categories';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Category> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('colorHex')) {
+      context.handle(
+        _colorHexMeta,
+        colorHex.isAcceptableOrUnknown(data['colorHex']!, _colorHexMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_colorHexMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Category map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Category(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      colorHex: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}colorHex'],
+      )!,
+      isDefault: Categories.$converterisDefault.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}isDefault'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  Categories createAlias(String alias) {
+    return Categories(attachedDatabase, alias);
+  }
+
+  static TypeConverter<bool, int> $converterisDefault = const BoolConverter();
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class Category extends DataClass implements Insertable<Category> {
+  final String id;
+  final String name;
+  final String colorHex;
+  final bool isDefault;
+  const Category({
+    required this.id,
+    required this.name,
+    required this.colorHex,
+    required this.isDefault,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['colorHex'] = Variable<String>(colorHex);
+    {
+      map['isDefault'] = Variable<int>(
+        Categories.$converterisDefault.toSql(isDefault),
+      );
+    }
+    return map;
+  }
+
+  CategoriesCompanion toCompanion(bool nullToAbsent) {
+    return CategoriesCompanion(
+      id: Value(id),
+      name: Value(name),
+      colorHex: Value(colorHex),
+      isDefault: Value(isDefault),
+    );
+  }
+
+  factory Category.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Category(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      colorHex: serializer.fromJson<String>(json['colorHex']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'colorHex': serializer.toJson<String>(colorHex),
+      'isDefault': serializer.toJson<bool>(isDefault),
+    };
+  }
+
+  Category copyWith({
+    String? id,
+    String? name,
+    String? colorHex,
+    bool? isDefault,
+  }) => Category(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    colorHex: colorHex ?? this.colorHex,
+    isDefault: isDefault ?? this.isDefault,
+  );
+  Category copyWithCompanion(CategoriesCompanion data) {
+    return Category(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Category(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('isDefault: $isDefault')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, colorHex, isDefault);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Category &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.colorHex == this.colorHex &&
+          other.isDefault == this.isDefault);
+}
+
+class CategoriesCompanion extends UpdateCompanion<Category> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> colorHex;
+  final Value<bool> isDefault;
+  final Value<int> rowid;
+  const CategoriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.colorHex = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CategoriesCompanion.insert({
+    required String id,
+    required String name,
+    required String colorHex,
+    required bool isDefault,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       colorHex = Value(colorHex),
+       isDefault = Value(isDefault);
+  static Insertable<Category> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? colorHex,
+    Expression<int>? isDefault,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (colorHex != null) 'colorHex': colorHex,
+      if (isDefault != null) 'isDefault': isDefault,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CategoriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? colorHex,
+    Value<bool>? isDefault,
+    Value<int>? rowid,
+  }) {
+    return CategoriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      colorHex: colorHex ?? this.colorHex,
+      isDefault: isDefault ?? this.isDefault,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (colorHex.present) {
+      map['colorHex'] = Variable<String>(colorHex.value);
+    }
+    if (isDefault.present) {
+      map['isDefault'] = Variable<int>(
+        Categories.$converterisDefault.toSql(isDefault.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CategoriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('colorHex: $colorHex, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class MerchantCategoryMap extends Table
+    with TableInfo<MerchantCategoryMap, MerchantCategoryMapData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  MerchantCategoryMap(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _merchantKeyMeta = const VerificationMeta(
+    'merchantKey',
+  );
+  late final GeneratedColumn<String> merchantKey = GeneratedColumn<String>(
+    'merchantKey',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _displayNameMeta = const VerificationMeta(
+    'displayName',
+  );
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+    'displayName',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
+    'categoryId',
+  );
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
+    'categoryId',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updatedAt',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    merchantKey,
+    displayName,
+    categoryId,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'merchant_category_map';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MerchantCategoryMapData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('merchantKey')) {
+      context.handle(
+        _merchantKeyMeta,
+        merchantKey.isAcceptableOrUnknown(
+          data['merchantKey']!,
+          _merchantKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_merchantKeyMeta);
+    }
+    if (data.containsKey('displayName')) {
+      context.handle(
+        _displayNameMeta,
+        displayName.isAcceptableOrUnknown(
+          data['displayName']!,
+          _displayNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_displayNameMeta);
+    }
+    if (data.containsKey('categoryId')) {
+      context.handle(
+        _categoryIdMeta,
+        categoryId.isAcceptableOrUnknown(data['categoryId']!, _categoryIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_categoryIdMeta);
+    }
+    if (data.containsKey('updatedAt')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updatedAt']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {merchantKey};
+  @override
+  MerchantCategoryMapData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MerchantCategoryMapData(
+      merchantKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}merchantKey'],
+      )!,
+      displayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}displayName'],
+      )!,
+      categoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}categoryId'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updatedAt'],
+      )!,
+    );
+  }
+
+  @override
+  MerchantCategoryMap createAlias(String alias) {
+    return MerchantCategoryMap(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class MerchantCategoryMapData extends DataClass
+    implements Insertable<MerchantCategoryMapData> {
+  final String merchantKey;
+  final String displayName;
+  final String categoryId;
+  final int updatedAt;
+  const MerchantCategoryMapData({
+    required this.merchantKey,
+    required this.displayName,
+    required this.categoryId,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['merchantKey'] = Variable<String>(merchantKey);
+    map['displayName'] = Variable<String>(displayName);
+    map['categoryId'] = Variable<String>(categoryId);
+    map['updatedAt'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  MerchantCategoryMapCompanion toCompanion(bool nullToAbsent) {
+    return MerchantCategoryMapCompanion(
+      merchantKey: Value(merchantKey),
+      displayName: Value(displayName),
+      categoryId: Value(categoryId),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory MerchantCategoryMapData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MerchantCategoryMapData(
+      merchantKey: serializer.fromJson<String>(json['merchantKey']),
+      displayName: serializer.fromJson<String>(json['displayName']),
+      categoryId: serializer.fromJson<String>(json['categoryId']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'merchantKey': serializer.toJson<String>(merchantKey),
+      'displayName': serializer.toJson<String>(displayName),
+      'categoryId': serializer.toJson<String>(categoryId),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  MerchantCategoryMapData copyWith({
+    String? merchantKey,
+    String? displayName,
+    String? categoryId,
+    int? updatedAt,
+  }) => MerchantCategoryMapData(
+    merchantKey: merchantKey ?? this.merchantKey,
+    displayName: displayName ?? this.displayName,
+    categoryId: categoryId ?? this.categoryId,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  MerchantCategoryMapData copyWithCompanion(MerchantCategoryMapCompanion data) {
+    return MerchantCategoryMapData(
+      merchantKey: data.merchantKey.present
+          ? data.merchantKey.value
+          : this.merchantKey,
+      displayName: data.displayName.present
+          ? data.displayName.value
+          : this.displayName,
+      categoryId: data.categoryId.present
+          ? data.categoryId.value
+          : this.categoryId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MerchantCategoryMapData(')
+          ..write('merchantKey: $merchantKey, ')
+          ..write('displayName: $displayName, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(merchantKey, displayName, categoryId, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MerchantCategoryMapData &&
+          other.merchantKey == this.merchantKey &&
+          other.displayName == this.displayName &&
+          other.categoryId == this.categoryId &&
+          other.updatedAt == this.updatedAt);
+}
+
+class MerchantCategoryMapCompanion
+    extends UpdateCompanion<MerchantCategoryMapData> {
+  final Value<String> merchantKey;
+  final Value<String> displayName;
+  final Value<String> categoryId;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const MerchantCategoryMapCompanion({
+    this.merchantKey = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MerchantCategoryMapCompanion.insert({
+    required String merchantKey,
+    required String displayName,
+    required String categoryId,
+    required int updatedAt,
+    this.rowid = const Value.absent(),
+  }) : merchantKey = Value(merchantKey),
+       displayName = Value(displayName),
+       categoryId = Value(categoryId),
+       updatedAt = Value(updatedAt);
+  static Insertable<MerchantCategoryMapData> custom({
+    Expression<String>? merchantKey,
+    Expression<String>? displayName,
+    Expression<String>? categoryId,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (merchantKey != null) 'merchantKey': merchantKey,
+      if (displayName != null) 'displayName': displayName,
+      if (categoryId != null) 'categoryId': categoryId,
+      if (updatedAt != null) 'updatedAt': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MerchantCategoryMapCompanion copyWith({
+    Value<String>? merchantKey,
+    Value<String>? displayName,
+    Value<String>? categoryId,
+    Value<int>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return MerchantCategoryMapCompanion(
+      merchantKey: merchantKey ?? this.merchantKey,
+      displayName: displayName ?? this.displayName,
+      categoryId: categoryId ?? this.categoryId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (merchantKey.present) {
+      map['merchantKey'] = Variable<String>(merchantKey.value);
+    }
+    if (displayName.present) {
+      map['displayName'] = Variable<String>(displayName.value);
+    }
+    if (categoryId.present) {
+      map['categoryId'] = Variable<String>(categoryId.value);
+    }
+    if (updatedAt.present) {
+      map['updatedAt'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MerchantCategoryMapCompanion(')
+          ..write('merchantKey: $merchantKey, ')
+          ..write('displayName: $displayName, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5699,12 +5699,12 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
   _$KobanDatabase(QueryExecutor e) : super(e);
   $KobanDatabaseManager get managers => $KobanDatabaseManager(this);
   late final Expenses expenses = Expenses(this);
-  late final Categories categories = Categories(this);
-  late final MerchantCategoryMap merchantCategoryMap = MerchantCategoryMap(
-    this,
-  );
   late final PendingPayments pendingPayments = PendingPayments(this);
   late final DroppedNotifications droppedNotifications = DroppedNotifications(
+    this,
+  );
+  late final Categories categories = Categories(this);
+  late final MerchantCategoryMap merchantCategoryMap = MerchantCategoryMap(
     this,
   );
   late final SplitBills splitBills = SplitBills(this);
@@ -5741,16 +5741,130 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
     'index_split_items_billId',
     'CREATE INDEX index_split_items_billId ON split_items (billId)',
   );
+  Selectable<Expense> findExpenseByNotificationKey(
+    String? notificationKey,
+    int postTime,
+  ) {
+    return customSelect(
+      'SELECT * FROM expenses WHERE notificationKey = ?1 AND notificationPostTime = ?2 AND status != \'DISMISSED\' LIMIT 1',
+      variables: [Variable<String>(notificationKey), Variable<int>(postTime)],
+      readsFrom: {this.expenses},
+    ).asyncMap(this.expenses.mapFromRow);
+  }
+
+  Selectable<Expense> findExpenseByDedupKeySince(String dedupKey, int since) {
+    return customSelect(
+      'SELECT * FROM expenses WHERE dedupKey = ?1 AND notificationPostTime >= ?2 LIMIT 1',
+      variables: [Variable<String>(dedupKey), Variable<int>(since)],
+      readsFrom: {this.expenses},
+    ).asyncMap(this.expenses.mapFromRow);
+  }
+
+  Selectable<Expense> findExpenseByAmountInWindow(
+    Decimal amount,
+    TransactionType transactionType,
+    int matchMerchant,
+    String? merchant,
+    int windowStart,
+    int windowEnd,
+  ) {
+    return customSelect(
+      'SELECT * FROM expenses WHERE status != \'DISMISSED\' AND amount = ?1 AND transactionType = ?2 AND(?3 = 0 OR merchant IS ?4)AND notificationPostTime >= ?5 AND notificationPostTime <= ?6 ORDER BY notificationPostTime DESC LIMIT 1',
+      variables: [
+        Variable<String>(Expenses.$converteramount.toSql(amount)),
+        Variable<String>(
+          Expenses.$convertertransactionType.toSql(transactionType),
+        ),
+        Variable<int>(matchMerchant),
+        Variable<String>(merchant),
+        Variable<int>(windowStart),
+        Variable<int>(windowEnd),
+      ],
+      readsFrom: {this.expenses},
+    ).asyncMap(this.expenses.mapFromRow);
+  }
+
+  Selectable<PendingPayment> findPendingByKeys(
+    String dedupKey,
+    String? notificationKey,
+    int postTime,
+  ) {
+    return customSelect(
+      'SELECT * FROM pending_payments WHERE dedupKey = ?1 OR(notificationKey = ?2 AND notificationPostTime = ?3)LIMIT 1',
+      variables: [
+        Variable<String>(dedupKey),
+        Variable<String>(notificationKey),
+        Variable<int>(postTime),
+      ],
+      readsFrom: {this.pendingPayments},
+    ).asyncMap(this.pendingPayments.mapFromRow);
+  }
+
+  Selectable<PendingPayment> findPendingByAmountInWindow(
+    Decimal amount,
+    TransactionType transactionType,
+    int matchMerchant,
+    String? merchant,
+    int windowStart,
+    int windowEnd,
+  ) {
+    return customSelect(
+      'SELECT * FROM pending_payments WHERE amount = ?1 AND transactionType = ?2 AND(?3 = 0 OR merchant IS ?4)AND notificationPostTime >= ?5 AND notificationPostTime <= ?6 LIMIT 1',
+      variables: [
+        Variable<String>(PendingPayments.$converteramount.toSql(amount)),
+        Variable<String>(
+          PendingPayments.$convertertransactionType.toSql(transactionType),
+        ),
+        Variable<int>(matchMerchant),
+        Variable<String>(merchant),
+        Variable<int>(windowStart),
+        Variable<int>(windowEnd),
+      ],
+      readsFrom: {this.pendingPayments},
+    ).asyncMap(this.pendingPayments.mapFromRow);
+  }
+
+  Selectable<DroppedNotification> findDropped(
+    String dedupKey,
+    String? notificationKey,
+  ) {
+    return customSelect(
+      'SELECT * FROM dropped_notifications WHERE dedupKey = ?1 OR notificationKey = ?2 LIMIT 1',
+      variables: [
+        Variable<String>(dedupKey),
+        Variable<String>(notificationKey),
+      ],
+      readsFrom: {this.droppedNotifications},
+    ).asyncMap(this.droppedNotifications.mapFromRow);
+  }
+
+  Future<int> deleteDroppedBefore(int cutoff) {
+    return customUpdate(
+      'DELETE FROM dropped_notifications WHERE droppedAt < ?1',
+      variables: [Variable<int>(cutoff)],
+      updates: {this.droppedNotifications},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Selectable<PendingPayment> observePending() {
+    return customSelect(
+      'SELECT * FROM pending_payments ORDER BY createdAt ASC',
+      variables: [],
+      readsFrom: {this.pendingPayments},
+    ).asyncMap(this.pendingPayments.mapFromRow);
+  }
+
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     expenses,
-    categories,
-    merchantCategoryMap,
     pendingPayments,
     droppedNotifications,
+    categories,
+    merchantCategoryMap,
     splitBills,
     splitItems,
     splitPeople,
@@ -6219,396 +6333,6 @@ typedef $ExpensesProcessedTableManager =
       $ExpensesUpdateCompanionBuilder,
       (Expense, BaseReferences<_$KobanDatabase, Expenses, Expense>),
       Expense,
-      PrefetchHooks Function()
-    >;
-typedef $CategoriesCreateCompanionBuilder = CategoriesCompanion Function({
-  required String id,
-  required String name,
-  required String colorHex,
-  required bool isDefault,
-  Value<int> rowid,
-});
-typedef $CategoriesUpdateCompanionBuilder = CategoriesCompanion Function({
-  Value<String> id,
-  Value<String> name,
-  Value<String> colorHex,
-  Value<bool> isDefault,
-  Value<int> rowid,
-});
-
-class $CategoriesFilterComposer extends Composer<_$KobanDatabase, Categories> {
-  $CategoriesFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get colorHex => $composableBuilder(
-    column: $table.colorHex,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnWithTypeConverterFilters<bool, bool, int> get isDefault =>
-      $composableBuilder(
-        column: $table.isDefault,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
-}
-
-class $CategoriesOrderingComposer
-    extends Composer<_$KobanDatabase, Categories> {
-  $CategoriesOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get colorHex => $composableBuilder(
-    column: $table.colorHex,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get isDefault => $composableBuilder(
-    column: $table.isDefault,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $CategoriesAnnotationComposer
-    extends Composer<_$KobanDatabase, Categories> {
-  $CategoriesAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<String> get colorHex =>
-      $composableBuilder(column: $table.colorHex, builder: (column) => column);
-
-  GeneratedColumnWithTypeConverter<bool, int> get isDefault =>
-      $composableBuilder(column: $table.isDefault, builder: (column) => column);
-}
-
-class $CategoriesTableManager
-    extends
-        RootTableManager<
-          _$KobanDatabase,
-          Categories,
-          Category,
-          $CategoriesFilterComposer,
-          $CategoriesOrderingComposer,
-          $CategoriesAnnotationComposer,
-          $CategoriesCreateCompanionBuilder,
-          $CategoriesUpdateCompanionBuilder,
-          (Category, BaseReferences<_$KobanDatabase, Categories, Category>),
-          Category,
-          PrefetchHooks Function()
-        > {
-  $CategoriesTableManager(_$KobanDatabase db, Categories table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $CategoriesFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $CategoriesOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $CategoriesAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String> colorHex = const Value.absent(),
-                Value<bool> isDefault = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => CategoriesCompanion(
-                id: id,
-                name: name,
-                colorHex: colorHex,
-                isDefault: isDefault,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                required String colorHex,
-                required bool isDefault,
-                Value<int> rowid = const Value.absent(),
-              }) => CategoriesCompanion.insert(
-                id: id,
-                name: name,
-                colorHex: colorHex,
-                isDefault: isDefault,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable<Categories, Category>(table),
-                  BaseReferences<_$KobanDatabase, Categories, Category>(
-                    db,
-                    table,
-                    e,
-                  ),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $CategoriesProcessedTableManager =
-    ProcessedTableManager<
-      _$KobanDatabase,
-      Categories,
-      Category,
-      $CategoriesFilterComposer,
-      $CategoriesOrderingComposer,
-      $CategoriesAnnotationComposer,
-      $CategoriesCreateCompanionBuilder,
-      $CategoriesUpdateCompanionBuilder,
-      (Category, BaseReferences<_$KobanDatabase, Categories, Category>),
-      Category,
-      PrefetchHooks Function()
-    >;
-typedef $MerchantCategoryMapCreateCompanionBuilder =
-    MerchantCategoryMapCompanion Function({
-      required String merchantKey,
-      required String displayName,
-      required String categoryId,
-      required int updatedAt,
-      Value<int> rowid,
-    });
-typedef $MerchantCategoryMapUpdateCompanionBuilder =
-    MerchantCategoryMapCompanion Function({
-      Value<String> merchantKey,
-      Value<String> displayName,
-      Value<String> categoryId,
-      Value<int> updatedAt,
-      Value<int> rowid,
-    });
-
-class $MerchantCategoryMapFilterComposer
-    extends Composer<_$KobanDatabase, MerchantCategoryMap> {
-  $MerchantCategoryMapFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get merchantKey => $composableBuilder(
-    column: $table.merchantKey,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get displayName => $composableBuilder(
-    column: $table.displayName,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get categoryId => $composableBuilder(
-    column: $table.categoryId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
-}
-
-class $MerchantCategoryMapOrderingComposer
-    extends Composer<_$KobanDatabase, MerchantCategoryMap> {
-  $MerchantCategoryMapOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get merchantKey => $composableBuilder(
-    column: $table.merchantKey,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get displayName => $composableBuilder(
-    column: $table.displayName,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get categoryId => $composableBuilder(
-    column: $table.categoryId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $MerchantCategoryMapAnnotationComposer
-    extends Composer<_$KobanDatabase, MerchantCategoryMap> {
-  $MerchantCategoryMapAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get merchantKey => $composableBuilder(
-    column: $table.merchantKey,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get displayName => $composableBuilder(
-    column: $table.displayName,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get categoryId => $composableBuilder(
-    column: $table.categoryId,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get updatedAt =>
-      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
-}
-
-class $MerchantCategoryMapTableManager
-    extends
-        RootTableManager<
-          _$KobanDatabase,
-          MerchantCategoryMap,
-          MerchantCategoryMapData,
-          $MerchantCategoryMapFilterComposer,
-          $MerchantCategoryMapOrderingComposer,
-          $MerchantCategoryMapAnnotationComposer,
-          $MerchantCategoryMapCreateCompanionBuilder,
-          $MerchantCategoryMapUpdateCompanionBuilder,
-          (
-            MerchantCategoryMapData,
-            BaseReferences<
-              _$KobanDatabase,
-              MerchantCategoryMap,
-              MerchantCategoryMapData
-            >,
-          ),
-          MerchantCategoryMapData,
-          PrefetchHooks Function()
-        > {
-  $MerchantCategoryMapTableManager(
-    _$KobanDatabase db,
-    MerchantCategoryMap table,
-  ) : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $MerchantCategoryMapFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $MerchantCategoryMapOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $MerchantCategoryMapAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> merchantKey = const Value.absent(),
-                Value<String> displayName = const Value.absent(),
-                Value<String> categoryId = const Value.absent(),
-                Value<int> updatedAt = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => MerchantCategoryMapCompanion(
-                merchantKey: merchantKey,
-                displayName: displayName,
-                categoryId: categoryId,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String merchantKey,
-                required String displayName,
-                required String categoryId,
-                required int updatedAt,
-                Value<int> rowid = const Value.absent(),
-              }) => MerchantCategoryMapCompanion.insert(
-                merchantKey: merchantKey,
-                displayName: displayName,
-                categoryId: categoryId,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable<MerchantCategoryMap, MerchantCategoryMapData>(
-                    table,
-                  ),
-                  BaseReferences<
-                    _$KobanDatabase,
-                    MerchantCategoryMap,
-                    MerchantCategoryMapData
-                  >(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $MerchantCategoryMapProcessedTableManager =
-    ProcessedTableManager<
-      _$KobanDatabase,
-      MerchantCategoryMap,
-      MerchantCategoryMapData,
-      $MerchantCategoryMapFilterComposer,
-      $MerchantCategoryMapOrderingComposer,
-      $MerchantCategoryMapAnnotationComposer,
-      $MerchantCategoryMapCreateCompanionBuilder,
-      $MerchantCategoryMapUpdateCompanionBuilder,
-      (
-        MerchantCategoryMapData,
-        BaseReferences<
-          _$KobanDatabase,
-          MerchantCategoryMap,
-          MerchantCategoryMapData
-        >,
-      ),
-      MerchantCategoryMapData,
       PrefetchHooks Function()
     >;
 typedef $PendingPaymentsCreateCompanionBuilder =
@@ -7235,6 +6959,396 @@ typedef $DroppedNotificationsProcessedTableManager =
         >,
       ),
       DroppedNotification,
+      PrefetchHooks Function()
+    >;
+typedef $CategoriesCreateCompanionBuilder = CategoriesCompanion Function({
+  required String id,
+  required String name,
+  required String colorHex,
+  required bool isDefault,
+  Value<int> rowid,
+});
+typedef $CategoriesUpdateCompanionBuilder = CategoriesCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<String> colorHex,
+  Value<bool> isDefault,
+  Value<int> rowid,
+});
+
+class $CategoriesFilterComposer extends Composer<_$KobanDatabase, Categories> {
+  $CategoriesFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<bool, bool, int> get isDefault =>
+      $composableBuilder(
+        column: $table.isDefault,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $CategoriesOrderingComposer
+    extends Composer<_$KobanDatabase, Categories> {
+  $CategoriesOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get colorHex => $composableBuilder(
+    column: $table.colorHex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $CategoriesAnnotationComposer
+    extends Composer<_$KobanDatabase, Categories> {
+  $CategoriesAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get colorHex =>
+      $composableBuilder(column: $table.colorHex, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<bool, int> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
+}
+
+class $CategoriesTableManager
+    extends
+        RootTableManager<
+          _$KobanDatabase,
+          Categories,
+          Category,
+          $CategoriesFilterComposer,
+          $CategoriesOrderingComposer,
+          $CategoriesAnnotationComposer,
+          $CategoriesCreateCompanionBuilder,
+          $CategoriesUpdateCompanionBuilder,
+          (Category, BaseReferences<_$KobanDatabase, Categories, Category>),
+          Category,
+          PrefetchHooks Function()
+        > {
+  $CategoriesTableManager(_$KobanDatabase db, Categories table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $CategoriesFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $CategoriesOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $CategoriesAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> colorHex = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CategoriesCompanion(
+                id: id,
+                name: name,
+                colorHex: colorHex,
+                isDefault: isDefault,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required String colorHex,
+                required bool isDefault,
+                Value<int> rowid = const Value.absent(),
+              }) => CategoriesCompanion.insert(
+                id: id,
+                name: name,
+                colorHex: colorHex,
+                isDefault: isDefault,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<Categories, Category>(table),
+                  BaseReferences<_$KobanDatabase, Categories, Category>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $CategoriesProcessedTableManager =
+    ProcessedTableManager<
+      _$KobanDatabase,
+      Categories,
+      Category,
+      $CategoriesFilterComposer,
+      $CategoriesOrderingComposer,
+      $CategoriesAnnotationComposer,
+      $CategoriesCreateCompanionBuilder,
+      $CategoriesUpdateCompanionBuilder,
+      (Category, BaseReferences<_$KobanDatabase, Categories, Category>),
+      Category,
+      PrefetchHooks Function()
+    >;
+typedef $MerchantCategoryMapCreateCompanionBuilder =
+    MerchantCategoryMapCompanion Function({
+      required String merchantKey,
+      required String displayName,
+      required String categoryId,
+      required int updatedAt,
+      Value<int> rowid,
+    });
+typedef $MerchantCategoryMapUpdateCompanionBuilder =
+    MerchantCategoryMapCompanion Function({
+      Value<String> merchantKey,
+      Value<String> displayName,
+      Value<String> categoryId,
+      Value<int> updatedAt,
+      Value<int> rowid,
+    });
+
+class $MerchantCategoryMapFilterComposer
+    extends Composer<_$KobanDatabase, MerchantCategoryMap> {
+  $MerchantCategoryMapFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get merchantKey => $composableBuilder(
+    column: $table.merchantKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $MerchantCategoryMapOrderingComposer
+    extends Composer<_$KobanDatabase, MerchantCategoryMap> {
+  $MerchantCategoryMapOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get merchantKey => $composableBuilder(
+    column: $table.merchantKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $MerchantCategoryMapAnnotationComposer
+    extends Composer<_$KobanDatabase, MerchantCategoryMap> {
+  $MerchantCategoryMapAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get merchantKey => $composableBuilder(
+    column: $table.merchantKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $MerchantCategoryMapTableManager
+    extends
+        RootTableManager<
+          _$KobanDatabase,
+          MerchantCategoryMap,
+          MerchantCategoryMapData,
+          $MerchantCategoryMapFilterComposer,
+          $MerchantCategoryMapOrderingComposer,
+          $MerchantCategoryMapAnnotationComposer,
+          $MerchantCategoryMapCreateCompanionBuilder,
+          $MerchantCategoryMapUpdateCompanionBuilder,
+          (
+            MerchantCategoryMapData,
+            BaseReferences<
+              _$KobanDatabase,
+              MerchantCategoryMap,
+              MerchantCategoryMapData
+            >,
+          ),
+          MerchantCategoryMapData,
+          PrefetchHooks Function()
+        > {
+  $MerchantCategoryMapTableManager(
+    _$KobanDatabase db,
+    MerchantCategoryMap table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $MerchantCategoryMapFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $MerchantCategoryMapOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $MerchantCategoryMapAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> merchantKey = const Value.absent(),
+                Value<String> displayName = const Value.absent(),
+                Value<String> categoryId = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MerchantCategoryMapCompanion(
+                merchantKey: merchantKey,
+                displayName: displayName,
+                categoryId: categoryId,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String merchantKey,
+                required String displayName,
+                required String categoryId,
+                required int updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => MerchantCategoryMapCompanion.insert(
+                merchantKey: merchantKey,
+                displayName: displayName,
+                categoryId: categoryId,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<MerchantCategoryMap, MerchantCategoryMapData>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$KobanDatabase,
+                    MerchantCategoryMap,
+                    MerchantCategoryMapData
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $MerchantCategoryMapProcessedTableManager =
+    ProcessedTableManager<
+      _$KobanDatabase,
+      MerchantCategoryMap,
+      MerchantCategoryMapData,
+      $MerchantCategoryMapFilterComposer,
+      $MerchantCategoryMapOrderingComposer,
+      $MerchantCategoryMapAnnotationComposer,
+      $MerchantCategoryMapCreateCompanionBuilder,
+      $MerchantCategoryMapUpdateCompanionBuilder,
+      (
+        MerchantCategoryMapData,
+        BaseReferences<
+          _$KobanDatabase,
+          MerchantCategoryMap,
+          MerchantCategoryMapData
+        >,
+      ),
+      MerchantCategoryMapData,
       PrefetchHooks Function()
     >;
 typedef $SplitBillsCreateCompanionBuilder = SplitBillsCompanion Function({
@@ -8718,14 +8832,14 @@ class $KobanDatabaseManager {
   $KobanDatabaseManager(this._db);
   $ExpensesTableManager get expenses =>
       $ExpensesTableManager(_db, _db.expenses);
-  $CategoriesTableManager get categories =>
-      $CategoriesTableManager(_db, _db.categories);
-  $MerchantCategoryMapTableManager get merchantCategoryMap =>
-      $MerchantCategoryMapTableManager(_db, _db.merchantCategoryMap);
   $PendingPaymentsTableManager get pendingPayments =>
       $PendingPaymentsTableManager(_db, _db.pendingPayments);
   $DroppedNotificationsTableManager get droppedNotifications =>
       $DroppedNotificationsTableManager(_db, _db.droppedNotifications);
+  $CategoriesTableManager get categories =>
+      $CategoriesTableManager(_db, _db.categories);
+  $MerchantCategoryMapTableManager get merchantCategoryMap =>
+      $MerchantCategoryMapTableManager(_db, _db.merchantCategoryMap);
   $SplitBillsTableManager get splitBills =>
       $SplitBillsTableManager(_db, _db.splitBills);
   $SplitItemsTableManager get splitItems =>

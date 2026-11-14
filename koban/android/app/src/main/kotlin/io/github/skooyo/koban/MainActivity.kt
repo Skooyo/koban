@@ -1,37 +1,44 @@
 package io.github.skooyo.koban
 
+import android.content.Intent
+import android.os.Bundle
+import com.expensetracker.app.listener.CaptureSignal
+import com.expensetracker.app.listener.ListenerDisconnectNotifier
+import com.expensetracker.app.listener.NotificationAccessHelper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodChannel
-import java.io.File
-import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
-    private val worker = Executors.newSingleThreadExecutor()
-
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "io.github.skooyo.koban/legacy")
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "databasePath" -> result.success(getDatabasePath("expense_tracker.db").absolutePath)
-                    "readSettings" -> worker.execute {
-                        try {
-                            val settings = LegacySettingsReader.read(File(filesDir, "datastore"))
-                            runOnUiThread { result.success(settings) }
-                        } catch (e: Throwable) {
-                            // Also an Error: an uncaught one on this thread stops the app,
-                            // and every start runs the import again.
-                            runOnUiThread { result.error("LEGACY_SETTINGS", e.message, null) }
-                        }
-                    }
-                    else -> result.notImplemented()
-                }
-            }
+        flutterEngine.plugins.add(KobanNativePlugin())
     }
 
-    override fun onDestroy() {
-        worker.shutdown()
-        super.onDestroy()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        reconnectIfAsked(intent)
+    }
+
+    // The launch mode is singleTop: a tap on the disconnect alert arrives here.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        reconnectIfAsked(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        NotificationAccessHelper.ensureListenerActive(this)
+        if (NotificationAccessHelper.isListenerConnected()) ListenerDisconnectNotifier.hide(this)
+        CaptureSignal.wakeIfQueued(this)
+    }
+
+    private fun reconnectIfAsked(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_RECONNECT_LISTENER, false) == true) {
+            NotificationAccessHelper.reconnectListener(this)
+        }
+    }
+
+    companion object {
+        const val EXTRA_RECONNECT_LISTENER = "reconnect_listener"
     }
 }

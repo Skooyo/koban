@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon: the Koban coin, cropped to fill 24dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <group
+        android:translateX="-22"
+        android:translateY="-22">
+        <group
+            android:pivotX="54"
+            android:pivotY="54"
+            android:rotation="-14">
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M32,54a22,30 0,1 0,44 0a22,30 0,1 0,-44 0z" />
+        </group>
+    </group>
+</vector>

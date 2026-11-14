@@ -115,7 +115,7 @@ Future<ImportResult> importLegacyData({
     try {
       settings = await legacy.readSettings();
     } catch (e) {
-      settingsError = _describe(e);
+      settingsError = describeError(e);
     }
     await _copySettings(settings, prefs);
 
@@ -141,20 +141,20 @@ Future<ImportResult> importLegacyData({
 ImportFailed _failureOf(Object e) => switch (e) {
       _Failure(:final result) => result,
       CouldNotRollBackException(:final cause) => _failureOf(cause),
-      _ => ImportFailed(const [], _describe(e)),
+      _ => ImportFailed(const [], describeError(e)),
     };
 
 /// The error text for the log. It never holds row values: the toString() of a
 /// SqliteException adds the statement and its bound values (a full payment
 /// row), so only the result code and the message stay.
-String _describe(Object e) {
+String describeError(Object e) {
   switch (e) {
     case SqliteException():
       return 'SqliteException(${e.extendedResultCode}): ${e.message}';
     case DriftRemoteException():
-      return _describe(e.remoteCause);
+      return describeError(e.remoteCause);
     case DriftWrappedException(:final cause?):
-      return _describe(cause);
+      return describeError(cause);
     case PlatformException():
       return 'PlatformException(${e.code}): ${e.message}';
   }
@@ -215,7 +215,7 @@ Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
           rows = old.select('SELECT $quoted FROM "$name"').rows;
         } catch (e) {
           failed.add(name);
-          errors.add('$name: ${_describe(e)}');
+          errors.add('$name: ${describeError(e)}');
           continue;
         }
         // New side: any error stops the transaction at once. SQLite can roll
@@ -252,7 +252,7 @@ Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
           counts[name] = rows.length;
         } catch (e) {
           throw _Failure(ImportFailed([...failed, name],
-              [...errors, '$name: ${_describe(e)}'].join('; ')));
+              [...errors, '$name: ${describeError(e)}'].join('; ')));
         }
       }
       // An error out of the transaction makes Drift roll back all tables.

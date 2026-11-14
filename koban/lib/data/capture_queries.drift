@@ -1,0 +1,44 @@
+import 'schema.drift';
+
+-- Copies of the Room @Query text of ExpenseDao and PendingPaymentDao.
+
+findExpenseByNotificationKey:
+SELECT * FROM expenses
+WHERE notificationKey = :notificationKey
+AND notificationPostTime = :postTime
+AND status != 'DISMISSED'
+LIMIT 1;
+
+findExpenseByDedupKeySince:
+SELECT * FROM expenses WHERE dedupKey = :dedupKey AND notificationPostTime >= :since LIMIT 1;
+
+findExpenseByAmountInWindow:
+SELECT * FROM expenses
+WHERE status != 'DISMISSED'
+AND amount = :amount
+AND transactionType = :transactionType
+AND (:matchMerchant = 0 OR merchant IS :merchant)
+AND notificationPostTime >= :windowStart AND notificationPostTime <= :windowEnd
+ORDER BY notificationPostTime DESC
+LIMIT 1;
+
+findPendingByKeys:
+SELECT * FROM pending_payments WHERE dedupKey = :dedupKey
+OR (notificationKey = :notificationKey AND notificationPostTime = :postTime) LIMIT 1;
+
+findPendingByAmountInWindow:
+SELECT * FROM pending_payments
+WHERE amount = :amount
+AND transactionType = :transactionType
+AND (:matchMerchant = 0 OR merchant IS :merchant)
+AND notificationPostTime >= :windowStart AND notificationPostTime <= :windowEnd
+LIMIT 1;
+
+findDropped:
+SELECT * FROM dropped_notifications WHERE dedupKey = :dedupKey OR notificationKey = :notificationKey LIMIT 1;
+
+deleteDroppedBefore:
+DELETE FROM dropped_notifications WHERE droppedAt < :cutoff;
+
+observePending:
+SELECT * FROM pending_payments ORDER BY createdAt ASC;

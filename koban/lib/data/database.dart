@@ -23,7 +23,7 @@ const legacyTableOrder = <String>[
 ];
 
 /// The Koban database. Its tables equal Room version 11, so the import is a copy.
-@DriftDatabase(include: {'schema.drift'})
+@DriftDatabase(include: {'schema.drift', 'capture_queries.drift'})
 class KobanDatabase extends _$KobanDatabase {
   KobanDatabase(super.executor);
 
