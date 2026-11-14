@@ -6,7 +6,9 @@ import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/payment/payment_screen.dart';
 import '../screens/payment/payment_view_model.dart';
 import '../screens/payment_apps/payment_apps_screen.dart';
+import '../screens/person/person_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../screens/split/split_editor_screen.dart';
 
 // Screen motion of 0.1.1 (`ExpenseTrackerNavHost.kt`): an opened page slides in
 // across the full width while the page below moves 30% left and darkens. Back
@@ -222,7 +224,30 @@ Future<PaymentResult?> openPaymentNew(BuildContext context) =>
     pushSheet<PaymentResult>(context, const PaymentScreen());
 
 /// Opens the sheet that edits the payment [expenseId].
+/// "Split this bill" closes the sheet, then the split editor opens for the payment.
 Future<PaymentResult?> openPaymentEdit(
   BuildContext context,
   String expenseId,
-) => pushSheet<PaymentResult>(context, PaymentScreen(expenseId: expenseId));
+) async {
+  final result = await pushSheet<PaymentResult>(
+    context,
+    PaymentScreen(expenseId: expenseId),
+  );
+  if (result is PaymentOpenSplit && context.mounted) {
+    await openSplitNew(context, expenseId: result.expenseId);
+  }
+  return result;
+}
+
+/// Opens the split editor for a new split. With [expenseId], the split links that payment,
+/// or the editor shows the split that already has it.
+Future<void> openSplitNew(BuildContext context, {String? expenseId}) =>
+    pushPage<void>(context, SplitEditorScreen(expenseId: expenseId));
+
+/// Opens the saved split [billId] on its summary.
+Future<void> openSplitEdit(BuildContext context, String billId) =>
+    pushPage<void>(context, SplitEditorScreen(billId: billId));
+
+/// Opens the page of the person [personId].
+Future<void> openPerson(BuildContext context, String personId) =>
+    pushPage<void>(context, PersonScreen(personId));

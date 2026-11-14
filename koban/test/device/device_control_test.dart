@@ -82,6 +82,23 @@ void main() {
     });
   });
 
+  test('a gallery error with another text is rethrown unchanged', () async {
+    answer(
+      (_) => throw PlatformException(
+        code: 'GALLERY',
+        message: "Couldn't save to gallery.",
+      ),
+    );
+    await expectLater(
+      DeviceControl().saveImageToGallery('/tmp/a.img', 'qr.jpg'),
+      throwsA(
+        isA<PlatformException>()
+            .having((e) => e.code, 'code', 'GALLERY')
+            .having((e) => e.message, 'message', "Couldn't save to gallery."),
+      ),
+    );
+  });
+
   test('another platform error is rethrown unchanged', () async {
     answer((_) => throw PlatformException(code: 'NATIVE_ERROR', message: 'x'));
     await expectLater(

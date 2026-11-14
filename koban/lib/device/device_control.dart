@@ -75,15 +75,20 @@ class DeviceControl {
   Future<bool> requestStoragePermission() async =>
       (await _channel.invokeMethod<bool>('requestStoragePermission'))!;
 
-  /// Saves the picture at [path] to Pictures/Koban. Throws [KobanUserError] when the save fails.
+  /// Saves the picture at [path] to Pictures/Koban. A picture that does not decode throws
+  /// [KobanUserError] "That file isn't an image.". Another failure rethrows the
+  /// [PlatformException], so the screen shows its general message, as 0.1.1 did.
   Future<void> saveImageToGallery(String path, String displayName) async {
+    const notImage = "That file isn't an image.";
     try {
       await _channel.invokeMethod<String>('saveImageToGallery', {
         'path': path,
         'displayName': displayName,
       });
     } on PlatformException catch (e) {
-      if (e.code == 'GALLERY') throw KobanUserError(e.message ?? '');
+      if (e.code == 'GALLERY' && e.message == notImage) {
+        throw const KobanUserError(notImage);
+      }
       rethrow;
     }
   }

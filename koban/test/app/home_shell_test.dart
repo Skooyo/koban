@@ -27,7 +27,17 @@ void main() {
         ['Home', 'Activity', 'People', 'Groups'],
       );
       expect(
-        [for (final d in items) (d.icon as Icon).icon],
+        [
+          for (final d in items)
+            tester
+                .widget<Icon>(
+                  find.descendant(
+                    of: find.byWidget(d),
+                    matching: find.byType(Icon),
+                  ),
+                )
+                .icon,
+        ],
         [Icons.home, Icons.receipt_long, Icons.people, Icons.groups],
       );
       expect(shownTab(tester), 0);

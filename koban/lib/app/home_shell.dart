@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../screens/activity/activity_screen.dart';
 import '../screens/home/home_screen.dart';
+import '../screens/people/people_screen.dart';
 import 'app_services.dart';
 import 'auto_open.dart';
 import 'online_placeholder.dart';
@@ -34,6 +35,9 @@ class HomeShellState extends State<HomeShell> {
   AppLifecycleListener? _lifecycle;
   var _autoOpening = false;
 
+  /// How many people have an open balance. It drives the badge of the People tab.
+  Stream<int>? _openPeople;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +45,14 @@ class HomeShellState extends State<HomeShell> {
     // As 0.1.1 on each activity start. A rotation does not restart the activity in Flutter.
     _lifecycle = AppLifecycleListener(onShow: _autoOpen);
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoOpen());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _openPeople ??= AppScope.of(context).people
+        .watchPeople()
+        .map((people) => people.where((p) => p.hasOpen).length);
   }
 
   @override
@@ -103,7 +115,7 @@ class HomeShellState extends State<HomeShell> {
             children: const [
               HomeScreen(),
               ActivityScreen(),
-              SizedBox.shrink(), // People: plan 4c.
+              PeopleScreen(),
               OnlinePlaceholder(OnlineFeature.groups),
             ],
           ),
@@ -111,14 +123,35 @@ class HomeShellState extends State<HomeShell> {
         bottomNavigationBar: NavigationBar(
           selectedIndex: _tab.index,
           onDestinationSelected: (i) => select(KobanTab.values[i]),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
+            const NavigationDestination(
               icon: Icon(Icons.receipt_long),
               label: 'Activity',
             ),
-            NavigationDestination(icon: Icon(Icons.people), label: 'People'),
-            NavigationDestination(icon: Icon(Icons.groups), label: 'Groups'),
+            NavigationDestination(
+              icon: StreamBuilder<int>(
+                stream: _openPeople,
+                initialData: 0,
+                builder: (context, snapshot) {
+                  final n = snapshot.data ?? 0;
+                  return Badge(
+                    isLabelVisible: n > 0,
+                    label: Semantics(
+                      label: '$n open',
+                      excludeSemantics: true,
+                      child: Text('$n'),
+                    ),
+                    child: const Icon(Icons.people),
+                  );
+                },
+              ),
+              label: 'People',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.groups),
+              label: 'Groups',
+            ),
           ],
         ),
       ),

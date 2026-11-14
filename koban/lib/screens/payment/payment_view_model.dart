@@ -203,7 +203,16 @@ class PaymentViewModel extends ChangeNotifier {
       _edit((f) => f.copyWith(privateToGroups: on));
 
   /// Saves the payment. Returns null when there is no valid amount or a save is under way.
-  Future<PaymentResult?> save() async {
+  Future<PaymentResult?> save() => _persist(split: false);
+
+  /// Saves the edited payment, then asks for the split editor of it.
+  /// Returns null when adding, when there is no valid amount, or when a save is under way.
+  Future<PaymentResult?> saveAndSplit() async {
+    if (_expenseId == null) return null;
+    return _persist(split: true);
+  }
+
+  Future<PaymentResult?> _persist({required bool split}) async {
     final f = _form;
     final amount = f == null ? null : AmountInput.toAmount(f.amountText);
     if (f == null || amount == null || _saving) return null;
@@ -233,6 +242,7 @@ class PaymentViewModel extends ChangeNotifier {
         type: f.type,
         privateToGroups: f.privateToGroups,
       );
+      if (split) return PaymentOpenSplit(id);
     }
     return PaymentClosed(
       id != null

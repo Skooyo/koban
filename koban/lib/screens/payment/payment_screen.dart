@@ -81,6 +81,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (r != null) _close(r);
   }
 
+  Future<void> _saveAndSplit() async {
+    final r = await _vm.saveAndSplit();
+    if (r != null) _close(r);
+  }
+
   Future<void> _delete() async {
     final r = await _vm.delete();
     if (r != null) _close(r);
@@ -307,6 +312,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         style: theme.textTheme.bodySmall!.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
+                      ),
+                    ),
+                  ],
+                  if (editing && f.type == TransactionType.withdraw) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 56,
+                      child: TonalButton(
+                        'Split this bill',
+                        valid ? _saveAndSplit : null,
+                        icon: Icons.groups,
                       ),
                     ),
                   ],

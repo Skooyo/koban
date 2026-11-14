@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +44,9 @@ const deviceChannelName = 'io.github.skooyo.koban/device';
 /// App services on an in-memory database with the categories seeded.
 /// The clock stops at [now] (default: Friday 13 Nov 2026, 12:00).
 /// [checkHold] is the Undo window of Check payments.
+/// [filesDir] is the folder for the QR pictures (default: a new temp folder that the test deletes).
+/// [pickImage] is the photo picker (default: the user cancels).
+/// [cacheDir] is the app cache folder where the picker copies pictures (default: [filesDir]).
 /// The database closes after the widget tree is gone.
 Future<AppServices> testServices({
   DateTime? now,
@@ -50,6 +55,9 @@ Future<AppServices> testServices({
   FakeChannel? listener,
   FakeChannel? device,
   Duration checkHold = const Duration(milliseconds: 4000),
+  Directory? filesDir,
+  Future<String?> Function()? pickImage,
+  Directory? cacheDir,
 }) async {
   final time = now ?? DateTime(2026, 11, 13, 12);
   final previous = SharedPreferencesAsyncPlatform.instance;
@@ -63,6 +71,14 @@ Future<AppServices> testServices({
   device ??= FakeChannel(deviceChannelName, {});
   final db = KobanDatabase(NativeDatabase.memory(setup: configureConnection));
   addTearDown(db.close);
+  if (filesDir == null) {
+    final temp = Directory.systemTemp.createTempSync('koban_files');
+    addTearDown(() {
+      if (temp.existsSync()) temp.deleteSync(recursive: true);
+    });
+    filesDir = temp;
+  }
+  final root = filesDir;
   final host = FakeCaptureHost();
   final s = AppServices(
     db: db,
@@ -74,6 +90,9 @@ Future<AppServices> testServices({
     device: DeviceControl(),
     now: () => time,
     checkHold: checkHold,
+    filesDir: () async => root,
+    cacheDir: () async => cacheDir ?? root,
+    pickImage: pickImage ?? () async => null,
   );
   await s.categories.seedIfEmpty();
   return s;
