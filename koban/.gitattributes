@@ -1,0 +1,3 @@
+# Test data written by the 0.1.1 code: never change line ends.
+*.preferences_pb binary
+*.db binary

@@ -63,3 +63,19 @@ enum CaptureFormat {
     orElse: () => throw ArgumentError('Unknown CaptureFormat: $name'),
   );
 }
+
+/// State of a split debt or an owed item.
+enum DebtStatus {
+  open('OPEN'),
+  paid('PAID');
+
+  const DebtStatus(this.dbName);
+
+  /// The name Room stores (the Kotlin enum constant name).
+  final String dbName;
+
+  static DebtStatus fromDbName(String name) => values.firstWhere(
+    (e) => e.dbName == name,
+    orElse: () => throw ArgumentError('Unknown DebtStatus: $name'),
+  );
+}
