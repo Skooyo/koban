@@ -26,21 +26,29 @@ void main() {
     expect(s.displayLarge!.height, 64 / 57);
     expect(s.displayLarge!.letterSpacing, -1.5);
     expect(s.displayLarge!.fontFamily, 'Bricolage');
-    expect(s.displayLarge!.fontVariations,
-        [const FontVariation('wght', 700), const FontVariation('opsz', 96)]);
-    expect(s.bodyMedium!.fontVariations,
-        [const FontVariation('wght', 400), const FontVariation('opsz', 14)]);
+    // Every style draws the 0.1.1 release look: weight 800, optical size 96.
+    for (final style in [s.displayLarge!, s.titleLarge!, s.bodyMedium!]) {
+      expect(style.fontWeight, FontWeight.w800);
+      expect(style.fontVariations, [
+        const FontVariation('wght', 800),
+        const FontVariation('opsz', 96),
+      ]);
+    }
   });
 
   testWidgets('category colors follow the category ids', (tester) async {
     late BuildContext ctx;
-    await tester.pumpWidget(MaterialApp(
-      theme: kobanTheme(Brightness.dark),
-      home: Builder(builder: (c) {
-        ctx = c;
-        return const SizedBox();
-      }),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: kobanTheme(Brightness.dark),
+        home: Builder(
+          builder: (c) {
+            ctx = c;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
     expect(categoryColor(ctx, 'food'), const Color(0xFFFF6B5E));
     expect(categoryColor(ctx, null), const Color(0xFFA3AEBD));
     expect(categoryColor(ctx, 'c1'), const Color(0xFF8C9EFF));
@@ -48,13 +56,17 @@ void main() {
 
   testWidgets('light money colors follow the tokens', (tester) async {
     late BuildContext ctx;
-    await tester.pumpWidget(MaterialApp(
-      theme: kobanTheme(Brightness.light),
-      home: Builder(builder: (c) {
-        ctx = c;
-        return const SizedBox();
-      }),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: kobanTheme(Brightness.light),
+        home: Builder(
+          builder: (c) {
+            ctx = c;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
     expect(categoryColor(ctx, 'bills'), const Color(0xFFE07A0F));
     expect(MoneyColors.light.gold, const Color(0xFFF2C94C));
     expect(MoneyColors.light.goldText, const Color(0xFF7A5D00));

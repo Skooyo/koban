@@ -35,6 +35,12 @@ class CheckPaymentsViewModel extends ChangeNotifier {
         }),
       )
       ..add(
+        _s.categories.watchMostUsedIds(chipCount).listen((ids) {
+          _mostUsed = ids;
+          notifyListeners();
+        }),
+      )
+      ..add(
         _s.paymentChecks.watchVisible().listen((rows) {
           _rows = rows;
           _build();
@@ -75,6 +81,25 @@ class CheckPaymentsViewModel extends ChangeNotifier {
   String? get undoLabel => _undoLabel;
 
   List<Category> get categories => _categories ?? const [];
+
+  /// How many category chips a card shows.
+  static const chipCount = 4;
+  List<String> _mostUsed = const [];
+
+  /// The chips of a card: the most used categories, then the rest by name.
+  /// The card's own category [selectedId] takes the last chip when it is not in them.
+  List<Category> chipCategories(String? selectedId) {
+    final byId = {for (final c in categories) c.id: c};
+    final chips = {
+      for (final id in _mostUsed) ?byId[id],
+      ...categories,
+    }.take(chipCount).toList();
+    final selected = byId[selectedId];
+    if (selected != null && !chips.contains(selected)) {
+      chips[chips.length - 1] = selected;
+    }
+    return chips;
+  }
 
   /// The messages for a snackbar.
   Stream<String> get messages => _s.paymentChecks.results

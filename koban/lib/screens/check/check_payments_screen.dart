@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/physics.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
+import '../../rules/top_up.dart';
 import '../../theme/mon.dart';
+import '../../ui/alerts_off_row.dart';
 import '../../ui/kit.dart';
+import '../payment/category_sheet.dart';
 import 'check_payment_card.dart';
 import 'check_payments_view_model.dart';
 
@@ -56,12 +60,26 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
   bool _flying = false;
   bool _closed = false;
   int _snackBars = 0;
+  bool _alertsOff = false;
 
   @override
   void initState() {
     super.initState();
     // Leaving the app commits the held swipe at once, so nothing waits on a hidden screen.
-    _lifecycle = AppLifecycleListener(onHide: () => _vm?.flushHold());
+    _lifecycle = AppLifecycleListener(
+      onHide: () => _vm?.flushHold(),
+      onResume: _readAlerts,
+    );
+  }
+
+  Future<void> _readAlerts() async {
+    final off = await alertsBlocked(AppScope.of(context).device);
+    if (mounted && off != _alertsOff) setState(() => _alertsOff = off);
+  }
+
+  Future<void> _turnOnAlerts() async {
+    await turnOnAlerts(AppScope.of(context).device);
+    if (mounted) await _readAlerts();
   }
 
   @override
@@ -71,6 +89,7 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
       final vm = _vm = CheckPaymentsViewModel(AppScope.of(context))
         ..addListener(_onChange);
       _messages = vm.messages.listen(_showMessage);
+      _readAlerts();
     }
   }
 
@@ -170,6 +189,16 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
     onSave: _vm!.edit,
   );
 
+  void _setCategory(CheckCard card, String? id) =>
+      _vm!.edit(card.payment.copyWith(categoryId: Value(id)));
+
+  void _moreCategories(CheckCard card) => showCategorySheet(
+    context,
+    categories: _vm!.categories,
+    selectedId: card.categoryId,
+    onPick: (id) => _setCategory(card, id),
+  );
+
   @override
   Widget build(BuildContext context) {
     final vm = _vm!;
@@ -182,6 +211,12 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
     final top = cards.firstOrNull;
     final shown = cards.take(_stackDepth).toList();
     final label = vm.undoLabel;
+    // A top-up is usually not a payment, so the gold button is Not a payment.
+    final topUp =
+        top != null && looksLikeTopUp(top.payment.rawNotificationText);
+    const dropLabel = _ButtonLabel(Icons.close, 'Not a payment');
+    const saveLabel = _ButtonLabel(Icons.check, 'Save payment');
+    const buttonSize = Size(0, 52);
     return Scaffold(
       body: SafeArea(
         child: Stack(
@@ -217,6 +252,11 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                     ],
                   ),
                 ),
+                if (_alertsOff)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: AlertsOffRow(onTurnOn: _turnOnAlerts),
+                  ),
                 // The card takes the height it needs (up to all of it); the hint sits right under it.
                 Expanded(
                   child: Padding(
@@ -259,28 +299,38 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                       spacing: 8,
                       children: [
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => _decide(save: false),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(0, 52),
-                            ),
-                            child: const _ButtonLabel(
-                              Icons.close,
-                              'Not a payment',
-                            ),
-                          ),
+                          child: topUp
+                              ? FilledButton(
+                                  onPressed: () => _decide(save: false),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: buttonSize,
+                                  ),
+                                  child: dropLabel,
+                                )
+                              : OutlinedButton(
+                                  onPressed: () => _decide(save: false),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: buttonSize,
+                                  ),
+                                  child: dropLabel,
+                                ),
                         ),
                         Expanded(
-                          child: FilledButton(
-                            onPressed: () => _decide(save: true),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(0, 52),
-                            ),
-                            child: const _ButtonLabel(
-                              Icons.check,
-                              'Save payment',
-                            ),
-                          ),
+                          child: topUp
+                              ? OutlinedButton(
+                                  onPressed: () => _decide(save: true),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: buttonSize,
+                                  ),
+                                  child: saveLabel,
+                                )
+                              : FilledButton(
+                                  onPressed: () => _decide(save: true),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: buttonSize,
+                                  ),
+                                  child: saveLabel,
+                                ),
                         ),
                       ],
                     ),
@@ -326,6 +376,7 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
   Widget _stackCard(CheckCard card, int depth) {
     final isTop = depth == 0;
     final payment = card.payment;
+    final chips = _vm!.chipCategories(card.categoryId);
     final layered = TweenAnimationBuilder<double>(
       tween: Tween(end: depth.toDouble()),
       duration: _reduceMotion ? Duration.zero : _move,
@@ -361,6 +412,7 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
               },
               child: CheckPaymentCard(
                 card: card,
+                chips: chips,
                 stamp: _stamp,
                 onEdit: () => _edit(card),
                 onChooseDirection: (type) => _vm!.edit(
@@ -369,9 +421,11 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                     directionUnclear: false,
                   ),
                 ),
+                onPickCategory: (id) => _setCategory(card, id),
+                onMoreCategories: () => _moreCategories(card),
               ),
             )
-          : CheckPaymentCard(card: card),
+          : CheckPaymentCard(card: card, chips: chips),
     );
     // One widget shape for every depth, so a card keeps its lift animation when it moves up.
     // The drag sits outside the layer, so the tilt does not skew the drag distance.
@@ -410,9 +464,8 @@ class _ButtonLabel extends StatelessWidget {
     children: [
       Icon(icon, size: 18),
       const SizedBox(width: 8),
-      Flexible(
-        child: Text(text, style: Theme.of(context).textTheme.labelLarge),
-      ),
+      // No own style: the button's label style holds the right text color.
+      Flexible(child: Text(text)),
     ],
   );
 }

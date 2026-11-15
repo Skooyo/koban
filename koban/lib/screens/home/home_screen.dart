@@ -11,6 +11,7 @@ import '../../data/legacy_import.dart';
 import '../../data/summaries.dart';
 import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
+import '../../ui/alerts_off_row.dart';
 import '../../ui/kit.dart';
 import '../../ui/listener_status_banner.dart';
 import '../../ui/money.dart';
@@ -110,6 +111,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         onEnable: vm.openNotificationSettings,
                       ),
                       const SizedBox(height: 12),
+                      if (vm.alertsOff) ...[
+                        AlertsOffRow(onTurnOn: vm.askForAlerts),
+                        const SizedBox(height: 12),
+                      ],
                       if (vm.listensToNoApp) ...[
                         ListGroup(
                           children: [
@@ -204,10 +209,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 heroTag: null,
                 onPressed: _add,
                 icon: const Icon(Icons.add),
-                label: Text(
-                  'Add payment',
-                  style: weighted(theme.textTheme.titleMedium!, 700),
-                ),
+                label: const Text('Add payment'),
+                extendedTextStyle: weighted(theme.textTheme.titleMedium!, 700),
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: theme.colorScheme.onPrimary,
               ),

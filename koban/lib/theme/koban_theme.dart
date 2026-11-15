@@ -85,22 +85,21 @@ class MoneyColors extends ThemeExtension<MoneyColors> {
     Color? custom,
     Color? other,
     Color? uncategorized,
-  }) =>
-      MoneyColors(
-        received: received ?? this.received,
-        review: review ?? this.review,
-        red: red ?? this.red,
-        blue: blue ?? this.blue,
-        orange: orange ?? this.orange,
-        purple: purple ?? this.purple,
-        teal: teal ?? this.teal,
-        green: green ?? this.green,
-        gold: gold ?? this.gold,
-        goldText: goldText ?? this.goldText,
-        custom: custom ?? this.custom,
-        other: other ?? this.other,
-        uncategorized: uncategorized ?? this.uncategorized,
-      );
+  }) => MoneyColors(
+    received: received ?? this.received,
+    review: review ?? this.review,
+    red: red ?? this.red,
+    blue: blue ?? this.blue,
+    orange: orange ?? this.orange,
+    purple: purple ?? this.purple,
+    teal: teal ?? this.teal,
+    green: green ?? this.green,
+    gold: gold ?? this.gold,
+    goldText: goldText ?? this.goldText,
+    custom: custom ?? this.custom,
+    other: other ?? this.other,
+    uncategorized: uncategorized ?? this.uncategorized,
+  );
 
   @override
   MoneyColors lerp(MoneyColors? other, double t) {
@@ -142,8 +141,8 @@ Color categoryColor(BuildContext context, String? categoryId) {
 
 /// Returns the style with tabular figures, for amounts.
 TextStyle tabular(TextStyle style) => style.copyWith(
-      fontFeatures: [...?style.fontFeatures, const FontFeature.tabularFigures()],
-    );
+  fontFeatures: [...?style.fontFeatures, const FontFeature.tabularFigures()],
+);
 
 // Light and dark schemes: `Theme.kt` LightColors and DarkColors.
 const _lightScheme = ColorScheme(
@@ -199,16 +198,22 @@ const _darkScheme = ColorScheme(
   outlineVariant: Color(0xFF2F3B57),
 );
 
+/// The font look of the 0.1.1 release build. On the phone, 0.1.1 draws every text at the
+/// font's default instance (weight 800, optical size 96), and the owner keeps that look.
+/// The token weights and optical sizes stay for size, line height and tracking only.
+const kobanFontVariations = [
+  FontVariation('wght', 800),
+  FontVariation('opsz', 96),
+];
+
 TextStyle _style(KobanTextStyle t, double opticalSize) => TextStyle(
-      fontFamily: 'Bricolage',
-      fontSize: t.size,
-      height: t.lineHeight / t.size,
-      letterSpacing: t.tracking,
-      fontVariations: [
-        FontVariation('wght', t.weight.toDouble()),
-        FontVariation('opsz', opticalSize),
-      ],
-    );
+  fontFamily: 'Bricolage',
+  fontSize: t.size,
+  height: t.lineHeight / t.size,
+  letterSpacing: t.tracking,
+  fontWeight: FontWeight.w800,
+  fontVariations: kobanFontVariations,
+);
 
 /// The Koban theme. It is the 0.1.1 theme with the colors of DESIGN.md.
 ThemeData kobanTheme(Brightness brightness) {
@@ -254,7 +259,9 @@ ThemeData kobanTheme(Brightness brightness) {
     snackBarTheme: SnackBarThemeData(
       backgroundColor: ink,
       contentTextStyle: textTheme.bodyMedium!.copyWith(color: night),
-      actionTextColor: Color(dark ? KobanColors.light.goldText : KobanColors.dark.gold),
+      actionTextColor: Color(
+        dark ? KobanColors.light.goldText : KobanColors.dark.gold,
+      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(KobanRadius.r12),
       ),

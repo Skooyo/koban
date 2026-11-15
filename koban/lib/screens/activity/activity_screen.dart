@@ -234,10 +234,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 heroTag: null,
                 onPressed: () => _show(openPaymentNew(context)),
                 icon: const Icon(Icons.add),
-                label: Text(
-                  'Add payment',
-                  style: weighted(theme.textTheme.titleMedium!, 700),
-                ),
+                label: const Text('Add payment'),
+                extendedTextStyle: weighted(theme.textTheme.titleMedium!, 700),
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: theme.colorScheme.onPrimary,
               ),

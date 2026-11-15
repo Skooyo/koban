@@ -196,10 +196,8 @@ class _PeopleScreenState extends State<PeopleScreen> {
                 heroTag: null,
                 onPressed: _add,
                 icon: const Icon(Icons.person_add),
-                label: Text(
-                  'Add person',
-                  style: weighted(theme.textTheme.titleMedium!, 700),
-                ),
+                label: const Text('Add person'),
+                extendedTextStyle: weighted(theme.textTheme.titleMedium!, 700),
                 backgroundColor: scheme.primary,
                 foregroundColor: scheme.onPrimary,
               ),

@@ -5876,6 +5876,14 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
     ).asyncMap(this.categories.mapFromRow);
   }
 
+  Selectable<String?> mostUsedCategoryIds(int count) {
+    return customSelect(
+      'SELECT categoryId FROM expenses WHERE status != \'DISMISSED\' AND categoryId IS NOT NULL GROUP BY categoryId ORDER BY COUNT(*) DESC, MAX(notificationPostTime) DESC LIMIT ?1',
+      variables: [Variable<int>(count)],
+      readsFrom: {this.expenses},
+    ).map((QueryRow row) => row.readNullable<String>('categoryId'));
+  }
+
   Selectable<int> categoryCount() {
     return customSelect(
       'SELECT COUNT(*) AS _c0 FROM categories',

@@ -476,7 +476,7 @@ class _Headline extends StatelessWidget {
             FilledButton(
               onPressed: onSettleUp,
               style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-              child: Text('Settle up', style: theme.textTheme.labelLarge),
+              child: const Text('Settle up'),
             ),
         ],
       ),

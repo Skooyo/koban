@@ -216,4 +216,19 @@ void main() {
     await pumpHome(tester, s, textScale: 1.3);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the Add payment label has the gold button text color', (
+    tester,
+  ) async {
+    await pumpHome(tester, await testServices());
+    final label = find.text('Add payment');
+    final color = tester
+        .widget<RichText>(
+          find.descendant(of: label, matching: find.byType(RichText)),
+        )
+        .text
+        .style!
+        .color;
+    expect(color, Theme.of(tester.element(label)).colorScheme.onPrimary);
+  });
 }

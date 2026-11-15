@@ -10,6 +10,7 @@ import '../../app/app_services.dart';
 import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../rules/amount_formatter.dart';
+import '../../rules/top_up.dart';
 import '../../rules/types.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/amount_input.dart';
@@ -27,20 +28,26 @@ String _timeText(BuildContext context, int ms) =>
     );
 
 /// One waiting payment. [stamp] gives the drag as -1 (full "Not a payment") to 1 (full "Save").
-/// [onEdit] and [onChooseDirection] are null on the cards under the top one.
+/// [chips] are the category chips. The callbacks are null on the cards under the top one.
 class CheckPaymentCard extends StatelessWidget {
   const CheckPaymentCard({
     super.key,
     required this.card,
+    this.chips = const [],
     this.stamp,
     this.onEdit,
     this.onChooseDirection,
+    this.onPickCategory,
+    this.onMoreCategories,
   });
 
   final CheckCard card;
+  final List<Category> chips;
   final ValueListenable<double>? stamp;
   final VoidCallback? onEdit;
   final ValueChanged<TransactionType>? onChooseDirection;
+  final ValueChanged<String>? onPickCategory;
+  final VoidCallback? onMoreCategories;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +69,8 @@ class CheckPaymentCard extends StatelessWidget {
       color: received ? money.received : scheme.onSurface,
     );
     final stamp = this.stamp;
+    final topUp = looksLikeTopUp(payment.rawNotificationText);
+    final guessed = payment.format == CaptureFormat.unknown && !topUp;
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: ColoredBox(
@@ -88,11 +97,25 @@ class CheckPaymentCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (payment.format == CaptureFormat.unknown)
-                          _Tag('Unknown format', money.review),
                       ],
                     ),
                   ),
+                  if (topUp)
+                    _Note(
+                      icon: Icons.swap_horiz,
+                      color: scheme.primary,
+                      text:
+                          'Looks like a wallet top-up. A top-up moves your own money, '
+                          'so it is usually not a payment.',
+                    )
+                  else if (guessed)
+                    _Note(
+                      icon: Icons.help_outline,
+                      color: money.review,
+                      text:
+                          'Koban did not know this message, so it guessed the shop '
+                          'and Spent or Received. Check them before you save.',
+                    ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: onEdit == null
@@ -119,10 +142,9 @@ class CheckPaymentCard extends StatelessWidget {
                       selected: payment.directionUnclear
                           ? null
                           : payment.transactionType,
-                      onPick: payment.directionUnclear
-                          ? onChooseDirection
-                          : null,
-                      onTapWhenFixed: onEdit,
+                      // A tap switches Spent or Received on the card, also when the
+                      // direction is known (owner decision; 0.1.1 opened the sheet).
+                      onPick: onChooseDirection,
                     ),
                   ),
                   if (payment.directionUnclear)
@@ -137,18 +159,8 @@ class CheckPaymentCard extends StatelessWidget {
                     children: [
                       KobanRow(
                         title: payment.merchant ?? 'Not set',
-                        subtitle: 'Shop',
-                        showChevron: true,
-                        onTap: onEdit,
-                        onTapLabel: 'Change payment',
-                      ),
-                      KobanRow(
-                        title: card.categoryName,
-                        subtitle: 'Category',
-                        leading: CategoryDot(
-                          categoryColor(context, card.categoryId),
-                          size: 12,
-                        ),
+                        subtitle: guessed ? 'Shop · guessed' : 'Shop',
+                        subtitleColor: guessed ? money.review : null,
                         showChevron: true,
                         onTap: onEdit,
                         onTapLabel: 'Change payment',
@@ -163,22 +175,15 @@ class CheckPaymentCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  _CategoryChips(
+                    chips: chips,
+                    selectedId: card.categoryId,
+                    onPick: onPickCategory,
+                    onMore: onMoreCategories,
+                  ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '“${payment.rawNotificationText}”',
-                        style: text.bodyMedium!.copyWith(color: muted),
-                      ),
-                    ),
+                    child: _RawText('“${payment.rawNotificationText}”'),
                   ),
                 ],
               ),
@@ -215,24 +220,160 @@ class CheckPaymentCard extends StatelessWidget {
   }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag(this.text, this.color);
+/// A short note on the card with an icon in [color].
+class _Note extends StatelessWidget {
+  const _Note({required this.icon, required this.color, required this.text});
 
-  final String text;
+  final IconData icon;
   final Color color;
+  final String text;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: ShapeDecoration(
-      shape: const StadiumBorder(),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    ),
-    child: Text(
-      text,
-      style: Theme.of(context).textTheme.labelLarge!.copyWith(color: color),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 10,
+        children: [
+          Icon(icon, size: 20, color: color),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+        ],
+      ),
     ),
   );
+}
+
+/// The category chips, with More for the full list. A tap on a chip sets its category.
+class _CategoryChips extends StatelessWidget {
+  const _CategoryChips({
+    required this.chips,
+    required this.selectedId,
+    required this.onPick,
+    required this.onMore,
+  });
+
+  final List<Category> chips;
+  final String? selectedId;
+  final ValueChanged<String>? onPick;
+  final VoidCallback? onMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final notSet = selectedId == null;
+    final onPick = this.onPick;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 8,
+        children: [
+          Text(
+            notSet ? 'Category · not set' : 'Category',
+            style: theme.textTheme.bodyMedium!.copyWith(
+              color: notSet
+                  ? MoneyColors.of(context).review
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final c in chips)
+                ChoiceChip(
+                  label: Text(c.name),
+                  avatar: CategoryDot(categoryColor(context, c.id), size: 10),
+                  showCheckmark: false,
+                  selected: c.id == selectedId,
+                  onSelected: onPick == null
+                      ? null
+                      : (_) {
+                          if (c.id != selectedId) onPick(c.id);
+                        },
+                ),
+              ActionChip(
+                label: const Text('More…'),
+                tooltip: 'All categories',
+                onPressed: onMore,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The notification text in one line, with "Show full text" when it is longer.
+class _RawText extends StatefulWidget {
+  const _RawText(this.text);
+
+  final String text;
+
+  @override
+  State<_RawText> createState() => _RawTextState();
+}
+
+class _RawTextState extends State<_RawText> {
+  static const _pad = 12.0;
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodyMedium!.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    return LayoutBuilder(
+      builder: (context, box) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          maxLines: 1,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: box.maxWidth - 2 * _pad);
+        final long = painter.didExceedMaxLines;
+        painter.dispose();
+        final folded = long && !_open;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: _pad,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                widget.text,
+                style: style,
+                maxLines: folded ? 1 : null,
+                overflow: folded ? TextOverflow.ellipsis : null,
+              ),
+            ),
+            if (long)
+              TextButton(
+                onPressed: () => setState(() => _open = !_open),
+                child: Text(_open ? 'Show less' : 'Show full text'),
+              ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 /// A stamp at an angle. It shows only while the drag goes in its direction ([sign]).

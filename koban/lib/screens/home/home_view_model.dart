@@ -6,6 +6,7 @@ import '../../app/app_services.dart';
 import '../../data/legacy_import.dart';
 import '../../data/summaries.dart';
 import '../../rules/periods.dart';
+import '../../ui/alerts_off_row.dart';
 
 /// The state of the Home tab: the access status, the 3 period summaries and the category names.
 class HomeViewModel extends ChangeNotifier {
@@ -48,7 +49,12 @@ class HomeViewModel extends ChangeNotifier {
   bool _hasAnyPayment = true;
   int _waitingCount = 0;
 
+  bool _alertsOff = false;
+
   bool get isAccessGranted => _isAccessGranted;
+
+  /// True when Android blocks Koban's own notifications.
+  bool get alertsOff => _alertsOff;
   PeriodSummary? get today => _today;
   PeriodSummary? get week => _week;
   PeriodSummary? get month => _month;
@@ -100,9 +106,17 @@ class HomeViewModel extends ChangeNotifier {
     // The day moves first: a failed platform call must not freeze it.
     if (_dayStamp() != _day) _watchPeriods();
     final granted = await _s.listener.isAccessGranted();
+    final alertsOff = await alertsBlocked(_s.device);
     if (_disposed) return;
     _isAccessGranted = granted;
+    _alertsOff = alertsOff;
     notifyListeners();
+  }
+
+  /// Asks for the notification permission, then reads it again.
+  Future<void> askForAlerts() async {
+    await turnOnAlerts(_s.device);
+    await refresh();
   }
 
   /// Points the Activity tab at the current month, with the current week when [withWeek].

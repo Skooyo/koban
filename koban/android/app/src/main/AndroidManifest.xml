@@ -11,9 +11,10 @@
         android:maxSdkVersion="28" />
 
     <application
-        android:label="koban"
+        android:label="@string/app_name"
         android:name="io.github.skooyo.koban.KobanApplication"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules">
         <activity

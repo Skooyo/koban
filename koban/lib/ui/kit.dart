@@ -4,13 +4,11 @@ import 'package:material_ui/material_ui.dart';
 import '../rules/types.dart';
 import '../theme/koban_theme.dart';
 
-/// The style with another weight. The Bricolage font is a variable font, so the weight is an axis.
+/// The style for a token weight. Every text uses the 0.1.1 release look (see
+/// [kobanFontVariations]), so [weight] does not change the drawn weight.
 TextStyle weighted(TextStyle style, int weight) => style.copyWith(
-  fontWeight: FontWeight.values[(weight ~/ 100) - 1],
-  fontVariations: [
-    FontVariation('wght', weight.toDouble()),
-    ...?style.fontVariations?.where((v) => v.axis != 'wght'),
-  ],
+  fontWeight: FontWeight.w800,
+  fontVariations: kobanFontVariations,
 );
 
 /// One rounded group of rows. A divider shows between rows only.
@@ -303,7 +301,7 @@ class TonalButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
-          Text(text, style: theme.textTheme.labelLarge),
+          Text(text),
         ],
       ),
     );

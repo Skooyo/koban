@@ -58,6 +58,12 @@ class CategoryRepository {
 
   Future<List<Category>> getAll() => _db.allCategories().get();
 
+  /// The ids of the [count] categories with the most saved payments, most used first.
+  Stream<List<String>> watchMostUsedIds(int count) => _db
+      .mostUsedCategoryIds(count)
+      .watch()
+      .map((ids) => ids.whereType<String>().toList());
+
   /// Adds the built-in categories when the table is empty.
   Future<void> seedIfEmpty() async {
     if (await _db.categoryCount().getSingle() == 0) {
