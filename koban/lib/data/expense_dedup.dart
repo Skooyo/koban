@@ -23,14 +23,18 @@ extension KobanDatabaseDedup on KobanDatabase {
     required String? notificationKey,
   }) async {
     if (notificationKey != null &&
-        await findExpenseByNotificationKey(notificationKey, postTime)
-                .getSingleOrNull() !=
+        await findExpenseByNotificationKey(
+              notificationKey,
+              postTime,
+            ).getSingleOrNull() !=
             null) {
       return true;
     }
     final lookback = postTime - DedupKeyGenerator.dedupLookbackMs();
-    if (await findExpenseByDedupKeySince(dedupKey, lookback)
-            .getSingleOrNull() !=
+    if (await findExpenseByDedupKeySince(
+          dedupKey,
+          lookback,
+        ).getSingleOrNull() !=
         null) {
       return true;
     }

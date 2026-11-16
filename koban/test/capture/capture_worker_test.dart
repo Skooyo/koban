@@ -41,10 +41,11 @@ void main() {
   late SharedPreferencesAsync prefs;
   late CaptureWorker worker;
 
-  Future<int> countPending(KobanDatabase d) async => (await d
-          .customSelect('SELECT COUNT(*) AS c FROM pending_payments')
-          .getSingle())
-      .read<int>('c');
+  Future<int> countPending(KobanDatabase d) async =>
+      (await d
+              .customSelect('SELECT COUNT(*) AS c FROM pending_payments')
+              .getSingle())
+          .read<int>('c');
 
   setUp(() {
     SharedPreferencesAsyncPlatform.instance =
@@ -123,42 +124,39 @@ void main() {
     expect(host.logUpdates.single.$2, 'SKIPPED_ERROR');
   });
 
-  test(
-    'rows that arrive during a drain are handled in the same run, each one time',
-    () async {
-      await prefs.setStringList('payment_app_allowlist', [maybank]);
-      host.queue.add(row(1, maybank, qrText, key: 'k1'));
-      var added = false;
-      late Future<void> second;
-      host.onTake = (afterId) {
-        // The empty answer for afterId 1 is picked. A drain call and two
-        // new rows come now, so only the run-again flag can handle them.
-        if (afterId == 1 && !added) {
-          added = true;
-          second = worker.drain();
-          host.queue.addAll([
-            row(
-              2,
-              maybank,
-              'Successful payment of RM 20.00 to KEDAI SATU. REF: QR000002.',
-              key: 'k2',
-            ),
-            row(
-              3,
-              maybank,
-              'Successful payment of RM 30.00 to KEDAI DUA. REF: QR000003.',
-              key: 'k3',
-            ),
-          ]);
-        }
-      };
-      await worker.drain();
-      await second;
-      expect(host.finished.map((f) => f.$1), [1, 2, 3]);
-      expect(host.finished.map((f) => f.$2), ['WAITING', 'WAITING', 'WAITING']);
-      expect(await countPending(db), 3);
-    },
-  );
+  test('rows that arrive during a drain are handled in the same run, each one time', () async {
+    await prefs.setStringList('payment_app_allowlist', [maybank]);
+    host.queue.add(row(1, maybank, qrText, key: 'k1'));
+    var added = false;
+    late Future<void> second;
+    host.onTake = (afterId) {
+      // The empty answer for afterId 1 is picked. A drain call and two
+      // new rows come now, so only the run-again flag can handle them.
+      if (afterId == 1 && !added) {
+        added = true;
+        second = worker.drain();
+        host.queue.addAll([
+          row(
+            2,
+            maybank,
+            'Successful payment of RM 20.00 to KEDAI SATU. REF: QR000002.',
+            key: 'k2',
+          ),
+          row(
+            3,
+            maybank,
+            'Successful payment of RM 30.00 to KEDAI DUA. REF: QR000003.',
+            key: 'k3',
+          ),
+        ]);
+      }
+    };
+    await worker.drain();
+    await second;
+    expect(host.finished.map((f) => f.$1), [1, 2, 3]);
+    expect(host.finished.map((f) => f.$2), ['WAITING', 'WAITING', 'WAITING']);
+    expect(await countPending(db), 3);
+  });
 
   test('a drain after a takeQueue error works', () async {
     await prefs.setStringList('payment_app_allowlist', [maybank]);

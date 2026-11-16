@@ -15,11 +15,26 @@ void main() {
     expect(c.fromSql('7'), Decimal.parse('7.00'));
   });
   test('enum converters store the Kotlin constant names', () {
-    expect(const ExpenseStatusConverter().toSql(ExpenseStatus.autoSaved), 'AUTO_SAVED');
-    expect(const ExpenseStatusConverter().fromSql('DISMISSED'), ExpenseStatus.dismissed);
-    expect(const TransactionTypeConverter().toSql(TransactionType.receive), 'RECEIVE');
-    expect(const ParseConfidenceConverter().fromSql('LOW'), ParseConfidence.low);
-    expect(const CaptureFormatConverter().toSql(CaptureFormat.unknown), 'UNKNOWN');
+    expect(
+      const ExpenseStatusConverter().toSql(ExpenseStatus.autoSaved),
+      'AUTO_SAVED',
+    );
+    expect(
+      const ExpenseStatusConverter().fromSql('DISMISSED'),
+      ExpenseStatus.dismissed,
+    );
+    expect(
+      const TransactionTypeConverter().toSql(TransactionType.receive),
+      'RECEIVE',
+    );
+    expect(
+      const ParseConfidenceConverter().fromSql('LOW'),
+      ParseConfidence.low,
+    );
+    expect(
+      const CaptureFormatConverter().toSql(CaptureFormat.unknown),
+      'UNKNOWN',
+    );
     expect(const DebtStatusConverter().fromSql('PAID'), DebtStatus.paid);
   });
 }

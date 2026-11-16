@@ -20,7 +20,8 @@ class ChannelLegacySource implements LegacySource {
 
   @override
   Future<Map<String, Object?>> readSettings() async {
-    final raw = await _channel.invokeMapMethod<String, Object?>('readSettings') ?? {};
+    final raw =
+        await _channel.invokeMapMethod<String, Object?>('readSettings') ?? {};
     return {
       for (final e in raw.entries)
         e.key: e.value is List ? List<String>.from(e.value! as List) : e.value,

@@ -148,10 +148,10 @@ class ChannelCaptureHost implements CaptureHost {
   });
 
   @override
-  Future<void> setPaymentApps(Set<String> apps) =>
-      _channel.invokeMethod<void>('setPaymentApps', {
-        'apps': apps.toList()..sort(),
-      });
+  Future<void> setPaymentApps(Set<String> apps) => _channel.invokeMethod<void>(
+    'setPaymentApps',
+    {'apps': apps.toList()..sort()},
+  );
 
   @override
   Future<void> acquireImportGate() =>

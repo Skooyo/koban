@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:drift/drift.dart' show CouldNotRollBackException, DriftWrappedException;
+import 'package:drift/drift.dart'
+    show CouldNotRollBackException, DriftWrappedException;
 // The app database runs in a background isolate, so its errors come as
 // DriftRemoteException. Only this type is used from the experimental library.
 // ignore: experimental_member_use
@@ -58,9 +59,8 @@ final class ImportDone extends ImportResult {
   final String? settingsError;
 
   /// The line for the notification log, or null when there is no problem to log.
-  String? get logLine => settingsError == null
-      ? null
-      : 'Settings import failed ($settingsError)';
+  String? get logLine =>
+      settingsError == null ? null : 'Settings import failed ($settingsError)';
 }
 
 /// The import did not copy the rows. The old file did not change.
@@ -139,10 +139,10 @@ Future<ImportResult> importLegacyData({
 /// The failure result for an error. When SQLite rolled back the transaction by
 /// itself, the ROLLBACK of Drift fails too, and Drift wraps the first error.
 ImportFailed _failureOf(Object e) => switch (e) {
-      _Failure(:final result) => result,
-      CouldNotRollBackException(:final cause) => _failureOf(cause),
-      _ => ImportFailed(const [], describeError(e)),
-    };
+  _Failure(:final result) => result,
+  CouldNotRollBackException(:final cause) => _failureOf(cause),
+  _ => ImportFailed(const [], describeError(e)),
+};
 
 /// The error text for the log. It never holds row values: the toString() of a
 /// SqliteException adds the statement and its bound values (a full payment
@@ -166,7 +166,9 @@ String describeError(Object e) {
 
 /// Writes each old setting that the new settings do not have.
 Future<void> _copySettings(
-    Map<String, Object?> settings, SharedPreferencesAsync prefs) async {
+  Map<String, Object?> settings,
+  SharedPreferencesAsync prefs,
+) async {
   for (final key in legacySettingKeys) {
     final value = settings[key];
     if (value == null || await prefs.containsKey(key)) continue;
@@ -181,7 +183,8 @@ Future<void> _copySettings(
         await prefs.setString(key, v);
       default:
         throw FormatException(
-            'setting $key has the unknown type ${value.runtimeType}');
+          'setting $key has the unknown type ${value.runtimeType}',
+        );
     }
   }
 }
@@ -194,8 +197,12 @@ Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
   try {
     final version = old.userVersion;
     if (version != _legacyVersion) {
-      throw _Failure(ImportFailed(
-          const [], 'old database version $version, needs $_legacyVersion'));
+      throw _Failure(
+        ImportFailed(
+          const [],
+          'old database version $version, needs $_legacyVersion',
+        ),
+      );
     }
     final tables = {for (final t in db.allTables) t.actualTableName: t};
     final counts = <String, int>{};
@@ -222,7 +229,8 @@ Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
         // back the transaction by itself (SQLITE_FULL, SQLITE_IOERR), and then
         // each later write would commit alone.
         try {
-          final insert = 'INSERT OR REPLACE INTO "$name" ($quoted) '
+          final insert =
+              'INSERT OR REPLACE INTO "$name" ($quoted) '
               'VALUES (${List.filled(columns.length, '?').join(', ')})';
           // The raw stored values go in unchanged, with parameter binding.
           await db.batch((b) {
@@ -235,24 +243,34 @@ Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
           final keys = [for (final c in table.$primaryKey) c.name];
           final keyIndexes = [for (final k in keys) columns.indexOf(k)];
           final newKeys = {
-            for (final r in await db
-                .customSelect(
-                    'SELECT ${keys.map((k) => '"$k"').join(', ')} FROM "$name"')
-                .get())
+            for (final r
+                in await db
+                    .customSelect(
+                      'SELECT ${keys.map((k) => '"$k"').join(', ')} FROM "$name"',
+                    )
+                    .get())
               jsonEncode(r.data.values.toList()),
           };
           final found = rows
-              .where((row) =>
-                  newKeys.contains(jsonEncode([for (final i in keyIndexes) row[i]])))
+              .where(
+                (row) => newKeys.contains(
+                  jsonEncode([for (final i in keyIndexes) row[i]]),
+                ),
+              )
               .length;
           if (found != rows.length) {
             throw StateError(
-                '$found of ${rows.length} old rows are in the new table');
+              '$found of ${rows.length} old rows are in the new table',
+            );
           }
           counts[name] = rows.length;
         } catch (e) {
-          throw _Failure(ImportFailed([...failed, name],
-              [...errors, '$name: ${describeError(e)}'].join('; ')));
+          throw _Failure(
+            ImportFailed([
+              ...failed,
+              name,
+            ], [...errors, '$name: ${describeError(e)}'].join('; ')),
+          );
         }
       }
       // An error out of the transaction makes Drift roll back all tables.

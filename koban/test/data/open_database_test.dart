@@ -26,7 +26,10 @@ void main() {
   late SharedPreferencesAsync secretPrefs;
 
   KobanDatabase openFile() => KobanDatabase(
-    NativeDatabase(File('${tmp.path}/koban.sqlite'), setup: configureConnection),
+    NativeDatabase(
+      File('${tmp.path}/koban.sqlite'),
+      setup: configureConnection,
+    ),
   );
 
   Future<ImportResult> run(Future<ImportResult> Function() runImport) =>
@@ -57,23 +60,31 @@ void main() {
     await tmp.delete(recursive: true);
   });
 
-  test('the import runs inside the gate and the gate opens after an error', () async {
-    bool? seenGateHeld;
-    await expectLater(
-      run(() async {
-        seenGateHeld = host.gateHeld;
-        throw StateError('x');
-      }),
-      throwsStateError,
-    );
-    expect(seenGateHeld, true);
-    expect(host.gateHeld, false);
-  });
+  test(
+    'the import runs inside the gate and the gate opens after an error',
+    () async {
+      bool? seenGateHeld;
+      await expectLater(
+        run(() async {
+          seenGateHeld = host.gateHeld;
+          throw StateError('x');
+        }),
+        throwsStateError,
+      );
+      expect(seenGateHeld, true);
+      expect(host.gateHeld, false);
+    },
+  );
 
   test('a failed import goes to the notification log', () async {
     await run(() async => const ImportFailed(['owed_items'], 'x'));
     expect(host.appended, [
-      ('Data import', 'Data import failed: owed_items (x)', 'SKIPPED_ERROR', ''),
+      (
+        'Data import',
+        'Data import failed: owed_items (x)',
+        'SKIPPED_ERROR',
+        '',
+      ),
     ]);
   });
 
@@ -99,7 +110,10 @@ void main() {
       ]);
       return const ImportSkipped();
     });
-    expect(host.paymentApps, {'com.maybank2u.life', 'my.com.tngdigital.ewallet'});
+    expect(host.paymentApps, {
+      'com.maybank2u.life',
+      'my.com.tngdigital.ewallet',
+    });
   });
 
   // Review Focus 4.
@@ -129,15 +143,21 @@ void main() {
     expect(host.appended, isEmpty);
   });
 
-  test('an open with no import moves the secrets of an earlier import', () async {
-    await prefs.setString('device_token', 'test-device-token');
-    await prefs.setString('group_session', '{"refresh_token":"r1"}');
+  test(
+    'an open with no import moves the secrets of an earlier import',
+    () async {
+      await prefs.setString('device_token', 'test-device-token');
+      await prefs.setString('group_session', '{"refresh_token":"r1"}');
 
-    await run(() async => const ImportSkipped());
+      await run(() async => const ImportSkipped());
 
-    expect(await prefs.getString('device_token'), isNull);
-    expect(await prefs.getString('group_session'), isNull);
-    expect(await secretPrefs.getString('device_token'), 'test-device-token');
-    expect(await secretPrefs.getString('group_session'), '{"refresh_token":"r1"}');
-  });
+      expect(await prefs.getString('device_token'), isNull);
+      expect(await prefs.getString('group_session'), isNull);
+      expect(await secretPrefs.getString('device_token'), 'test-device-token');
+      expect(
+        await secretPrefs.getString('group_session'),
+        '{"refresh_token":"r1"}',
+      );
+    },
+  );
 }

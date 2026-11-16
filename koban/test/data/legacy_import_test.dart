@@ -22,7 +22,10 @@ const groupSessionJson =
 
 /// The 8 values of the Task 4 Kotlin test (LegacySettingsReaderTest).
 const legacySettings = <String, Object?>{
-  'payment_app_allowlist': <String>['com.maybank2u.life', 'my.com.tngdigital.ewallet'],
+  'payment_app_allowlist': <String>[
+    'com.maybank2u.life',
+    'my.com.tngdigital.ewallet',
+  ],
   'payment_apps_chosen': true,
   'onboarding_done': true,
   'dark_mode': false,
@@ -91,12 +94,13 @@ void main() {
     writer.execute('PRAGMA journal_mode=WAL');
     writer.execute('PRAGMA wal_autocheckpoint=0');
     writer.execute(
-        'INSERT INTO expenses (id, amount, currency, merchant, rawNotificationText, '
-        'sourcePackage, notificationPostTime, createdAt, dedupKey, status, confidence, '
-        'notificationKey, categoryId, notes, transactionType, countedAmount, privateToGroups) '
-        "VALUES ('w1', '7.00', 'MYR', 'Wal Shop', 'raw w1', 'com.maybank2u.life', "
-        "1762000240000, 1762000240500, 'dk-w1', 'AUTO_SAVED', 'HIGH', NULL, NULL, NULL, "
-        "'WITHDRAW', NULL, 0)");
+      'INSERT INTO expenses (id, amount, currency, merchant, rawNotificationText, '
+      'sourcePackage, notificationPostTime, createdAt, dedupKey, status, confidence, '
+      'notificationKey, categoryId, notes, transactionType, countedAmount, privateToGroups) '
+      "VALUES ('w1', '7.00', 'MYR', 'Wal Shop', 'raw w1', 'com.maybank2u.life', "
+      "1762000240000, 1762000240500, 'dk-w1', 'AUTO_SAVED', 'HIGH', NULL, NULL, NULL, "
+      "'WITHDRAW', NULL, 0)",
+    );
     // Copy the .db and -wal files (not -shm) while the writer is open.
     File(writerPath).copySync(oldPath);
     File('$writerPath-wal').copySync('$oldPath-wal');
@@ -132,40 +136,41 @@ void main() {
     expect(r.settingsError, isNull);
     expect(r.logLine, isNull);
     expect(await rowCountsOf(newDb), fixtureCounts);
-    final e1 = await (newDb.select(newDb.expenses)
-          ..where((e) => e.id.equals('e1')))
-        .getSingle();
+    final e1 = await (newDb.select(
+      newDb.expenses,
+    )..where((e) => e.id.equals('e1'))).getSingle();
     expect(e1.amount, Decimal.parse('12.50'));
     expect(e1.merchant, 'KEDAI Café ☕');
-    expect(e1.rawNotificationText,
-        'Pembayaran RM\u00a012.50 kepada KEDAI Café ☕ berjaya');
+    expect(
+      e1.rawNotificationText,
+      'Pembayaran RM\u00a012.50 kepada KEDAI Café ☕ berjaya',
+    );
     expect(e1.status, ExpenseStatus.autoSaved);
-    final e2 = await (newDb.select(newDb.expenses)
-          ..where((e) => e.id.equals('e2')))
-        .getSingle();
+    final e2 = await (newDb.select(
+      newDb.expenses,
+    )..where((e) => e.id.equals('e2'))).getSingle();
     expect(e2.countedAmount, Decimal.parse('411.33'));
     expect(e2.privateToGroups, true);
     expect(e2.merchant, null);
-    final b1 = await (newDb.select(newDb.splitBills)
-          ..where((b) => b.id.equals('b1')))
-        .getSingle();
+    final b1 = await (newDb.select(
+      newDb.splitBills,
+    )..where((b) => b.id.equals('b1'))).getSingle();
     expect(b1.rounding, Decimal.parse('-0.02'));
-    final d2 = await (newDb.select(newDb.splitDebts)
-          ..where((d) => d.id.equals('d2')))
-        .getSingle();
+    final d2 = await (newDb.select(
+      newDb.splitDebts,
+    )..where((d) => d.id.equals('d2'))).getSingle();
     expect(d2.status, DebtStatus.paid);
     expect(d2.paidAt, 1762100000000);
-    final p2 = await (newDb.select(newDb.pendingPayments)
-          ..where((p) => p.id.equals('p2')))
-        .getSingle();
+    final p2 = await (newDb.select(
+      newDb.pendingPayments,
+    )..where((p) => p.id.equals('p2'))).getSingle();
     expect(p2.format, CaptureFormat.unknown);
     expect(p2.directionUnclear, true);
   });
 
   test('copies stored values without change', () async {
     expect(await run(), isA<ImportDone>());
-    final old =
-        sqlite3.open('$oldPath.pre-flutter', mode: OpenMode.readOnly);
+    final old = sqlite3.open('$oldPath.pre-flutter', mode: OpenMode.readOnly);
     addTearDown(old.close);
     for (final table in newDb.allTables) {
       final name = table.actualTableName;
@@ -180,19 +185,23 @@ void main() {
     }
   });
 
-  test('copies the 8 settings and keeps the group session JSON as it is',
-      () async {
-    expect(await run(), isA<ImportDone>());
-    expect(await prefs.getStringList('payment_app_allowlist'),
-        ['com.maybank2u.life', 'my.com.tngdigital.ewallet']);
-    expect(await prefs.getBool('payment_apps_chosen'), true);
-    expect(await prefs.getBool('onboarding_done'), true);
-    expect(await prefs.getBool('dark_mode'), false);
-    expect(await prefs.getBool('online_features'), false);
-    expect(await prefs.getInt('last_update_check'), 1762300000000);
-    expect(await prefs.getString('device_token'), 'test-device-token-0001');
-    expect(await prefs.getString('group_session'), groupSessionJson);
-  });
+  test(
+    'copies the 8 settings and keeps the group session JSON as it is',
+    () async {
+      expect(await run(), isA<ImportDone>());
+      expect(await prefs.getStringList('payment_app_allowlist'), [
+        'com.maybank2u.life',
+        'my.com.tngdigital.ewallet',
+      ]);
+      expect(await prefs.getBool('payment_apps_chosen'), true);
+      expect(await prefs.getBool('onboarding_done'), true);
+      expect(await prefs.getBool('dark_mode'), false);
+      expect(await prefs.getBool('online_features'), false);
+      expect(await prefs.getInt('last_update_check'), 1762300000000);
+      expect(await prefs.getString('device_token'), 'test-device-token-0001');
+      expect(await prefs.getString('group_session'), groupSessionJson);
+    },
+  );
 
   test('marks the import done and renames the old file', () async {
     await run();
@@ -203,55 +212,70 @@ void main() {
     expect((await rowCountsOf(newDb))['expenses'], 4);
   });
 
-  test('finishes the rename when the mark is set but the old file is still there',
-      () async {
-    await prefs.setBool(importDoneKey, true);
-    expect(await run(), isA<ImportSkipped>());
-    expect(File('$dir/expense_tracker.db').existsSync(), false);
-    expect(File('$dir/expense_tracker.db.pre-flutter').existsSync(), true);
-    expect(await rowCountsOf(newDb), {for (final t in fixtureCounts.keys) t: 0});
-    expect(await prefs.getBool('dark_mode'), isNull);
-  });
+  test(
+    'finishes the rename when the mark is set but the old file is still there',
+    () async {
+      await prefs.setBool(importDoneKey, true);
+      expect(await run(), isA<ImportSkipped>());
+      expect(File('$dir/expense_tracker.db').existsSync(), false);
+      expect(File('$dir/expense_tracker.db.pre-flutter').existsSync(), true);
+      expect(await rowCountsOf(newDb), {
+        for (final t in fixtureCounts.keys) t: 0,
+      });
+      expect(await prefs.getBool('dark_mode'), isNull);
+    },
+  );
 
   // Review Focus 1
-  test('copies rows that are only in the -wal file and moves the -wal file',
-      () async {
-    writeWalOnlyRow();
-    final dbBytes = File(oldPath).readAsBytesSync();
-    final walBytes = File('$oldPath-wal').readAsBytesSync();
+  test(
+    'copies rows that are only in the -wal file and moves the -wal file',
+    () async {
+      writeWalOnlyRow();
+      final dbBytes = File(oldPath).readAsBytesSync();
+      final walBytes = File('$oldPath-wal').readAsBytesSync();
 
-    expect(await run(), isA<ImportDone>());
-    expect((await rowCountsOf(newDb))['expenses'], 5);
-    expect(File('$dir/expense_tracker.db-wal').existsSync(), false);
-    expect(File('$dir/expense_tracker.db.pre-flutter-wal').existsSync(), true);
-    // The read-only open did not checkpoint: both old files are unchanged.
-    expect(File('$oldPath.pre-flutter').readAsBytesSync(), dbBytes);
-    expect(File('$oldPath.pre-flutter-wal').readAsBytesSync(), walBytes);
-    final moved =
-        sqlite3.open('$oldPath.pre-flutter', mode: OpenMode.readOnly);
-    expect(moved.select('SELECT COUNT(*) FROM expenses').first.columnAt(0), 5);
-    moved.close();
-  });
+      expect(await run(), isA<ImportDone>());
+      expect((await rowCountsOf(newDb))['expenses'], 5);
+      expect(File('$dir/expense_tracker.db-wal').existsSync(), false);
+      expect(
+        File('$dir/expense_tracker.db.pre-flutter-wal').existsSync(),
+        true,
+      );
+      // The read-only open did not checkpoint: both old files are unchanged.
+      expect(File('$oldPath.pre-flutter').readAsBytesSync(), dbBytes);
+      expect(File('$oldPath.pre-flutter-wal').readAsBytesSync(), walBytes);
+      final moved = sqlite3.open(
+        '$oldPath.pre-flutter',
+        mode: OpenMode.readOnly,
+      );
+      expect(
+        moved.select('SELECT COUNT(*) FROM expenses').first.columnAt(0),
+        5,
+      );
+      moved.close();
+    },
+  );
 
   // Controller ruling R1b
-  test('copies the rows from a copy when the old file cannot be opened in place',
-      () async {
-    writeWalOnlyRow();
-    // A folder with the -shm name makes the read-only open of the old file fail.
-    Directory('$oldPath-shm').createSync();
-    final dbBytes = File(oldPath).readAsBytesSync();
-    final walBytes = File('$oldPath-wal').readAsBytesSync();
+  test(
+    'copies the rows from a copy when the old file cannot be opened in place',
+    () async {
+      writeWalOnlyRow();
+      // A folder with the -shm name makes the read-only open of the old file fail.
+      Directory('$oldPath-shm').createSync();
+      final dbBytes = File(oldPath).readAsBytesSync();
+      final walBytes = File('$oldPath-wal').readAsBytesSync();
 
-    expect(await run(), isA<ImportDone>());
-    expect((await rowCountsOf(newDb))['expenses'], 5);
-    expect(File('$oldPath.pre-flutter').readAsBytesSync(), dbBytes);
-    expect(File('$oldPath.pre-flutter-wal').readAsBytesSync(), walBytes);
-    expect(Directory('$dir/legacy_import_copy').existsSync(), false);
-  });
+      expect(await run(), isA<ImportDone>());
+      expect((await rowCountsOf(newDb))['expenses'], 5);
+      expect(File('$oldPath.pre-flutter').readAsBytesSync(), dbBytes);
+      expect(File('$oldPath.pre-flutter-wal').readAsBytesSync(), walBytes);
+      expect(Directory('$dir/legacy_import_copy').existsSync(), false);
+    },
+  );
 
   // Controller ruling R1b, review fix round 1
-  test('rolls back a hot journal in the copy and imports the values before the crash',
-      () async {
+  test('rolls back a hot journal in the copy and imports the values before the crash', () async {
     // A writer on a separate copy stops in the middle of a commit in rollback
     // journal mode: the main file has some changed pages, and the -journal has
     // the original pages.
@@ -278,8 +302,12 @@ void main() {
     // The main file alone has the half-written values.
     File(oldPath).copySync('$dir/db-only.db');
     final dbOnly = sqlite3.open('$dir/db-only.db', mode: OpenMode.readOnly);
-    expect(dbOnly.select("SELECT name FROM categories WHERE id = 'food'").first['name'],
-        'CHANGED');
+    expect(
+      dbOnly
+          .select("SELECT name FROM categories WHERE id = 'food'")
+          .first['name'],
+      'CHANGED',
+    );
     dbOnly.close();
     final dbBytes = File(oldPath).readAsBytesSync();
     final journalBytes = File('$oldPath-journal').readAsBytesSync();
@@ -299,7 +327,10 @@ void main() {
     }
     // The old files did not change. They moved with the rename.
     expect(File('$oldPath.pre-flutter').readAsBytesSync(), dbBytes);
-    expect(File('$oldPath.pre-flutter-journal').readAsBytesSync(), journalBytes);
+    expect(
+      File('$oldPath.pre-flutter-journal').readAsBytesSync(),
+      journalBytes,
+    );
     expect(Directory('$dir/legacy_import_copy').existsSync(), false);
   });
 
@@ -314,81 +345,100 @@ void main() {
   });
 
   // Review Focus 2
-  test('copies by column name when the old columns are in another order',
-      () async {
-    changeOld((old) {
-      final cols = [
-        for (final r in old.select('PRAGMA table_info(expenses)'))
-          '"${r['name']}" ${r['type']}',
-      ].reversed.toList();
-      final names = [for (final c in cols) c.split(' ').first];
-      old.execute('CREATE TABLE expenses_new (${cols.join(', ')})');
-      old.execute('INSERT INTO expenses_new SELECT ${names.join(', ')} FROM expenses');
-      old.execute('DROP TABLE expenses');
-      old.execute('ALTER TABLE expenses_new RENAME TO expenses');
-      expect(old.select('PRAGMA table_info(expenses)').first['name'],
-          'privateToGroups');
-    });
-    expect(await run(), isA<ImportDone>());
-    final e1 = await (newDb.select(newDb.expenses)
-          ..where((e) => e.id.equals('e1')))
-        .getSingle();
-    expect(e1.amount, Decimal.parse('12.50'));
-    expect(e1.dedupKey, 'dk-e1');
-    expect(e1.notificationKey, 'nk-1');
-    expect(e1.categoryId, 'food');
-  });
+  test(
+    'copies by column name when the old columns are in another order',
+    () async {
+      changeOld((old) {
+        final cols = [
+          for (final r in old.select('PRAGMA table_info(expenses)'))
+            '"${r['name']}" ${r['type']}',
+        ].reversed.toList();
+        final names = [for (final c in cols) c.split(' ').first];
+        old.execute('CREATE TABLE expenses_new (${cols.join(', ')})');
+        old.execute(
+          'INSERT INTO expenses_new SELECT ${names.join(', ')} FROM expenses',
+        );
+        old.execute('DROP TABLE expenses');
+        old.execute('ALTER TABLE expenses_new RENAME TO expenses');
+        expect(
+          old.select('PRAGMA table_info(expenses)').first['name'],
+          'privateToGroups',
+        );
+      });
+      expect(await run(), isA<ImportDone>());
+      final e1 = await (newDb.select(
+        newDb.expenses,
+      )..where((e) => e.id.equals('e1'))).getSingle();
+      expect(e1.amount, Decimal.parse('12.50'));
+      expect(e1.dedupKey, 'dk-e1');
+      expect(e1.notificationKey, 'nk-1');
+      expect(e1.categoryId, 'food');
+    },
+  );
 
   // Review Focus 4
-  test('a second import keeps new rows and lets old rows win on the same key',
-      () async {
-    const defaults = {
-      'food': ('Food', '#E53935'),
-      'transport': ('Transport', '#1E88E5'),
-      'shopping': ('Shopping', '#8E24AA'),
-      'bills': ('Bills & Utilities', '#FB8C00'),
-      'entertainment': ('Entertainment', '#43A047'),
-      'health': ('Health', '#00ACC1'),
-      'other': ('Other', '#757575'),
-    };
-    for (final e in defaults.entries) {
-      await newDb.into(newDb.categories).insert(CategoriesCompanion.insert(
-          id: e.key, name: e.value.$1, colorHex: e.value.$2, isDefault: true));
-    }
-    await newDb.into(newDb.expenses).insert(ExpensesCompanion.insert(
-          id: 'new-1',
-          amount: Decimal.parse('3.00'),
-          currency: 'MYR',
-          rawNotificationText: 'raw new-1',
-          sourcePackage: 'com.maybank2u.life',
-          notificationPostTime: 1763000000000,
-          createdAt: 1763000000500,
-          dedupKey: 'dk-new-1',
-          status: ExpenseStatus.autoSaved,
-          confidence: ParseConfidence.high,
-          transactionType: TransactionType.withdraw,
-          privateToGroups: false,
-        ));
-    await prefs.setBool('dark_mode', true);
+  test(
+    'a second import keeps new rows and lets old rows win on the same key',
+    () async {
+      const defaults = {
+        'food': ('Food', '#E53935'),
+        'transport': ('Transport', '#1E88E5'),
+        'shopping': ('Shopping', '#8E24AA'),
+        'bills': ('Bills & Utilities', '#FB8C00'),
+        'entertainment': ('Entertainment', '#43A047'),
+        'health': ('Health', '#00ACC1'),
+        'other': ('Other', '#757575'),
+      };
+      for (final e in defaults.entries) {
+        await newDb
+            .into(newDb.categories)
+            .insert(
+              CategoriesCompanion.insert(
+                id: e.key,
+                name: e.value.$1,
+                colorHex: e.value.$2,
+                isDefault: true,
+              ),
+            );
+      }
+      await newDb
+          .into(newDb.expenses)
+          .insert(
+            ExpensesCompanion.insert(
+              id: 'new-1',
+              amount: Decimal.parse('3.00'),
+              currency: 'MYR',
+              rawNotificationText: 'raw new-1',
+              sourcePackage: 'com.maybank2u.life',
+              notificationPostTime: 1763000000000,
+              createdAt: 1763000000500,
+              dedupKey: 'dk-new-1',
+              status: ExpenseStatus.autoSaved,
+              confidence: ParseConfidence.high,
+              transactionType: TransactionType.withdraw,
+              privateToGroups: false,
+            ),
+          );
+      await prefs.setBool('dark_mode', true);
 
-    expect(await run(), isA<ImportDone>());
-    expect((await rowCountsOf(newDb))['categories'], 8);
-    expect((await rowCountsOf(newDb))['expenses'], 5);
-    final food = await (newDb.select(newDb.categories)
-          ..where((c) => c.id.equals('food')))
-        .getSingle();
-    expect(food.name, 'Food & Dining');
-    final new1 = await (newDb.select(newDb.expenses)
-          ..where((e) => e.id.equals('new-1')))
-        .getSingle();
-    expect(new1.dedupKey, 'dk-new-1');
-    expect(await prefs.getBool('dark_mode'), true);
-    expect(await prefs.getBool('onboarding_done'), true);
-  });
+      expect(await run(), isA<ImportDone>());
+      expect((await rowCountsOf(newDb))['categories'], 8);
+      expect((await rowCountsOf(newDb))['expenses'], 5);
+      final food = await (newDb.select(
+        newDb.categories,
+      )..where((c) => c.id.equals('food'))).getSingle();
+      expect(food.name, 'Food & Dining');
+      final new1 = await (newDb.select(
+        newDb.expenses,
+      )..where((e) => e.id.equals('new-1'))).getSingle();
+      expect(new1.dedupKey, 'dk-new-1');
+      expect(await prefs.getBool('dark_mode'), true);
+      expect(await prefs.getBool('onboarding_done'), true);
+    },
+  );
 
   // Review Focus 5
-  test('rolls back and keeps the old file when a table cannot be copied',
-      () async {
+  test('rolls back and keeps the old file when a table cannot be copied', () async {
     changeOld((old) => old.execute('DROP TABLE owed_items'));
     final r = await run() as ImportFailed;
     expect(r.tables, ['owed_items']);
@@ -397,8 +447,10 @@ void main() {
     expect(File('$dir/expense_tracker.db').existsSync(), true);
     expect(File('$dir/expense_tracker.db.pre-flutter').existsSync(), false);
     expect(await prefs.getBool('legacy_import_done'), isNull);
-    expect(importFailedMessage,
-        'Koban could not move your data. Your data is safe. Update again later.');
+    expect(
+      importFailedMessage,
+      'Koban could not move your data. Your data is safe. Update again later.',
+    );
   });
 
   test('refuses an old database that is not version 11', () async {
@@ -416,15 +468,21 @@ void main() {
     expect(await prefs.getKeys(), isEmpty);
   });
 
-  test('copies the rows and reports the settings error when the settings cannot be read',
-      () async {
-    legacy = FakeLegacySource(oldPath,
-        settingsError: PlatformException(code: 'LEGACY_SETTINGS', message: 'bad file'));
+  test('copies the rows and reports the settings error when the settings cannot be read', () async {
+    legacy = FakeLegacySource(
+      oldPath,
+      settingsError: PlatformException(
+        code: 'LEGACY_SETTINGS',
+        message: 'bad file',
+      ),
+    );
     final r = await run() as ImportDone;
     expect(r.rowCounts, fixtureCounts);
     expect(r.settingsError, 'PlatformException(LEGACY_SETTINGS): bad file');
-    expect(r.logLine,
-        'Settings import failed (PlatformException(LEGACY_SETTINGS): bad file)');
+    expect(
+      r.logLine,
+      'Settings import failed (PlatformException(LEGACY_SETTINGS): bad file)',
+    );
     expect(await rowCountsOf(newDb), fixtureCounts);
     expect(await prefs.getKeys(), {importDoneKey});
     expect(await prefs.getBool(importDoneKey), true);
@@ -435,51 +493,60 @@ void main() {
   // The app opens the database in a background isolate (drift_flutter), so
   // the error comes back as a DriftRemoteException. Check both ways.
   for (final background in [false, true]) {
-    test('keeps the row values out of the log line when a row cannot be written '
-        '(background isolate: $background)', () async {
-      if (background) {
-        await newDb.close();
-        newDb = KobanDatabase(
-            NativeDatabase.createInBackground(File('$dir/koban-bg.sqlite')));
-      }
-      // A damaged old row: the old table has no NOT NULL rule and e1 has no currency.
-      changeOld((old) {
-        final cols = [
-          for (final r in old.select('PRAGMA table_info(expenses)')) '"${r['name']}"',
-        ];
-        old.execute('CREATE TABLE expenses_loose (${cols.join(', ')})');
-        old.execute('INSERT INTO expenses_loose SELECT * FROM expenses');
-        old.execute('DROP TABLE expenses');
-        old.execute('ALTER TABLE expenses_loose RENAME TO expenses');
-        old.execute("UPDATE expenses SET currency = NULL WHERE id = 'e1'");
-      });
-      final r = await run() as ImportFailed;
-      expect(r.tables, ['expenses']);
-      expect(r.logLine, isNot(contains('KEDAI')));
-      expect(r.logLine, isNot(contains('Pembayaran')));
-      expect(r.logLine, isNot(contains('dk-e1')));
-      expect(r.logLine,
+    test(
+      'keeps the row values out of the log line when a row cannot be written '
+      '(background isolate: $background)',
+      () async {
+        if (background) {
+          await newDb.close();
+          newDb = KobanDatabase(
+            NativeDatabase.createInBackground(File('$dir/koban-bg.sqlite')),
+          );
+        }
+        // A damaged old row: the old table has no NOT NULL rule and e1 has no currency.
+        changeOld((old) {
+          final cols = [
+            for (final r in old.select('PRAGMA table_info(expenses)'))
+              '"${r['name']}"',
+          ];
+          old.execute('CREATE TABLE expenses_loose (${cols.join(', ')})');
+          old.execute('INSERT INTO expenses_loose SELECT * FROM expenses');
+          old.execute('DROP TABLE expenses');
+          old.execute('ALTER TABLE expenses_loose RENAME TO expenses');
+          old.execute("UPDATE expenses SET currency = NULL WHERE id = 'e1'");
+        });
+        final r = await run() as ImportFailed;
+        expect(r.tables, ['expenses']);
+        expect(r.logLine, isNot(contains('KEDAI')));
+        expect(r.logLine, isNot(contains('Pembayaran')));
+        expect(r.logLine, isNot(contains('dk-e1')));
+        expect(
+          r.logLine,
           'Data import failed: expenses (expenses: SqliteException(1299): '
-          'NOT NULL constraint failed: expenses.currency)');
-      expect(File(oldPath).existsSync(), true);
-      expect(await prefs.getBool(importDoneKey), isNull);
-    });
+          'NOT NULL constraint failed: expenses.currency)',
+        );
+        expect(File(oldPath).existsSync(), true);
+        expect(await prefs.getBool(importDoneKey), isNull);
+      },
+    );
   }
 
-  test('stops all tables and keeps the new rows when SQLite rolls back the transaction',
-      () async {
+  test('stops all tables and keeps the new rows when SQLite rolls back the transaction', () async {
     // Rows that the new database had before the import.
     await newDb.customStatement(
-        "INSERT INTO categories (id, name, colorHex, isDefault) "
-        "VALUES ('new-cat', 'New', '#000000', 0)");
+      "INSERT INTO categories (id, name, colorHex, isDefault) "
+      "VALUES ('new-cat', 'New', '#000000', 0)",
+    );
     await newDb.customStatement(
-        "INSERT INTO split_people (id, name, lastUsedAt) "
-        "VALUES ('new-person', 'New', 1763000000000)");
+      "INSERT INTO split_people (id, name, lastUsedAt) "
+      "VALUES ('new-person', 'New', 1763000000000)",
+    );
     // A write to split_bills makes SQLite roll back the whole transaction,
     // as SQLITE_FULL or SQLITE_IOERR can do.
     await newDb.customStatement(
-        'CREATE TRIGGER fail_split_bills BEFORE INSERT ON split_bills '
-        "BEGIN SELECT RAISE(ROLLBACK, 'test write failure'); END");
+      'CREATE TRIGGER fail_split_bills BEFORE INSERT ON split_bills '
+      "BEGIN SELECT RAISE(ROLLBACK, 'test write failure'); END",
+    );
     final before = await rowCountsOf(newDb);
 
     final r = await run() as ImportFailed;

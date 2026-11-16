@@ -266,6 +266,9 @@ ThemeData kobanTheme(Brightness brightness) {
         borderRadius: BorderRadius.circular(KobanRadius.r12),
       ),
       behavior: SnackBarBehavior.floating,
+      // The tab pages put the "Add ..." button 16 up from the tab bar. It is 56 high,
+      // so the snackbar floats 16 above it and never covers it.
+      insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
     ),
     dialogTheme: DialogThemeData(
       shape: RoundedRectangleBorder(
