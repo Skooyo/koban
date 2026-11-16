@@ -271,6 +271,22 @@ OutlinedButton galleryButton(WidgetTester tester) =>
     tester.widget(find.widgetWithText(OutlinedButton, 'Choose from gallery'));
 
 void main() {
+  testWidgets(
+    'the receipt step says the photo goes to the server with online access',
+    (tester) async {
+      await openEditor(
+        tester,
+        await testServices(secrets: {'device_token': 'test-token'}),
+      );
+      expect(
+        find.text(
+          "Koban reads the items on your phone and with Claude. The photo goes to Koban's server, which deletes it after reading.",
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('the receipt step offers the photo buttons and typing', (
     tester,
   ) async {
@@ -280,7 +296,7 @@ void main() {
     expect(find.text('Start with the receipt'), findsOneWidget);
     expect(
       find.text(
-        'Koban reads the items for you. The photo is read once and then deleted. It is not kept.',
+        'Koban reads the items on your phone. The photo is not sent anywhere.',
       ),
       findsOneWidget,
     );

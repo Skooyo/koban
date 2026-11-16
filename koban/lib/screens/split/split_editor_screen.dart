@@ -13,6 +13,7 @@ import '../../theme/mon.dart';
 import '../../ui/amount_input.dart';
 import '../../ui/dialogs.dart';
 import '../../ui/kit.dart';
+import '../../ui/sheets.dart';
 import 'split_editor_steps.dart';
 import 'split_editor_view_model.dart';
 
@@ -405,8 +406,8 @@ class _PhotoStepState extends State<_PhotoStep> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
                       widget.state.onlineAccess
-                          ? "Koban reads the items for you. With online access, the photo goes to Koban's server to be read, then it is deleted."
-                          : 'Koban reads the items for you. The photo is read once and then deleted. It is not kept.',
+                          ? "Koban reads the items on your phone and with Claude. The photo goes to Koban's server, which deletes it after reading."
+                          : 'Koban reads the items on your phone. The photo is not sent anywhere.',
                       style: theme.textTheme.bodyMedium!.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -615,8 +616,10 @@ class MismatchCard extends StatelessWidget {
 
 /// The Fix sheet of 0.1.1. It closes when no mismatch is left and Claude does not read.
 Future<void> showFixSheet(BuildContext context, SplitEditorViewModel vm) =>
-    showModalBottomSheet<void>(
+    showKobanSheet<void>(
       context: context,
+      isScrollControlled: false,
+      showDragHandle: false,
       builder: (context) => _FixSheet(vm: vm),
     );
 

@@ -137,10 +137,11 @@ void main() {
     notificationKey: key,
   );
 
-  Future<Object?> cards() async => (await db
-          .customSelect('SELECT COUNT(*) AS n FROM pending_payments')
-          .getSingle())
-      .data['n'];
+  Future<Object?> cards() async =>
+      (await db
+              .customSelect('SELECT COUNT(*) AS n FROM pending_payments')
+              .getSingle())
+          .data['n'];
 
   test('a new payment becomes a waiting card in the Room formats', () async {
     final id = await repo.capture(
@@ -197,59 +198,54 @@ void main() {
     },
   );
 
-  test('a dismissed expense does not block by notification key or amount',
-      () async {
-    await addExpense(
-      notificationKey: 'k1',
-      status: ExpenseStatus.dismissed,
-    );
-    expect(await capture(rm15), isA<String>());
-    expect(await cards(), 1);
-  });
-
   test(
-    'an expense with the same dedup key blocks only from 30 minutes before the post time',
+    'a dismissed expense does not block by notification key or amount',
     () async {
-      // The capture is at P. The check starts at P - 1800000.
-      await addExpense(
-        dedupKey: rm15Key,
-        amount: '1.00',
-        merchant: 'Z',
-        postTime: P - 1740000,
-      );
-      expect(await capture(rm15), isNull);
-      await db.delete(db.expenses).go();
-      await addExpense(
-        dedupKey: rm15Key,
-        amount: '1.00',
-        merchant: 'Z',
-        postTime: P - 1800001,
-      );
+      await addExpense(notificationKey: 'k1', status: ExpenseStatus.dismissed);
       expect(await capture(rm15), isA<String>());
+      expect(await cards(), 1);
     },
   );
 
-  test('a dismissed expense with the same dedup key still blocks the card',
-      () async {
+  test('an expense with the same dedup key blocks only from 30 minutes before the post time', () async {
+    // The capture is at P. The check starts at P - 1800000.
     await addExpense(
       dedupKey: rm15Key,
       amount: '1.00',
       merchant: 'Z',
-      status: ExpenseStatus.dismissed,
+      postTime: P - 1740000,
     );
     expect(await capture(rm15), isNull);
+    await db.delete(db.expenses).go();
+    await addExpense(
+      dedupKey: rm15Key,
+      amount: '1.00',
+      merchant: 'Z',
+      postTime: P - 1800001,
+    );
+    expect(await capture(rm15), isA<String>());
   });
 
   test(
-    'the same amount and direction within 5 minutes blocks a spend from another app',
+    'a dismissed expense with the same dedup key still blocks the card',
     () async {
-      await addExpense(pkg: tng, merchant: 'OTHER', postTime: P + 300000);
+      await addExpense(
+        dedupKey: rm15Key,
+        amount: '1.00',
+        merchant: 'Z',
+        status: ExpenseStatus.dismissed,
+      );
       expect(await capture(rm15), isNull);
-      await db.delete(db.expenses).go();
-      await addExpense(pkg: tng, merchant: 'OTHER', postTime: P + 300001);
-      expect(await capture(rm15), isA<String>());
     },
   );
+
+  test('the same amount and direction within 5 minutes blocks a spend from another app', () async {
+    await addExpense(pkg: tng, merchant: 'OTHER', postTime: P + 300000);
+    expect(await capture(rm15), isNull);
+    await db.delete(db.expenses).go();
+    await addExpense(pkg: tng, merchant: 'OTHER', postTime: P + 300001);
+    expect(await capture(rm15), isA<String>());
+  });
 
   test('a receive is blocked only by the same sender', () async {
     await addExpense(
@@ -299,14 +295,16 @@ void main() {
     expect(left.map((r) => r.data['dedupKey']).toList(), ['keep']);
   });
 
-  test('a text with no clear direction makes a card with directionUnclear 1',
-      () async {
-    await capture(parsed('15.00', 'RESTORAN CONTOH', clear: false));
-    final row = await db
-        .customSelect('SELECT directionUnclear FROM pending_payments')
-        .getSingle();
-    expect(row.data['directionUnclear'], 1);
-  });
+  test(
+    'a text with no clear direction makes a card with directionUnclear 1',
+    () async {
+      await capture(parsed('15.00', 'RESTORAN CONTOH', clear: false));
+      final row = await db
+          .customSelect('SELECT directionUnclear FROM pending_payments')
+          .getSingle();
+      expect(row.data['directionUnclear'], 1);
+    },
+  );
 
   test('force capture skips every check and uses a forced key', () async {
     await addExpense(dedupKey: rm15Key, notificationKey: 'k1');
@@ -327,6 +325,19 @@ void main() {
     expect(row.data['notificationKey'], isNull);
     expect(row.data['amount'], '15.00');
     expect(row.data['createdAt'], T);
+  });
+
+  test('force capture saves a received-from text as Received', () async {
+    // "Payment" is a debit word, but "received from" says the money came in.
+    await repo.forceCapture(
+      sourcePackage: 'com.example.wallet',
+      rawText:
+          'Payment received. RM 69.00 received from TEST PERSON for TEST OWNER',
+      notificationPostTime: P,
+    );
+    final card = (await repo.watchWaiting().first).single;
+    expect(card.transactionType, TransactionType.receive);
+    expect(card.directionUnclear, false);
   });
 
   test('force capture returns false when the text has no amount', () async {

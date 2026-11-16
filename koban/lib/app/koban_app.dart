@@ -1,9 +1,26 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/koban_theme.dart';
 import 'app_services.dart';
 import 'home_shell.dart';
 import 'routes.dart';
+
+/// The system bars follow the theme: the navigation bar has the color of the app tab bar,
+/// and the icons of both bars are light on dark and dark on light.
+SystemUiOverlayStyle systemBarStyle(ThemeData theme) {
+  final icons = theme.brightness == Brightness.dark
+      ? Brightness.light
+      : Brightness.dark;
+  return SystemUiOverlayStyle(
+    statusBarColor: const Color(0x00000000),
+    statusBarIconBrightness: icons,
+    systemNavigationBarColor: theme.colorScheme.surfaceContainer,
+    systemNavigationBarDividerColor: const Color(0x00000000),
+    systemNavigationBarIconBrightness: icons,
+    systemNavigationBarContrastEnforced: false,
+  );
+}
 
 /// The app root. The stored dark mode setting picks the theme, not the phone setting.
 /// While the app is in front, it looks for cards of the capture engine.
@@ -63,9 +80,12 @@ class _KobanAppState extends State<KobanApp> {
         darkTheme: kobanTheme(Brightness.dark),
         themeMode: dark ? ThemeMode.dark : ThemeMode.light,
         // The night color under the pages, so the page below darkens toward night.
-        builder: (context, navigator) => ColoredBox(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          child: navigator,
+        builder: (context, navigator) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: systemBarStyle(Theme.of(context)),
+          child: ColoredBox(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            child: navigator,
+          ),
         ),
         onGenerateInitialRoutes: (_) => [KobanPageRoute(builder: (_) => home)],
         // The app has no named routes. A route builder must be set, or the app has no Navigator.

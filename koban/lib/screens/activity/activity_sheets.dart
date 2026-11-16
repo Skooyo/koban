@@ -9,20 +9,15 @@ import '../../theme/koban_theme.dart';
 import '../../ui/category_donut.dart';
 import '../../ui/kit.dart';
 import '../../ui/money.dart';
+import '../../ui/sheets.dart';
 import 'activity_view_model.dart';
 
 Future<void> _showSheet(
   BuildContext context,
   String title,
   Widget Function(BuildContext) body,
-) => showModalBottomSheet<void>(
+) => showKobanSheet<void>(
   context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  showDragHandle: true,
-  shape: const RoundedRectangleBorder(
-    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-  ),
   builder: (context) => Column(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,

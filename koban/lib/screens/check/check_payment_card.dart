@@ -382,8 +382,14 @@ Future<void> showEditPaymentSheet(
   final localizations = MaterialLocalizations.of(context);
   return navigator.push(
     _EditSheetRoute(
-      builder: (_) =>
-          EditPaymentSheet(card: card, categories: categories, onSave: onSave),
+      builder: (_) => SafeArea(
+        top: false,
+        child: EditPaymentSheet(
+          card: card,
+          categories: categories,
+          onSave: onSave,
+        ),
+      ),
       capturedThemes: InheritedTheme.capture(
         from: context,
         to: navigator.context,

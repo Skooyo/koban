@@ -4,6 +4,7 @@ import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/kit.dart';
+import '../../ui/sheets.dart';
 
 /// A sheet that lists Uncategorized and the [categories] by name. A tap on one
 /// calls [onPick] (null for Uncategorized) and closes the sheet. With [mostUsedIds]
@@ -24,14 +25,8 @@ Future<void> showCategorySheet(
     for (final c in categories)
       if (!top.contains(c)) (c.id, c.name),
   ];
-  return showModalBottomSheet<void>(
+  return showKobanSheet<void>(
     context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
     builder: (context) {
       final theme = Theme.of(context);
       Widget row(BuildContext context, String? id, String name) => Semantics(

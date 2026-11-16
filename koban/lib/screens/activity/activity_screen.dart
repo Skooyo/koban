@@ -619,6 +619,7 @@ class _MonthBar extends StatelessWidget {
       children: [
         IconButton(
           onPressed: onPrevious,
+          color: theme.colorScheme.onSurface,
           tooltip: 'Previous month',
           icon: const Icon(Icons.keyboard_arrow_left),
         ),
@@ -632,13 +633,7 @@ class _MonthBar extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Flexible(
-                    child: Text(
-                      label,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ),
+                  Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
                   const Icon(Icons.arrow_drop_down),
                 ],
               ),
@@ -647,6 +642,7 @@ class _MonthBar extends StatelessWidget {
         ),
         IconButton(
           onPressed: canGoNext ? onNext : null,
+          color: theme.colorScheme.onSurface,
           tooltip: 'Next month',
           icon: const Icon(Icons.keyboard_arrow_right),
         ),

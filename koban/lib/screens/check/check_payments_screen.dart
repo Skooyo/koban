@@ -344,7 +344,7 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),
                       ),
-                      child: Text('Back to Home', style: text.labelLarge),
+                      child: const Text('Back to Home'),
                     ),
                   ),
               ],

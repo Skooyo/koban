@@ -71,10 +71,7 @@ class ListenerStatusBanner extends StatelessWidget {
               ),
             ),
           ),
-          TextButton(
-            onPressed: onEnable,
-            child: Text('Turn on', style: text.labelLarge),
-          ),
+          TextButton(onPressed: onEnable, child: const Text('Turn on')),
         ],
       ),
     );

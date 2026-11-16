@@ -15,6 +15,7 @@ import '../../theme/koban_theme.dart';
 import '../../ui/date_labels.dart';
 import '../../ui/kit.dart';
 import '../../ui/money.dart';
+import '../../ui/sheets.dart';
 import '../../ui/undo_snack_bar.dart';
 import 'person_dialogs.dart';
 import 'person_view_model.dart';
@@ -367,11 +368,8 @@ class PersonScreenState extends State<PersonScreen> {
 
   /// The QR big, with Save QR to gallery. A tap on the QR itself replaces it.
   Future<void> _showQr(PersonViewModel vm, String name, String path) =>
-      showModalBottomSheet<void>(
+      showKobanSheet<void>(
         context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        showDragHandle: true,
         builder: (context) => ListenableBuilder(
           listenable: vm,
           builder: (context, _) => Padding(
