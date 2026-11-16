@@ -29,11 +29,7 @@ Future<String> addOne(AppServices s) async {
   return (await allExpenses(s.db)).single.id;
 }
 
-void typeAmount(PaymentViewModel vm, String keys) {
-  for (final k in keys.split('')) {
-    vm.press(k);
-  }
-}
+void typeAmount(PaymentViewModel vm, String text) => vm.setAmount(text);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -55,9 +51,9 @@ void main() {
     expect(vm.isEditing, false);
     expect(vm.loadedCategoryId, null);
     expect(vm.hasChanges, false);
-    vm.press('5');
+    vm.setAmount('5');
     expect(vm.hasChanges, true);
-    vm.backspace();
+    vm.setAmount('');
     expect(vm.hasChanges, false);
   });
 
@@ -120,9 +116,6 @@ void main() {
       ),
     );
     expect(vm.hasChanges, false);
-    for (var i = 0; i < 5; i++) {
-      vm.backspace();
-    }
     typeAmount(vm, '16.5');
     final r = await vm.save();
     expect((r as PaymentClosed).message, null);
@@ -150,7 +143,10 @@ void main() {
     addTearDown(vm.dispose);
     await vm.ready;
     final r = await Future.wait([vm.delete(), vm.delete()]);
-    expect(r.whereType<PaymentClosed>().single.message, 'Payment deleted');
+    expect(
+      r.whereType<PaymentClosed>().single.message,
+      'Payment deleted: Kedai Contoh, RM 15.00',
+    );
     expect(r.where((x) => x == null).length, 1);
     expect((await allExpenses(s.db)).single.status, ExpenseStatus.dismissed);
   });

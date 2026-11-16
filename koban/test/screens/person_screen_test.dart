@@ -128,25 +128,27 @@ void main() {
     final ali = await seedAli(s);
     await openPage(tester, s, ali);
 
-    final headline = find.text('Ali pays you RM 30.00', findRichText: true);
-    expect(headline, findsOneWidget);
-    final spans = <TextSpan>[];
-    tester.widget<RichText>(headline).text.visitChildren((span) {
-      if (span is TextSpan && span.text != null) spans.add(span);
-      return true;
-    });
-    expect(spans.map((t) => t.text), ['Ali pays you ', 'RM 30.00']);
-    final context = tester.element(headline);
-    expect(spans.first.style?.color, isNull);
-    expect(spans.last.style!.color, MoneyColors.of(context).received);
-    expect(find.text('Add their payment QR'), findsOneWidget);
-    for (final text in [
-      'Ali owes you',
-      'Kedai Contoh',
-      'Cash',
-      'You owe Ali',
-      'Parking',
-    ]) {
+    // The balance card comes first, with the amount in the received color.
+    final amount = find.text('+ RM 30.00');
+    expect(amount, findsOneWidget);
+    expect(
+      tester.widget<Text>(amount).style!.color,
+      MoneyColors.of(tester.element(amount)).received,
+    );
+    expect(
+      tester.getTopLeft(amount).dy,
+      lessThan(tester.getTopLeft(find.text('Kedai Contoh')).dy),
+    );
+    expect(find.text('Ali owes you'), findsNWidgets(2));
+    expect(find.text('From 2 split bills. Oldest: Today.'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Send reminder'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Settle up'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Settle up'), findsNothing);
+    // The QR is a row, not a box on top of the page.
+    await seek(tester, find.text("Ali's payment QR"));
+    expect(find.text('Not added yet. Tap to add it.'), findsOneWidget);
+    expect(find.text('Add their payment QR'), findsNothing);
+    for (final text in ['Kedai Contoh', 'Cash', 'You owe Ali', 'Parking']) {
       await seek(tester, find.text(text));
       expect(find.text(text), findsOneWidget);
     }
@@ -160,6 +162,52 @@ void main() {
     expect(find.text('Save QR to gallery'), findsNothing);
   });
 
+  testWidgets('a bill you owe shows the owe card with one gold Settle up', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final ali = await s.people.addPerson('Ali');
+    await s.people.addOwedItem(
+      ali,
+      'Parking',
+      d('4'),
+      DateTime(2026, 10, 31, 12).millisecondsSinceEpoch,
+    );
+    await openPage(tester, s, ali);
+
+    expect(find.text('You owe Ali'), findsNWidgets(2));
+    final amount = find.text('RM 4.00');
+    // The card amount and the row amount are in ink, not gold.
+    final ink = Theme.of(tester.element(amount.first)).colorScheme.onSurface;
+    for (final w in tester.widgetList<Text>(amount)) {
+      expect(w.style?.color ?? w.textSpan?.style?.color, ink);
+    }
+    expect(
+      find.text('From 1 split bill. Oldest: Sat, 31 Oct.'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(FilledButton, 'Settle up'), findsOneWidget);
+    expect(find.text('Send reminder'), findsNothing);
+    expect(find.byType(FilledButton), findsOneWidget);
+  });
+
+  testWidgets('Send reminder opens the share sheet with the plain text', (
+    tester,
+  ) async {
+    final device = FakeChannel(deviceChannelName, {'shareText': null});
+    final s = await testServices(device: device);
+    final ali = await seedAli(s);
+    await openPage(tester, s, ali);
+
+    await tapIn(tester, find.text('Send reminder'));
+
+    expect(device.calls.single.method, 'shareText');
+    expect(device.calls.single.arguments, {
+      'text': 'Hi Ali, you owe me RM 30.00 for 2 bills (Koban).',
+      'chooserTitle': 'Send reminder',
+    });
+  });
+
   testWidgets('Settle up asks with the counts and closes everything', (
     tester,
   ) async {
@@ -167,7 +215,7 @@ void main() {
     final ali = await seedAli(s);
     await openPage(tester, s, ali);
 
-    await tapIn(tester, find.widgetWithText(FilledButton, 'Settle up'));
+    await tapIn(tester, find.widgetWithText(OutlinedButton, 'Settle up'));
     expect(inDialog(find.text('Settle up with Ali?')), findsOneWidget);
     expect(
       inDialog(
@@ -179,10 +227,10 @@ void main() {
     );
     await tapIn(tester, inDialog(find.text('Settle up')));
 
-    expect(find.text('All paid', findRichText: true), findsOneWidget);
+    expect(find.text('All paid'), findsOneWidget);
     await seek(tester, find.text('Add what I owe'));
     expect(find.text('Nothing.'), findsNWidgets(2));
-    expect(find.widgetWithText(FilledButton, 'Settle up'), findsNothing);
+    expect(find.text('Settle up'), findsNothing);
     final debts = await s.db.select(s.db.splitDebts).get();
     expect(debts.map((x) => x.status), [DebtStatus.paid, DebtStatus.paid]);
   });
@@ -216,15 +264,8 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
     await seek(tester, find.text('Teh'));
     expect(find.text('Teh'), findsOneWidget);
-    await seek(
-      tester,
-      find.text('Ali pays you RM 26.50', findRichText: true),
-      up: true,
-    );
-    expect(
-      find.text('Ali pays you RM 26.50', findRichText: true),
-      findsOneWidget,
-    );
+    await seek(tester, find.text('+ RM 26.50'), up: true);
+    expect(find.text('+ RM 26.50'), findsOneWidget);
   });
 
   testWidgets(
@@ -275,15 +316,8 @@ void main() {
     final debt = await s.db.debt(splitDebt).getSingle();
     expect(debt.status, DebtStatus.paid);
     expect(find.text('Kedai Contoh'), findsNothing);
-    await seek(
-      tester,
-      find.text('Ali pays you RM 16.00', findRichText: true),
-      up: true,
-    );
-    expect(
-      find.text('Ali pays you RM 16.00', findRichText: true),
-      findsOneWidget,
-    );
+    await seek(tester, find.text('+ RM 16.00'), up: true);
+    expect(find.text('+ RM 16.00'), findsOneWidget);
   });
 
   testWidgets(
@@ -341,7 +375,13 @@ void main() {
     );
     await openPage(tester, s, ali);
 
-    expect(find.bySemanticsLabel("Ali's payment QR"), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+    expect(find.text('Save QR to gallery'), findsNothing);
+    await tapIn(tester, find.text("Ali's payment QR"));
+    expect(
+      tester.widget<Image>(find.byType(Image)).semanticLabel,
+      "Ali's payment QR",
+    );
     final image = find.byType(Image);
     expect(image, findsOneWidget);
     expect(tester.widget<Image>(image).key, const ValueKey(0));
@@ -354,17 +394,22 @@ void main() {
       findsOneWidget,
     );
 
-    await tapIn(tester, find.byTooltip('More options'));
-    await tapIn(tester, find.text('Replace QR'));
+    // A tap on the QR in the sheet replaces it.
+    await tapIn(tester, find.byType(Image));
     final vm = vmOf(tester);
     await settleReal(tester, () => vm.qrVersion == 1);
 
     expect(tester.widget<Image>(find.byType(Image)).key, const ValueKey(1));
     expect(qr.readAsBytesSync(), wideBytes);
-    expect(find.bySemanticsLabel("Ali's payment QR"), findsOneWidget);
+    expect(
+      tester.widget<Image>(find.byType(Image)).semanticLabel,
+      "Ali's payment QR",
+    );
   });
 
-  testWidgets('Delete person asks and closes the page', (tester) async {
+  testWidgets('Delete person closes the page at once and shows Undo', (
+    tester,
+  ) async {
     final s = await testServices();
     final ali = await seedAli(s);
     await s.people.settleUp(ali);
@@ -372,19 +417,13 @@ void main() {
 
     await tapIn(tester, find.byTooltip('More options'));
     await tapIn(tester, find.text('Delete person'));
-    expect(inDialog(find.text('Delete Ali?')), findsOneWidget);
-    expect(
-      inDialog(
-        find.text(
-          'Their QR and paid items are removed. Split bills keep their name.',
-        ),
-      ),
-      findsOneWidget,
-    );
-    await tapIn(tester, inDialog(find.text('Delete')));
+    await settle(tester);
 
+    expect(find.text('Delete Ali?'), findsNothing);
     expect(find.byType(PersonScreen), findsNothing);
     expect(opener.closed, isTrue);
+    expect(find.text('Ali deleted'), findsOneWidget);
+    expect(find.text('Undo'), findsOneWidget);
     expect((await s.db.person(ali).getSingle()).archived, isTrue);
   });
 

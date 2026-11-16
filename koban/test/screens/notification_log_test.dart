@@ -19,13 +19,14 @@ const sample =
     'Successful payment of RM 15.00 to RESTORAN CONTOH. REF: QR123456.';
 const statement = 'Your statement is ready.';
 const emptyAll =
-    'No notifications captured yet. Make a payment or tap “Snapshot active notifications” after granting access.';
+    'No notifications captured yet. Make a payment or tap “Scan now” after granting access.';
 const emptyFilter = 'No notifications match this filter.';
 const postTime = 1761999940000;
 const capturedAt = 1761999940500;
 
+/// The time of a row older than today, as the log shows it.
 String stamp(int ms) => DateFormat(
-  'MMM d, HH:mm:ss',
+  'EEE, d MMM, HH:mm',
   'en_US',
 ).format(DateTime.fromMillisecondsSinceEpoch(ms));
 
@@ -130,55 +131,115 @@ void main() {
       logged('INFO_ONLY', event: 'REMOVED'),
       logged('SKIPPED_NO_RULE'),
       logged('SKIPPED_ERROR', event: 'ACTIVE_SNAPSHOT'),
+      logged('SKIPPED_EMPTY'),
     ];
     expect(filterLog(rows, LogFilter.all), rows);
-    expect(filterLog(rows, LogFilter.postedOnly), [rows[0], rows[1], rows[3]]);
-    expect(filterLog(rows, LogFilter.waiting), [rows[0]]);
-    expect(filterLog(rows, LogFilter.skipped), [rows[3], rows[4]]);
+    expect(filterLog(rows, LogFilter.saved), [rows[0]]);
+    expect(filterLog(rows, LogFilter.notPayment), [rows[3], rows[4]]);
+    expect(filterLog(rows, LogFilter.noText), [rows[5]]);
   });
 
   testWidgets('the log shows the status and the rows', (tester) async {
     final s = await testServices(
       listener: logChannel(),
-      device: FakeChannel(deviceChannelName, {}),
+      device: FakeChannel(deviceChannelName, {
+        'appLabels': {maybank: 'Maybank'},
+      }),
     );
     await pumpLog(tester, s);
     expect(find.text('Notification log'), findsOneWidget);
-    expect(find.text('Listener active'), findsOneWidget);
-    expect(
-      find.text(
-        'Captured 3 · listener connected · last connected ${stamp(postTime)}',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Koban can read notifications'), findsOneWidget);
+    // The rows are from 2025, so nothing counts for today.
+    expect(find.text('0 seen today · 0 saved · 0 skipped'), findsOneWidget);
     expect(card('a'), findsOneWidget);
     expect(card('b'), findsOneWidget);
     expect(card('c'), findsOneWidget);
-    expect(inCard('a', find.text('Waiting for check')), findsOneWidget);
-    expect(inCard('b', find.text('No rule matched')), findsOneWidget);
-    expect(inCard('c', find.text('Info')), findsOneWidget);
+    expect(inCard('a', find.text('Waiting in Check payments')), findsOneWidget);
     expect(
-      inCard('a', find.text('$maybank · Posted · ${stamp(capturedAt)}')),
+      inCard('b', find.text('Skipped: this message has no amount.')),
       findsOneWidget,
     );
     expect(
-      inCard('c', find.text('$maybank · Removed · ${stamp(capturedAt)}')),
+      inCard('c', find.text('Seen only. Koban did not save it.')),
       findsOneWidget,
     );
-    expect(inCard('a', find.text('Maybank')), findsOneWidget);
+    // The app name replaces the package name.
+    expect(
+      inCard('a', find.text('Maybank · ${stamp(postTime)}')),
+      findsOneWidget,
+    );
+    expect(find.textContaining(maybank), findsNothing);
     expect(inCard('a', find.text(sample)), findsOneWidget);
-    expect(
-      inCard('a', find.text('RESTORAN CONTOH · RM 15.00')),
-      findsOneWidget,
-    );
-    expect(inCard('a', find.text('Posted ${stamp(postTime)}')), findsOneWidget);
-    // WAITING shows no button; the other two do.
-    expect(inCard('a', find.text('Add as payment')), findsNothing);
-    expect(inCard('b', find.text('Add as payment')), findsOneWidget);
-    expect(inCard('c', find.text('Add as payment')), findsOneWidget);
-    for (final label in ['All', 'Posted', 'Waiting', 'Skipped']) {
+    // Waiting shows no button; the other two do.
+    expect(inCard('a', find.text('Save payment')), findsNothing);
+    expect(inCard('b', find.text('Save payment')), findsOneWidget);
+    expect(inCard('c', find.text('Save payment')), findsOneWidget);
+    expect(find.text('Add as payment'), findsNothing);
+    expect(find.text('Snapshot'), findsNothing);
+    for (final label in ['All', 'Saved', 'Not a payment', 'No text']) {
       expect(find.widgetWithText(FilterChip, label), findsOneWidget);
     }
+    expect(find.widgetWithText(FilterChip, 'Posted'), findsNothing);
+    // No filled (gold) button on the screen.
+    expect(find.byType(FilledButton), findsNothing);
+  });
+
+  testWidgets('today rows say Today and count as seen, saved or skipped', (
+    tester,
+  ) async {
+    final nine = DateTime(2026, 11, 13, 9, 5).millisecondsSinceEpoch;
+    Map<String, Object?> today(String id, String disposition) => {
+      ...row(id, disposition: disposition),
+      'postTime': nine,
+      'capturedAt': nine,
+    };
+    final listener = logChannel(
+      rows: [
+        today('a', 'WAITING'),
+        today('b', 'SKIPPED_NO_RULE'),
+        today('c', 'SKIPPED_EMPTY'),
+        row('d'),
+      ],
+    );
+    await pumpLog(
+      tester,
+      await testServices(
+        listener: listener,
+        device: FakeChannel(deviceChannelName, {
+          'appLabels': {maybank: 'Maybank'},
+        }),
+      ),
+    );
+    expect(find.text('3 seen today · 1 saved · 2 skipped'), findsOneWidget);
+    expect(inCard('a', find.text('Maybank · Today, 09:05')), findsOneWidget);
+    expect(
+      inCard('c', find.text('Skipped: this message has no text.')),
+      findsOneWidget,
+    );
+    expect(
+      inCard('d', find.text('Maybank · ${stamp(postTime)}')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('the log shows a card number with its last 2 digits only', (
+    tester,
+  ) async {
+    const text = 'RM 9.00 on your Visa ending 1234 at SHOP CONTOH.';
+    await pumpLog(
+      tester,
+      await testServices(
+        listener: logChannel(rows: [row('a', body: text)]),
+      ),
+    );
+    expect(
+      inCard(
+        'a',
+        find.text('RM 9.00 on your Visa ending ••34 at SHOP CONTOH.'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('1234'), findsNothing);
   });
 
   testWidgets('the status line follows access and connection', (tester) async {
@@ -186,12 +247,6 @@ void main() {
     listener.answers['isAccessGranted'] = false;
     await pumpLog(tester, await testServices(listener: listener));
     expect(find.text('Notification access not granted'), findsOneWidget);
-    expect(
-      find.text(
-        'Captured 3 · listener not connected · last connected ${stamp(postTime)}',
-      ),
-      findsOneWidget,
-    );
     listener.answers['isAccessGranted'] = true;
     await tester.tap(find.byTooltip('Refresh'));
     await tester.pumpAndSettle();
@@ -200,20 +255,20 @@ void main() {
 
   testWidgets('a filter shows its rows and the empty texts', (tester) async {
     await pumpLog(tester, await testServices(listener: logChannel()));
-    await tester.tap(find.widgetWithText(FilterChip, 'Posted'));
-    await tester.pump();
-    expect(card('a'), findsOneWidget);
-    expect(card('b'), findsOneWidget);
-    expect(card('c'), findsNothing);
-    await tester.tap(find.widgetWithText(FilterChip, 'Waiting'));
+    await tester.tap(find.widgetWithText(FilterChip, 'Saved'));
     await tester.pump();
     expect(card('a'), findsOneWidget);
     expect(card('b'), findsNothing);
-    await tester.tap(find.widgetWithText(FilterChip, 'Skipped'));
+    expect(card('c'), findsNothing);
+    await tester.tap(find.widgetWithText(FilterChip, 'Not a payment'));
     await tester.pump();
     expect(card('b'), findsOneWidget);
     expect(card('a'), findsNothing);
     expect(find.text(emptyFilter), findsNothing);
+    await tester.tap(find.widgetWithText(FilterChip, 'No text'));
+    await tester.pump();
+    expect(card('b'), findsNothing);
+    expect(find.text(emptyFilter), findsOneWidget);
   });
 
   testWidgets('an empty log and an empty filter have their own text', (
@@ -222,16 +277,11 @@ void main() {
     final listener = logChannel(rows: []);
     await pumpLog(tester, await testServices(listener: listener));
     expect(find.text(emptyAll), findsOneWidget);
-    expect(
-      find.text(
-        'Captured 0 · listener connected · last connected ${stamp(postTime)}',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('0 seen today · 0 saved · 0 skipped'), findsOneWidget);
     listener.answers['recentNotifications'] = [row('a')];
     await tester.tap(find.byTooltip('Refresh'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilterChip, 'Skipped'));
+    await tester.tap(find.widgetWithText(FilterChip, 'Not a payment'));
     await tester.pump();
     expect(find.text(emptyFilter), findsOneWidget);
     expect(find.text(emptyAll), findsNothing);
@@ -240,7 +290,7 @@ void main() {
   testWidgets('the log shows new rows while it is open', (tester) async {
     final listener = logChannel();
     await pumpLog(tester, await testServices(listener: listener));
-    expect(find.textContaining('Posted ${stamp(postTime)}'), findsNWidgets(3));
+    expect(find.textContaining(stamp(postTime)), findsNWidgets(3));
     listener.answers['recentNotifications'] = [
       ...threeRows(),
       row('d', disposition: 'SKIPPED_ERROR'),
@@ -251,8 +301,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
     expect(card('d'), findsOneWidget);
-    expect(find.textContaining('Posted ${stamp(postTime)}'), findsNWidgets(4));
-    expect(find.textContaining('Captured 4 ·'), findsOneWidget);
+    expect(find.textContaining(stamp(postTime)), findsNWidgets(4));
   });
 
   testWidgets('the poll stops when the screen is hidden or closed', (
@@ -283,13 +332,13 @@ void main() {
     expect(calls(listener, 'recentNotifications'), polled + 2);
   });
 
-  testWidgets('Add as payment makes a card and marks the row', (tester) async {
+  testWidgets('Save payment makes a card and marks the row', (tester) async {
     final listener = logChannel(
       rows: [row('b', disposition: 'SKIPPED_NO_RULE', detail: null)],
     );
     final s = await testServices(listener: listener);
     await pumpLog(tester, s);
-    await tester.tap(inCard('b', find.text('Add as payment')));
+    await tester.tap(inCard('b', find.text('Save payment')));
     await tester.pump();
     final waiting = await settleMark(tester, s);
     expect(waiting, hasLength(1));
@@ -297,9 +346,11 @@ void main() {
     expect((s.captureHost as FakeCaptureHost).logUpdates, [
       ('b', 'WAITING', 'Added as a card. Check it on the Home screen.'),
     ]);
+    expect(inCard('b', find.text('Saved as a payment')), findsOneWidget);
+    expect(inCard('b', find.text('Save payment')), findsNothing);
   });
 
-  testWidgets('two taps on Add as payment in one frame make one card', (
+  testWidgets('two taps on Save payment in one frame make one card', (
     tester,
   ) async {
     final listener = logChannel(
@@ -307,7 +358,7 @@ void main() {
     );
     final s = await testServices(listener: listener);
     await pumpLog(tester, s);
-    final button = inCard('b', find.text('Add as payment'));
+    final button = inCard('b', find.text('Save payment'));
     await tester.tap(button);
     await tester.tap(button);
     await tester.pump();
@@ -317,7 +368,7 @@ void main() {
   });
 
   testWidgets(
-    'Add as payment while a poll read waits makes one card for two taps',
+    'Save payment while a poll read waits makes one card for two taps',
     (tester) async {
       final skipped = [row('b', disposition: 'SKIPPED_NO_RULE', detail: null)];
       var reads = 0;
@@ -363,7 +414,7 @@ void main() {
   );
 
   testWidgets(
-    'a failed log update keeps one card and hides Add as payment on the row',
+    'a failed log update keeps one card and hides Save payment on the row',
     (tester) async {
       final listener = logChannel(
         rows: [row('b', disposition: 'SKIPPED_NO_RULE', detail: null)],
@@ -372,14 +423,14 @@ void main() {
       final host = s.captureHost as FakeCaptureHost;
       host.updateLogError = PlatformException(code: 'NATIVE_ERROR');
       await pumpLog(tester, s);
-      await tester.tap(inCard('b', find.text('Add as payment')));
+      await tester.tap(inCard('b', find.text('Save payment')));
       await tester.pump();
       final waiting = await settleMark(tester, s);
       expect(waiting, hasLength(1));
       expect(tester.takeException(), isNull);
-      // The row is still skipped in the log, but a second tap is not possible.
-      expect(inCard('b', find.text('No rule matched')), findsOneWidget);
-      expect(inCard('b', find.text('Add as payment')), findsNothing);
+      // The log row is still skipped, but the card exists: the row says so and a second tap is not possible.
+      expect(inCard('b', find.text('Saved as a payment')), findsOneWidget);
+      expect(inCard('b', find.text('Save payment')), findsNothing);
       expect(host.logUpdates, hasLength(1));
     },
   );
@@ -431,7 +482,7 @@ void main() {
       final listener = logChannel();
       await pumpLog(tester, await testServices(listener: listener));
       listener.answers['reconnect'] = null;
-      await tester.tap(find.text('Reconnect listener'));
+      await tester.tap(find.text('Restart payment tracking'));
       await tester.pump();
       await tester.pump();
       expect(
@@ -440,7 +491,7 @@ void main() {
       );
       expect(find.text('Reconnecting…'), findsNothing);
       listener.answers['reconnect'] = 'THROTTLED';
-      await tester.tap(find.text('Reconnect listener'));
+      await tester.tap(find.text('Restart payment tracking'));
       await tester.pump();
       await tester.pump();
       expect(
@@ -450,15 +501,13 @@ void main() {
     },
   );
 
-  testWidgets('Add as payment for a text with no amount says so', (
-    tester,
-  ) async {
+  testWidgets('Save payment for a text with no amount says so', (tester) async {
     final listener = logChannel(
       rows: [row('b', disposition: 'SKIPPED_NO_RULE', body: statement)],
     );
     final s = await testServices(listener: listener);
     await pumpLog(tester, s);
-    await tester.tap(inCard('b', find.text('Add as payment')));
+    await tester.tap(inCard('b', find.text('Save payment')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(
@@ -475,7 +524,7 @@ void main() {
   testWidgets('Clear log and Snapshot show their result', (tester) async {
     final listener = logChannel();
     await pumpLog(tester, await testServices(listener: listener));
-    await tester.tap(find.text('Snapshot'));
+    await tester.tap(find.text('Scan now'));
     await tester.pump();
     await tester.pump();
     expect(calls(listener, 'snapshotActive'), 1);
@@ -484,7 +533,7 @@ void main() {
       findsOneWidget,
     );
     listener.answers['snapshotActive'] = false;
-    await tester.tap(find.text('Snapshot'));
+    await tester.tap(find.text('Scan now'));
     await tester.pump();
     await tester.pump();
     expect(
@@ -493,13 +542,18 @@ void main() {
       ),
       findsOneWidget,
     );
-    listener.answers['recentNotifications'] = <Map<String, Object?>>[];
     await tester.tap(find.text('Clear log'));
     await tester.pump();
     await tester.pump();
-    expect(calls(listener, 'clearLog'), 1);
+    // The rows hide at once. The native log clears when the Undo time ends.
     expect(find.text('Log cleared'), findsOneWidget);
     expect(find.text(emptyAll), findsOneWidget);
+    expect(calls(listener, 'clearLog'), 0);
+    // The 6 seconds start when the snackbar is in.
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 7));
+    await tester.pumpAndSettle();
+    expect(calls(listener, 'clearLog'), 1);
   });
 
   testWidgets(
@@ -507,7 +561,7 @@ void main() {
     (tester) async {
       final listener = logChannel();
       await pumpLog(tester, await testServices(listener: listener));
-      await tester.tap(find.text('Reconnect listener'));
+      await tester.tap(find.text('Restart payment tracking'));
       await tester.pump();
       expect(find.text('Reconnecting…'), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 900));
@@ -526,7 +580,7 @@ void main() {
       tester,
       await testServices(listener: logChannel(connected: false)),
     );
-    await tester.tap(find.text('Reconnect listener'));
+    await tester.tap(find.text('Restart payment tracking'));
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
     expect(
@@ -542,10 +596,10 @@ void main() {
   ) async {
     final listener = logChannel();
     await pumpLog(tester, await testServices(listener: listener));
-    await tester.tap(find.text('Reconnect listener'));
+    await tester.tap(find.text('Restart payment tracking'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    await tester.tap(find.text('Reconnect listener'));
+    await tester.tap(find.text('Restart payment tracking'));
     await tester.pump();
     expect(calls(listener, 'reconnect'), 1);
     // The result shows 1 s after the first tap, not after the second.
@@ -553,7 +607,7 @@ void main() {
     await tester.pump();
     expect(find.text('Listener connected.'), findsOneWidget);
     // The next tap works again.
-    await tester.tap(find.text('Reconnect listener'));
+    await tester.tap(find.text('Restart payment tracking'));
     await tester.pump();
     expect(find.text('Reconnecting…'), findsOneWidget);
     expect(calls(listener, 'reconnect'), 2);
@@ -565,7 +619,7 @@ void main() {
     final listener = logChannel(reconnect: 'THROTTLED');
     await pumpLog(tester, await testServices(listener: listener));
     Future<void> tap() async {
-      await tester.tap(find.text('Reconnect listener'));
+      await tester.tap(find.text('Restart payment tracking'));
       await tester.pump();
       await tester.pump();
     }
@@ -605,11 +659,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Notification log'));
     await tester.pumpAndSettle();
-    expect(find.text('Listener active'), findsOneWidget);
+    expect(find.text('Koban can read notifications'), findsOneWidget);
     expect(card('a'), findsOneWidget);
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Listener active'), findsNothing);
+    expect(find.text('Koban can read notifications'), findsNothing);
   });
 
   testWidgets(

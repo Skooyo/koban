@@ -28,26 +28,22 @@ String _timeText(BuildContext context, int ms) =>
     );
 
 /// One waiting payment. [stamp] gives the drag as -1 (full "Not a payment") to 1 (full "Save").
-/// [chips] are the category chips. The callbacks are null on the cards under the top one.
+/// The callbacks are null on the cards under the top one.
 class CheckPaymentCard extends StatelessWidget {
   const CheckPaymentCard({
     super.key,
     required this.card,
-    this.chips = const [],
     this.stamp,
     this.onEdit,
     this.onChooseDirection,
     this.onPickCategory,
-    this.onMoreCategories,
   });
 
   final CheckCard card;
-  final List<Category> chips;
   final ValueListenable<double>? stamp;
   final VoidCallback? onEdit;
   final ValueChanged<TransactionType>? onChooseDirection;
-  final ValueChanged<String>? onPickCategory;
-  final VoidCallback? onMoreCategories;
+  final VoidCallback? onPickCategory;
 
   @override
   Widget build(BuildContext context) {
@@ -104,9 +100,7 @@ class CheckPaymentCard extends StatelessWidget {
                     _Note(
                       icon: Icons.swap_horiz,
                       color: scheme.primary,
-                      text:
-                          'Looks like a wallet top-up. A top-up moves your own money, '
-                          'so it is usually not a payment.',
+                      text: 'Looks like a wallet top-up, so usually not a payment.',
                     )
                   else if (guessed)
                     _Note(
@@ -173,13 +167,25 @@ class CheckPaymentCard extends StatelessWidget {
                         onTap: onEdit,
                         onTapLabel: 'Change payment',
                       ),
+                      KobanRow(
+                        title: card.categoryId == null
+                            ? 'Not set'
+                            : card.categoryName,
+                        subtitle: card.categoryId == null
+                            ? 'Category · tap to pick'
+                            : 'Category',
+                        subtitleColor: card.categoryId == null
+                            ? money.review
+                            : null,
+                        leading: CategoryDot(
+                          categoryColor(context, card.categoryId),
+                          size: 12,
+                        ),
+                        showChevron: true,
+                        onTap: onPickCategory,
+                        onTapLabel: 'Change category',
+                      ),
                     ],
-                  ),
-                  _CategoryChips(
-                    chips: chips,
-                    selectedId: card.categoryId,
-                    onPick: onPickCategory,
-                    onMore: onMoreCategories,
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -249,68 +255,6 @@ class _Note extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// The category chips, with More for the full list. A tap on a chip sets its category.
-class _CategoryChips extends StatelessWidget {
-  const _CategoryChips({
-    required this.chips,
-    required this.selectedId,
-    required this.onPick,
-    required this.onMore,
-  });
-
-  final List<Category> chips;
-  final String? selectedId;
-  final ValueChanged<String>? onPick;
-  final VoidCallback? onMore;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final notSet = selectedId == null;
-    final onPick = this.onPick;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 8,
-        children: [
-          Text(
-            notSet ? 'Category · not set' : 'Category',
-            style: theme.textTheme.bodyMedium!.copyWith(
-              color: notSet
-                  ? MoneyColors.of(context).review
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final c in chips)
-                ChoiceChip(
-                  label: Text(c.name),
-                  avatar: CategoryDot(categoryColor(context, c.id), size: 10),
-                  showCheckmark: false,
-                  selected: c.id == selectedId,
-                  onSelected: onPick == null
-                      ? null
-                      : (_) {
-                          if (c.id != selectedId) onPick(c.id);
-                        },
-                ),
-              ActionChip(
-                label: const Text('More…'),
-                tooltip: 'All categories',
-                onPressed: onMore,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// The notification text in one line, with "Show full text" when it is longer.
@@ -658,10 +602,7 @@ class _EditPaymentSheetState extends State<EditPaymentSheet> {
               height: 56,
               child: FilledButton(
                 onPressed: amount == null ? null : () => _save(amount),
-                child: Text(
-                  'Save changes',
-                  style: weighted(theme.textTheme.titleMedium!, 700),
-                ),
+                child: const Text('Save changes'),
               ),
             ),
           ),

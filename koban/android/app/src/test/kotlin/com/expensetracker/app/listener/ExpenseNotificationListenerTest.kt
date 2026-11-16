@@ -99,12 +99,16 @@ class ExpenseNotificationListenerTest {
         listener.onNotificationPosted(post)
         listener.onNotificationPosted(post)
         assertEquals(1, queue.size())
-        assertEquals(
-            listOf(NotificationDisposition.SKIPPED_DUPLICATE, NotificationDisposition.PENDING),
-            RecentNotificationsStore.snapshot().map { it.disposition },
-        )
-        assertEquals("Already processing this notification", RecentNotificationsStore.snapshot().first().detail)
+        assertEquals(listOf(NotificationDisposition.PENDING), RecentNotificationsStore.snapshot().map { it.disposition })
         assertEquals(1, wakes)
+    }
+
+    @Test fun aRemovalOfALoggedNotificationAddsNoSecondRow() {
+        PaymentAppsMirror.write(context, setOf(bank))
+        val post = sbn(bank, key = "k1", postTime = 1000, text = payment)
+        listener.onNotificationPosted(post)
+        listener.onNotificationRemoved(post)
+        assertEquals(listOf(NotificationDisposition.PENDING), RecentNotificationsStore.snapshot().map { it.disposition })
     }
 
     // Review Focus 2

@@ -8,6 +8,7 @@ import 'database.dart';
 import 'ids.dart';
 import 'qr_store.dart';
 import 'split_repository.dart';
+import 'undoable.dart';
 import 'user_error.dart';
 import 'watch.dart';
 
@@ -166,14 +167,24 @@ class PeopleRepository {
       });
 
   /// Archives a person with nothing open. It deletes the paid items and the QR file.
-  Future<void> archivePerson(String personId) async {
-    final qrPath = await _db.transaction(() async {
+  /// Undo puts back the person row, the paid items and the QR file. It returns null
+  /// when the person is missing.
+  Future<Undoable?> archivePerson(String personId) async {
+    final snapshot = await _db.transaction(() async {
       final person = await _db.person(personId).getSingleOrNull();
       if (person == null) return null;
       if ((await _db.openDebtsFor(personId).get()).isNotEmpty ||
           (await _db.openOwedItems(personId).get()).isNotEmpty) {
         throw const KobanUserError('Settle up with them first.');
       }
+      final paid = [
+        for (final i in await (_db.select(
+          _db.owedItems,
+        )..where((t) => t.personId.equals(personId))).get())
+          if (i.status == DebtStatus.paid) i,
+      ];
+      // Read the picture before the row stops pointing at it.
+      final qr = await _qr.read(person.qrPath);
       await _db.deletePaidOwedItems(personId);
       await _upsertPerson(
         person.copyWith(
@@ -182,10 +193,32 @@ class PeopleRepository {
           suggestedSettleExpenseId: const Value(null),
         ),
       );
-      return person.qrPath;
+      return (person, paid, qr);
     });
+    if (snapshot == null) return null;
+    final (person, paid, qr) = snapshot;
     // Delete the file only after the row no longer points at it.
-    await _qr.delete(qrPath);
+    await _qr.delete(person.qrPath);
+    return Undoable(
+      undo: () async {
+        var replaced = false;
+        await _db.transaction(() async {
+          final now = await _db.person(personId).getSingleOrNull();
+          // Added again by name in the meantime: that row has the person already,
+          // and it does not point to the old QR file.
+          replaced = now != null && !now.archived;
+          if (!replaced) await _upsertPerson(person);
+          for (final i in paid) {
+            await _db
+                .into(_db.owedItems)
+                .insert(i, mode: InsertMode.insertOrReplace);
+          }
+        });
+        if (!replaced && person.qrPath != null && qr != null) {
+          await _qr.restore(person.qrPath!, qr);
+        }
+      },
+    );
   }
 
   /// Copies the picture at [sourcePath] as the QR of the person.
@@ -253,11 +286,27 @@ class PeopleRepository {
     });
   }
 
-  Future<void> deleteOwedItem(String id) => _db.transaction(() async {
+  /// Undo puts the item back, and the repayment suggestion that the delete cleared.
+  Future<Undoable?> deleteOwedItem(String id) => _db.transaction(() async {
     final item = await _db.owedItem(id).getSingleOrNull();
-    if (item == null) return;
+    if (item == null) return null;
+    final suggested = (await _db.person(item.personId).getSingleOrNull())
+        ?.suggestedSettleExpenseId;
     await _db.deleteOwedItem(id);
     await _splits.clearSettleSuggestion(item.personId);
+    return Undoable(
+      undo: () => _db.transaction(() async {
+        await _db
+            .into(_db.owedItems)
+            .insert(item, mode: InsertMode.insertOrReplace);
+        // An open item of an archived person shows nowhere.
+        final owner = await _db.person(item.personId).getSingleOrNull();
+        if (item.status == DebtStatus.open && owner != null && owner.archived) {
+          await _upsertPerson(owner.copyWith(archived: false));
+        }
+        await _splits.restoreSettleSuggestion(item.personId, suggested);
+      }),
+    );
   });
 
   Future<void> markOwedItemPaid(String id) => _db.transaction(() async {
@@ -356,12 +405,13 @@ class PeopleRepository {
     });
   }
 
-  Future<void> deleteOwedToMe(String debtId) async {
+  /// Deletes the hand-added debt with its bill. Undo restores both.
+  Future<Undoable?> deleteOwedToMe(String debtId) async {
     final billId = await _db.transaction(
       () async => (await _openManualDebt(debtId))?.$2.id,
     );
-    if (billId == null) return;
-    await _splits.deleteSplit(billId);
+    if (billId == null) return null;
+    return _splits.deleteSplit(billId);
   }
 
   Future<(SplitDebt, SplitBill)?> _openManualDebt(String debtId) async {

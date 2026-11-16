@@ -186,7 +186,10 @@ class KobanNativePlugin(private val executor: Executor = Executors.newSingleThre
                     "totalCaptured" to s.totalCaptured,
                 )
             }
-            "clearLog" -> work(result) { RecentNotificationsStore.clear() }
+            "clearLog" -> work(result) {
+                val ids = call.argument<List<String>>("ids")
+                if (ids == null) RecentNotificationsStore.clear() else RecentNotificationsStore.clear(ids.toSet())
+            }
             "snapshotActive" -> work(result) { NotificationListenerBridge.refreshActiveNotifications() }
             else -> result.notImplemented()
         }

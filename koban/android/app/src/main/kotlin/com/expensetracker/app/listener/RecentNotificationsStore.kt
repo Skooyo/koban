@@ -26,6 +26,19 @@ object RecentNotificationsStore {
         }
     }
 
+    /** True when a row of this notification (same key and post time) is in the log. */
+    fun hasSeen(packageName: String, key: String, postTime: Long): Boolean = synchronized(lock) {
+        items.any { it.key == key && it.postTime == postTime && it.packageName == packageName }
+    }
+
+    /** Adds the row unless the log has one for the same key and post time: a repost, a removal or a scan is the same notification. */
+    fun addUnlessSeen(notification: CapturedNotification) {
+        val key = notification.key
+        synchronized(lock) {
+            if (key == null || !hasSeen(notification.packageName, key, notification.postTime)) add(notification)
+        }
+    }
+
     fun update(id: String, disposition: NotificationDisposition, detail: String? = null) {
         synchronized(lock) {
             val index = items.indexOfFirst { it.id == id }
@@ -50,6 +63,14 @@ object RecentNotificationsStore {
     fun clear() {
         synchronized(lock) {
             items.clear()
+            publish()
+        }
+    }
+
+    /** Removes only the rows with these ids. A row that came after the ids were read stays. */
+    fun clear(ids: Set<String>) {
+        synchronized(lock) {
+            items.removeAll { it.id in ids }
             publish()
         }
     }

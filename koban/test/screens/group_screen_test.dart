@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:koban/app/app_services.dart';
 import 'package:koban/app/home_shell.dart';
 import 'package:koban/screens/groups/group_screen.dart';
+import 'package:koban/theme/mon.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../online/group_repository_test.dart'
@@ -432,4 +433,32 @@ void main() {
       handle.dispose();
     },
   );
+
+  testWidgets('a group that fails to load shows Mon and Try again retries', (
+    tester,
+  ) async {
+    final s = await open();
+    routes();
+    var down = true;
+    backend.on('GET', '/rest/v1/shared_totals', (r) {
+      if (down) return http.Response('{"message":"boom"}', 500);
+      return jsonReply([
+        {'user_id': 'user-1', 'category': 'Food & Dining', 'amount': 20},
+      ]);
+    });
+    await openGroup(tester, s);
+
+    expect(onPageText('Could not load the group.'), findsOneWidget);
+    expect(
+      onPageText('Check the internet connection, then try again.'),
+      findsOneWidget,
+    );
+    expect(onPage(find.byType(Mon)), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    down = false;
+    await tester.tap(onPageText('Try again'));
+    await tester.pumpAndSettle();
+    expect(onPageText('Could not load the group.'), findsNothing);
+    expect(onPageText('You spent in November'), findsOneWidget);
+  });
 }

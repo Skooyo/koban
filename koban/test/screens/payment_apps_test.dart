@@ -188,7 +188,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Payment apps'), findsOneWidget);
     // The stored list is empty and chosen: nothing is ticked.
-    expect(find.text('Save'), findsOneWidget);
+    expect(find.text('Save without apps'), findsOneWidget);
   });
 
   testWidgets('two taps on Save in one frame save once and close one page', (

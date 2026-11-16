@@ -9,6 +9,7 @@ import '../../app/app_services.dart';
 import '../../data/database.dart';
 import '../../data/ids.dart';
 import '../../data/split_repository.dart';
+import '../../data/undoable.dart';
 import '../../data/user_error.dart';
 import '../../online/receipt_cloud_client.dart' show ReceiptCloudClient;
 import '../../receipts/receipt_photos.dart';
@@ -18,10 +19,13 @@ import '../../rules/receipt_cloud.dart'
 import '../../rules/receipt_rules.dart' show ReceiptRead;
 import '../../rules/split_math.dart';
 
+/// One share: person id ([meId] for the owner), name and amount.
+typedef _Line = (String, String, Decimal);
+
 /// The steps of the split editor.
 enum SplitStep { photo, reading, items, people, assign, link, summary }
 
-const _loadFailed = 'Something went wrong. Try again.';
+const _loadFailed = 'Could not open the split. Try again.';
 const _saveFailed = "Couldn't save the split. Try again.";
 const _deleteFailed = "Couldn't delete the split. Try again.";
 const _keep = Object();
@@ -78,6 +82,10 @@ class SplitEditorState {
     this.people = const [],
     this.candidates = const [],
     this.selectedExpenseId,
+    this.linkedPayment,
+    this.skipLink = false,
+    this.noReceipt = false,
+    this.amounts,
     this.message,
     this.onlineAccess = false,
     this.readNote,
@@ -115,6 +123,18 @@ class SplitEditorState {
   final List<SplitPeopleData> people;
   final List<Expense> candidates;
   final String? selectedExpenseId;
+
+  /// The payment that [selectedExpenseId] names. The summary compares its amount with the receipt.
+  final Expense? linkedPayment;
+
+  /// The split started from a payment, so the link step is skipped.
+  final bool skipLink;
+
+  /// The split is one amount with no receipt. Everyone shares its one item, so Who had what is skipped.
+  final bool noReceipt;
+
+  /// The amounts that the user types on the summary, by person id and [meId]. Null shows the computed shares.
+  final Map<String, String>? amounts;
   final String? message;
 
   /// A device token is stored.
@@ -154,6 +174,10 @@ class SplitEditorState {
     List<SplitPeopleData>? people,
     List<Expense>? candidates,
     Object? selectedExpenseId = _keep,
+    Object? linkedPayment = _keep,
+    bool? skipLink,
+    bool? noReceipt,
+    Object? amounts = _keep,
     Object? message = _keep,
     bool? onlineAccess,
     Object? readNote = _keep,
@@ -186,6 +210,14 @@ class SplitEditorState {
     selectedExpenseId: identical(selectedExpenseId, _keep)
         ? this.selectedExpenseId
         : selectedExpenseId as String?,
+    linkedPayment: identical(linkedPayment, _keep)
+        ? this.linkedPayment
+        : linkedPayment as Expense?,
+    skipLink: skipLink ?? this.skipLink,
+    noReceipt: noReceipt ?? this.noReceipt,
+    amounts: identical(amounts, _keep)
+        ? this.amounts
+        : amounts as Map<String, String>?,
     message: identical(message, _keep) ? this.message : message as String?,
     onlineAccess: onlineAccess ?? this.onlineAccess,
     readNote: identical(readNote, _keep) ? this.readNote : readNote as String?,
@@ -310,25 +342,31 @@ class SplitEditorViewModel extends ChangeNotifier {
 
   Future<void> _startFromPayment(String expenseId) async {
     final existing = await _s.splits.billForExpense(expenseId);
-    if (existing != null) return _loadExisting(existing.id);
+    if (existing != null) return _loadExisting(existing.id, fromPayment: true);
     final expense = await _s.expenses.getById(expenseId);
     // The time of the linked payment is the best bill time until a receipt gives a date.
     _update(
       (s) => s.copyWith(
         loading: false,
         selectedExpenseId: expenseId,
+        linkedPayment: expense,
+        skipLink: true,
         billTime: expense?.notificationPostTime ?? s.billTime,
       ),
     );
   }
 
-  Future<void> _loadExisting(String billId) async {
+  Future<void> _loadExisting(String billId, {bool fromPayment = false}) async {
     final draft = await _s.splits.loadDraft(billId);
     if (draft == null) {
       _update((s) => s.copyWith(loading: false, finished: true));
       return;
     }
     final locked = await _s.splits.isLocked(billId);
+    final linkedId = draft.linkedExpenseId;
+    final linked = linkedId == null
+        ? null
+        : await _s.expenses.getById(linkedId);
     _update(
       (s) => s.copyWith(
         loading: false,
@@ -353,7 +391,9 @@ class SplitEditorViewModel extends ChangeNotifier {
         discount: _chargeText(draft.charges.discount),
         rounding: _chargeText(draft.charges.rounding),
         people: draft.people,
-        selectedExpenseId: draft.linkedExpenseId,
+        selectedExpenseId: linkedId,
+        linkedPayment: linked,
+        skipLink: fromPayment,
       ),
     );
   }
@@ -493,6 +533,23 @@ class SplitEditorViewModel extends ChangeNotifier {
     );
   }
 
+  /// One item for the whole [amount], named [name]. The editor goes to People.
+  void splitWithoutReceipt(Decimal amount, String name) => _update(
+    (s) => s.copyWith(
+      step: SplitStep.people,
+      noReceipt: true,
+      merchant: name,
+      message: null,
+      items: [
+        ItemRow(
+          key: _nextKey++,
+          name: name,
+          price: AmountFormatter.formatDisplay(amount),
+        ),
+      ],
+    ),
+  );
+
   void typeItemsInstead() {
     _update((s) => s.copyWith(step: SplitStep.items, message: null));
     if (_state.items.isEmpty) addItem();
@@ -588,10 +645,66 @@ class SplitEditorViewModel extends ChangeNotifier {
     ),
   );
 
+  /// Every item goes to Me and every person in the split.
+  void splitEverythingEvenly() => _update(
+    (s) => s.copyWith(
+      items: [for (final r in s.items) r.copyWith(sharedBy: _everyone(s))],
+    ),
+  );
+
+  /// The Everyone chip of one item: all people, or nobody when all already share it.
+  void toggleEveryone(int key) => updateItem(
+    key,
+    (r) => r.copyWith(
+      sharedBy: r.sharedBy.length == _everyone(_state).length
+          ? <String>{}
+          : _everyone(_state),
+    ),
+  );
+
+  static Set<String> _everyone(SplitEditorState s) => {
+    meId,
+    for (final p in s.people) p.id,
+  };
+
+  // Amounts
+
+  /// Shows a field for each share, filled with the computed shares.
+  void changeAmounts() => _update(
+    (s) => s.copyWith(
+      amounts: {
+        for (final l in _computedLines(s) ?? const <_Line>[])
+          l.$1: AmountFormatter.formatDisplay(l.$3),
+      },
+    ),
+  );
+
+  void setAmount(String id, String text) =>
+      _update((s) => s.copyWith(amounts: {...?s.amounts, id: text}));
+
+  /// The total in equal parts for everyone with a share. Me takes the rounding cents.
+  void splitAmountsEvenly() => _update((s) {
+    final total = totalOf(s);
+    final ids = s.amounts?.keys.toSet();
+    if (total == null || ids == null || ids.isEmpty) return s;
+    final even = SplitMath.shares([
+      SplitItemInput(price: total, sharedBy: ids),
+    ], SplitCharges());
+    return s.copyWith(
+      amounts: {
+        for (final id in ids) id: AmountFormatter.formatDisplay(even[id]!),
+      },
+    );
+  });
+
   // Link
 
-  void selectExpense(String? id) =>
-      _update((s) => s.copyWith(selectedExpenseId: id));
+  void selectExpense(String? id) => _update(
+    (s) => s.copyWith(
+      selectedExpenseId: id,
+      linkedPayment: s.candidates.where((e) => e.id == id).firstOrNull,
+    ),
+  );
 
   Future<void> _loadCandidates() async {
     final s = _state;
@@ -642,7 +755,12 @@ class SplitEditorViewModel extends ChangeNotifier {
   }
 
   void editItems() => _update(
-    (s) => s.copyWith(step: SplitStep.items, editing: true, error: null),
+    (s) => s.copyWith(
+      step: SplitStep.items,
+      editing: true,
+      error: null,
+      amounts: null,
+    ),
   );
 
   void changePayment() {
@@ -650,13 +768,15 @@ class SplitEditorViewModel extends ChangeNotifier {
     _loadCandidatesLogged();
   }
 
-  Future<void> deleteSplit() async {
+  /// Deletes the saved split and closes the editor. Returns what Undo runs, or null.
+  Future<Undoable?> deleteSplit() async {
     final billId = _state.billId;
-    if (billId == null || _state.saving) return;
+    if (billId == null || _state.saving) return null;
     _update((s) => s.copyWith(saving: true, error: null));
     try {
-      await _s.splits.deleteSplit(billId);
+      final undo = await _s.splits.deleteSplit(billId);
       _update((s) => s.copyWith(finished: true));
+      return undo;
     } catch (e, st) {
       developer.log(
         'Delete split failed',
@@ -665,6 +785,7 @@ class SplitEditorViewModel extends ChangeNotifier {
         stackTrace: st,
       );
       _update((s) => s.copyWith(saving: false, error: _deleteFailed));
+      return null;
     }
   }
 
@@ -673,14 +794,23 @@ class SplitEditorViewModel extends ChangeNotifier {
   void next() {
     final target = switch (_state.step) {
       SplitStep.items => SplitStep.people,
-      SplitStep.people => SplitStep.assign,
-      SplitStep.assign => SplitStep.link,
+      SplitStep.people =>
+        _state.noReceipt ? SplitStep.summary : SplitStep.assign,
+      SplitStep.assign => _state.skipLink ? SplitStep.summary : SplitStep.link,
       SplitStep.link => SplitStep.summary,
       _ => null,
     };
     if (target == null) return;
     if (_state.step == SplitStep.items) _dropPhoto();
-    _update((s) => s.copyWith(step: target, error: null));
+    _update(
+      (s) => s.copyWith(
+        step: target,
+        error: null,
+        items: s.noReceipt
+            ? [for (final r in s.items) r.copyWith(sharedBy: _everyone(s))]
+            : null,
+      ),
+    );
     if (target == SplitStep.link) _loadCandidatesLogged();
   }
 
@@ -706,14 +836,34 @@ class SplitEditorViewModel extends ChangeNotifier {
         if (s.billId != null) return false;
         target = SplitStep.photo;
       case SplitStep.people:
+        if (s.noReceipt) {
+          _update(
+            (st) => st.copyWith(
+              step: SplitStep.photo,
+              noReceipt: false,
+              merchant: '',
+              items: const [],
+            ),
+          );
+          return true;
+        }
         target = SplitStep.items;
       case SplitStep.assign:
         target = SplitStep.people;
       case SplitStep.link:
-        target = s.locked ? SplitStep.summary : SplitStep.assign;
+        target = s.locked || s.skipLink ? SplitStep.summary : SplitStep.assign;
       case SplitStep.summary:
+        // Back leaves the typed amounts first.
+        if (s.amounts != null) {
+          _update((st) => st.copyWith(amounts: null));
+          return true;
+        }
         if (s.locked || (s.billId != null && !s.editing)) return false;
-        target = SplitStep.link;
+        target = s.noReceipt
+            ? SplitStep.people
+            : s.skipLink
+            ? SplitStep.assign
+            : SplitStep.link;
     }
     _update((st) => st.copyWith(step: target, error: null));
     return true;
@@ -733,12 +883,15 @@ class SplitEditorViewModel extends ChangeNotifier {
     final s = _state;
     if (s.locked || s.saving) return;
     // A viewed bill has nothing to save. A new save would drop its repayment suggestions.
-    if (s.billId != null && !s.editing) {
+    if (s.billId != null && !s.editing && s.amounts == null) {
       _update((st) => st.copyWith(finished: true));
       return;
     }
-    final items = parseItems(s);
-    final charges = chargesOf(s);
+    // Typed amounts must add up to the total. Amounts equal to the computed shares keep the items.
+    if (s.amounts != null && amountsLeft(s)?.sign != 0) return;
+    final custom = s.amounts == null ? null : _customItems(s);
+    final items = custom ?? parseItems(s);
+    final charges = custom == null ? chargesOf(s) : SplitCharges();
     if (items == null || charges == null) return;
     final merchant = s.merchant.trim();
     final draft = SplitDraft(
@@ -866,8 +1019,8 @@ class SplitEditorViewModel extends ChangeNotifier {
       s.items[i].key,
   };
 
-  /// The names with their amounts, Me last. Null until the bill is complete.
-  static List<(String, Decimal)>? summaryLines(SplitEditorState s) {
+  /// The shares of the items: id, name and amount, Me last. Null until the bill is complete.
+  static List<_Line>? _computedLines(SplitEditorState s) {
     final inputs = _inputsOf(s);
     final charges = chargesOf(s);
     if (inputs == null || charges == null) return null;
@@ -876,8 +1029,69 @@ class SplitEditorViewModel extends ChangeNotifier {
     final names = {for (final p in s.people) p.id: p.name};
     return [
       for (final e in shares.entries)
-        if (e.key != meId) (names[e.key] ?? e.key, e.value),
-      ('Me', shares[meId]!),
+        if (e.key != meId) (e.key, names[e.key] ?? e.key, e.value),
+      (meId, 'Me', shares[meId]!),
+    ];
+  }
+
+  /// The shares as (id, name, amount), Me last: the typed amounts when they add up to the total.
+  static List<(String, String, Decimal)>? shareLines(SplitEditorState s) {
+    final lines = _computedLines(s);
+    final typed = s.amounts;
+    if (lines == null || typed == null || amountsLeft(s)?.sign != 0) {
+      return lines;
+    }
+    return [
+      for (final l in lines)
+        (l.$1, l.$2, AmountFormatter.parseInput(typed[l.$1] ?? '')!),
+    ];
+  }
+
+  /// The names with their amounts, Me last. Null until the bill is complete.
+  static List<(String, Decimal)>? summaryLines(SplitEditorState s) =>
+      shareLines(s)?.map((l) => (l.$2, l.$3)).toList();
+
+  /// The total minus the typed amounts. Null when an amount is empty or not valid.
+  static Decimal? amountsLeft(SplitEditorState s) {
+    final typed = s.amounts;
+    final total = totalOf(s);
+    if (typed == null || total == null) return null;
+    var sum = Decimal.zero;
+    for (final text in typed.values) {
+      final v = AmountFormatter.parseInput(text);
+      if (v == null || v.sign < 0) return null;
+      sum += v;
+    }
+    return total - sum;
+  }
+
+  /// Items that give each person the typed amount: one item each, no charges.
+  /// Null when the amounts do not add up to the total, or are the computed shares.
+  static List<DraftItem>? _customItems(SplitEditorState s) {
+    final computed = _computedLines(s);
+    final lines = shareLines(s);
+    if (computed == null || lines == null || amountsLeft(s)?.sign != 0) {
+      return null;
+    }
+    if ([for (var i = 0; i < lines.length; i++) lines[i].$3 == computed[i].$3]
+        .every((same) => same)) {
+      return null;
+    }
+    final merchant = s.merchant.trim();
+    final base = merchant.isNotEmpty
+        ? merchant
+        : s.items.length == 1
+        ? s.items.single.name.trim()
+        : 'Shared cost';
+    return [
+      for (final (id, name, amount) in lines)
+        if (amount.sign > 0)
+          DraftItem(
+            name: '$base · $name',
+            quantity: 1,
+            price: amount,
+            sharedBy: {id},
+          ),
     ];
   }
 

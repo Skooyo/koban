@@ -13,6 +13,7 @@ import 'ids.dart';
 import 'merchant_category_repository.dart';
 import 'split_repository.dart';
 import 'summaries.dart';
+import 'undoable.dart';
 import 'watch.dart';
 
 const _recentInPeriod = 5;
@@ -130,6 +131,7 @@ class ExpenseRepository {
               byId[row.categoryId]?.colorHex ??
               CategoryRepository.uncategorizedColor,
           total: row.total,
+          count: row.spentCount ?? 0,
           // Round half up to 4 decimals, as Kotlin divide(absSum, 4, HALF_UP).
           fraction: absSum > Decimal.zero
               ? (row.total.abs() * Decimal.fromInt(10000) / absSum)
@@ -289,12 +291,23 @@ class ExpenseRepository {
     }
   }
 
-  Future<void> dismissExpense(String id) async {
+  /// Hides the payment from every total. The row and its split links stay.
+  /// Undo sets the status the payment had. It returns null when the payment is missing.
+  Future<Undoable?> dismissExpense(String id) async {
     final existing = await getById(id);
-    if (existing == null) return;
+    if (existing == null) return null;
     await _db
         .update(_db.expenses)
         .replace(existing.copyWith(status: ExpenseStatus.dismissed));
+    return Undoable(
+      undo: () => _db.transaction(() async {
+        final now = await getById(id);
+        if (now == null || now.status != ExpenseStatus.dismissed) return;
+        await _db
+            .update(_db.expenses)
+            .replace(now.copyWith(status: existing.status));
+      }),
+    );
   }
 
   // ponytail: SQLite lower() folds ASCII letters only, so a shop with non-ASCII capitals can be missed.

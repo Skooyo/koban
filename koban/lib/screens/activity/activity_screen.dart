@@ -9,10 +9,12 @@ import '../../data/database.dart';
 import '../../data/summaries.dart';
 import '../../rules/periods.dart';
 import '../../theme/koban_theme.dart';
+import '../../theme/mon.dart';
 import '../../ui/category_donut.dart';
 import '../../ui/kit.dart';
 import '../../ui/money.dart';
 import '../../ui/payment_row.dart';
+import '../../ui/undo_snack_bar.dart';
 import '../payment/payment_view_model.dart';
 import 'activity_sheets.dart';
 import 'activity_view_model.dart';
@@ -34,6 +36,7 @@ class ActivityScreen extends StatefulWidget {
 
 class _ActivityScreenState extends State<ActivityScreen> {
   ActivityViewModel? _vm;
+  final _search = TextEditingController();
 
   @override
   void didChangeDependencies() {
@@ -43,8 +46,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   @override
   void dispose() {
+    _search.dispose();
     _vm?.dispose();
     super.dispose();
+  }
+
+  void _clearSearch() {
+    _search.clear();
+    _vm!.setQuery('');
   }
 
   /// Shows the message that the payment page gives back.
@@ -52,7 +61,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final result = await page;
     if (result is PaymentClosed && result.message != null) {
-      messenger.showSnackBar(SnackBar(content: Text(result.message!)));
+      showUndoSnackBar(messenger, result.message!, undo: result.undo);
     }
   }
 
@@ -93,6 +102,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
             .firstOrNull;
         final selectedLabel = selected == null ? null : _weekLabel(selected);
         final filter = state.categoryFilter;
+        final filterName = filter == null
+            ? null
+            : state.categoryNames[filter] ??
+                  CategoryRepository.uncategorizedName;
+        final query = state.query.trim();
+        final summary = vm.summary;
+        final scope = state.showAll
+            ? 'all months'
+            : selectedLabel ?? monthLabel;
 
         List<Widget> days(List<Expense> expenses) => expensesByDay(
           expenses: expenses,
@@ -108,21 +126,32 @@ class _ActivityScreenState extends State<ActivityScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _SearchField(controller: _search, onChanged: vm.setQuery),
+                  const SizedBox(height: 12),
                   SegmentedControl(
                     labels: const ['Month', 'All'],
                     selectedIndex: state.showAll ? 1 : 0,
                     onPick: (i) => vm.setShowAll(i == 1),
                   ),
-                  if (filter != null)
+                  if (summary != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
-                      child: _FilterChip(
-                        name:
-                            state.categoryNames[filter] ??
-                            CategoryRepository.uncategorizedName,
-                        total: state.showAll ? null : state.monthTotal,
-                        period: selectedLabel ?? monthLabel,
-                        onClear: () => vm.setCategoryFilter(null),
+                      child: _SummaryRow(
+                        title: [
+                          ?filterName,
+                          if (query.isNotEmpty) '"$query"',
+                        ].join(', '),
+                        subtitle: '${_paymentsCount(summary.count)}, $scope',
+                        total: summary.total,
+                        leading: filter == null
+                            ? const Icon(Icons.search)
+                            : CategoryDot(
+                                sliceColor(
+                                  context,
+                                  filter == uncategorizedFilter ? null : filter,
+                                ),
+                                size: 12,
+                              ),
                       ),
                     ),
                   if (!state.showAll) ...[
@@ -148,6 +177,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         onRingTap: _openFilter,
                       ),
                     ),
+                    if (state.breakdown.any((b) => b.total > Decimal.zero))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: _ByCategory(
+                          breakdown: state.breakdown,
+                          onPick: vm.setCategoryFilter,
+                          onOther: _openFilter,
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: _WeekStrip(
@@ -169,9 +207,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
             slivers.add(
               _emptySliver(
                 context,
-                filter != null
-                    ? 'No payments in this category.'
-                    : 'No payments yet.',
+                filterName == null
+                    ? 'No payments yet.'
+                    : 'No $filterName payments.',
+                filtered: filter != null,
+                query: query,
+                onClear: () => vm.setCategoryFilter(null),
               ),
             );
           }
@@ -199,11 +240,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
           slivers.add(
             _emptySliver(
               context,
-              filter != null
-                  ? 'No payments in this category.'
-                  : state.selectedWeek != null
-                  ? 'No payments in this week.'
-                  : 'No payments in $monthLabel.',
+              filterName == null
+                  ? 'No payments in ${state.selectedWeek != null ? 'this week' : monthLabel}.'
+                  : 'No $filterName payments in ${state.selectedWeek != null ? 'this week' : monthLabel}.',
+              filtered: filter != null,
+              query: query,
+              onClear: () => vm.setCategoryFilter(null),
             ),
           );
         } else {
@@ -222,7 +264,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
               children: [
                 LargeTopBar(
                   title: 'Activity',
-                  actions: [_FilterButton(onOpen: _openFilter)],
+                  actions: [
+                    _FilterButton(
+                      onOpen: _openFilter,
+                      active: filter == null ? 0 : 1,
+                    ),
+                  ],
                 ),
                 Expanded(child: CustomScrollView(slivers: slivers)),
               ],
@@ -246,16 +293,47 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
-  Widget _emptySliver(BuildContext context, String text) {
+  Widget _emptySliver(
+    BuildContext context,
+    String title, {
+    required bool filtered,
+    required String query,
+    required VoidCallback onClear,
+  }) {
     final theme = Theme.of(context);
+    final searching = query.isNotEmpty;
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
       sliver: SliverToBoxAdapter(
-        child: Text(
-          text,
-          style: theme.textTheme.bodyLarge!.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+        child: Column(
+          children: [
+            const Mon(MonFace.idle, size: 64),
+            const SizedBox(height: 12),
+            Text(
+              searching ? 'No payments match "$query".' : title,
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              searching
+                  ? 'Try another word, or clear the search.'
+                  : filtered
+                  ? 'Clear the filter to see all payments.'
+                  : 'Add one, or turn on tracking to find them.',
+              style: theme.textTheme.bodyMedium!.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (searching || filtered) ...[
+              const SizedBox(height: 16),
+              TonalButton(
+                searching ? 'Clear search' : 'Clear filter',
+                searching ? _clearSearch : onClear,
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -264,22 +342,30 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
 /// The outlined Filter button. It opens the category sheet.
 class _FilterButton extends StatelessWidget {
-  const _FilterButton({required this.onOpen});
+  const _FilterButton({required this.onOpen, required this.active});
 
   final VoidCallback onOpen;
+
+  /// How many filters are on. Above 0 the button shows the count and a gold-soft fill.
+  final int active;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final on = active > 0;
+    final color = on ? scheme.onPrimaryContainer : scheme.onSurface;
     return Semantics(
-      label: 'Filter by category',
+      label: on ? 'Filter by category, $active on' : 'Filter by category',
       button: true,
       excludeSemantics: true,
       onTap: onOpen,
       child: Material(
-        color: Colors.transparent,
+        color: on ? scheme.primaryContainer : Colors.transparent,
         shape: StadiumBorder(
-          side: BorderSide(color: theme.colorScheme.outlineVariant),
+          side: BorderSide(
+            color: on ? scheme.primaryContainer : scheme.outlineVariant,
+          ),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -291,17 +377,11 @@ class _FilterButton extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.filter_list,
-                    size: 18,
-                    color: theme.colorScheme.onSurface,
-                  ),
+                  Icon(Icons.filter_list, size: 18, color: color),
                   const SizedBox(width: 6),
                   Text(
-                    'Filter',
-                    style: theme.textTheme.labelLarge!.copyWith(
-                      color: theme.colorScheme.onSurface,
-                    ),
+                    on ? 'Filter · $active' : 'Filter',
+                    style: theme.textTheme.labelLarge!.copyWith(color: color),
                   ),
                 ],
               ),
@@ -313,96 +393,73 @@ class _FilterButton extends StatelessWidget {
   }
 }
 
-/// The category now shown: a gold-soft chip that clears the filter, and what was spent in it.
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.name,
+/// The count and the spent total of what the list shows, while a category filter or a search is on.
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow({
+    required this.title,
+    required this.subtitle,
     required this.total,
-    required this.period,
-    required this.onClear,
+    required this.leading,
   });
 
-  final String name;
-  final Decimal? total;
-  final String period;
-  final VoidCallback onClear;
+  final String title;
+  final String subtitle;
+  final Decimal total;
+  final Widget leading;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final muted = scheme.onSurfaceVariant;
-    return Row(
+    return ListGroup(
       children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 200),
-          child: Semantics(
-            label: 'Filtered by $name. Clear filter',
-            button: true,
-            excludeSemantics: true,
-            onTap: onClear,
-            child: Material(
-              color: scheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: onClear,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.check,
-                          size: 18,
-                          color: scheme.onPrimaryContainer,
-                        ),
-                        Flexible(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: weighted(
-                                theme.textTheme.labelLarge!,
-                                600,
-                              ).copyWith(color: scheme.onPrimaryContainer),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+        KobanRow(
+          title: title,
+          subtitle: subtitle,
+          leading: leading,
+          trailing: MoneyAmount(
+            amount: total,
+            style: weighted(theme.textTheme.titleMedium!, 700),
+            color: theme.colorScheme.onSurface,
           ),
         ),
-        if (total != null) ...[
-          const SizedBox(width: 12),
-          Flexible(
-            child: Row(
-              children: [
-                MoneyAmount(
-                  amount: total!,
-                  style: theme.textTheme.bodyMedium!,
-                  color: muted,
-                ),
-                Flexible(
-                  child: Text(
-                    ' $period',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium!.copyWith(color: muted),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
+    );
+  }
+}
+
+/// The search field. It filters the list while the owner types.
+class _SearchField extends StatelessWidget {
+  const _SearchField({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      maxLines: 1,
+      decoration: InputDecoration(
+        hintText: 'Search shop or note',
+        prefixIcon: Icon(Icons.search, color: muted),
+        suffixIcon: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => controller.text.isEmpty
+              ? const SizedBox.shrink()
+              : IconButton(
+                  onPressed: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                  tooltip: 'Clear search',
+                  icon: const Icon(Icons.close),
+                ),
+        ),
+        border: const OutlineInputBorder(),
+      ),
     );
   }
 }
@@ -469,6 +526,72 @@ class _ChartCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+const _byCategoryRows = 4;
+
+String _paymentsCount(int n) => n == 1 ? '1 payment' : '$n payments';
+
+/// The top categories by amount, each a tap to filter. The rest fold into one row that opens the filter sheet.
+class _ByCategory extends StatelessWidget {
+  const _ByCategory({
+    required this.breakdown,
+    required this.onPick,
+    required this.onOther,
+  });
+
+  final List<CategoryBreakdown> breakdown;
+  final ValueChanged<String> onPick;
+  final VoidCallback onOther;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final all = breakdown.where((b) => b.total > Decimal.zero).toList()
+      ..sort((a, b) => b.total.compareTo(a.total));
+    final top = all.take(_byCategoryRows).toList();
+    final rest = all.skip(_byCategoryRows).toList();
+    Widget amount(Decimal v) => MoneyAmount(
+      amount: v,
+      style: theme.textTheme.titleMedium!,
+      color: theme.colorScheme.onSurface,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionHeading('By category'),
+        ListGroup(
+          children: [
+            for (final b in top)
+              KobanRow(
+                title: b.name,
+                subtitle: _paymentsCount(b.count),
+                leading: CategoryDot(
+                  sliceColor(context, b.categoryId),
+                  size: 12,
+                ),
+                trailing: amount(b.total),
+                onTap: () => onPick(b.categoryId ?? uncategorizedFilter),
+                onTapLabel: 'Show ${b.name} payments only',
+              ),
+            if (rest.isNotEmpty)
+              KobanRow(
+                title: 'Other categories',
+                subtitle: _paymentsCount(
+                  rest.fold(0, (sum, b) => sum + b.count),
+                ),
+                leading: CategoryDot(MoneyColors.of(context).other, size: 12),
+                trailing: amount(
+                  rest.fold(Decimal.zero, (sum, b) => sum + b.total),
+                ),
+                onTap: onOther,
+                onTapLabel: 'Choose a category',
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

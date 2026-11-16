@@ -114,9 +114,11 @@ class DeviceControl {
       .invokeMethod<String>('relativeTime', {'time': time, 'now': now}))!;
 
   /// Opens the system share chooser with [text].
-  Future<void> shareText(String text, {String chooserTitle = 'Share summary'}) =>
-      _channel.invokeMethod<void>('shareText', {
-        'text': text,
-        'chooserTitle': chooserTitle,
-      });
+  Future<void> shareText(
+    String text, {
+    String chooserTitle = 'Share summary',
+  }) => _channel.invokeMethod<void>('shareText', {
+    'text': text,
+    'chooserTitle': chooserTitle,
+  });
 }

@@ -343,7 +343,7 @@ void main() {
       final vm = await open(s, billId: id);
 
       expect(vm.state.loading, false);
-      expect(vm.state.error, 'Something went wrong. Try again.');
+      expect(vm.state.error, 'Could not open the split. Try again.');
     },
   );
 

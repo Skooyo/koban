@@ -88,15 +88,15 @@ abstract final class PeopleMath {
     Balance balance, {
     required bool hasQr,
   }) => switch (balance) {
-    PaysYou(:final amount) => 'Pays you ${_money(amount)}',
-    YouPay(:final amount) => 'You pay ${_money(amount)}',
+    PaysYou(:final amount) => 'Owes you ${_money(amount)}',
+    YouPay(:final amount) => 'You owe ${_money(amount)}',
     Even() => "You're even",
     AllPaid() => hasQr ? 'All paid' : 'No QR saved yet',
   };
 
   static String headline(String name, Balance balance) => switch (balance) {
-    PaysYou(:final amount) => '$name pays you ${_money(amount)}',
-    YouPay(:final amount) => 'You pay $name ${_money(amount)}',
+    PaysYou(:final amount) => '$name owes you ${_money(amount)}',
+    YouPay(:final amount) => 'You owe $name ${_money(amount)}',
     Even() => "You're even",
     AllPaid() => 'All paid',
   };

@@ -192,10 +192,11 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
   void _setCategory(CheckCard card, String? id) =>
       _vm!.edit(card.payment.copyWith(categoryId: Value(id)));
 
-  void _moreCategories(CheckCard card) => showCategorySheet(
+  void _pickCategory(CheckCard card) => showCategorySheet(
     context,
     categories: _vm!.categories,
     selectedId: card.categoryId,
+    mostUsedIds: _vm!.mostUsedIds,
     onPick: (id) => _setCategory(card, id),
   );
 
@@ -376,7 +377,6 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
   Widget _stackCard(CheckCard card, int depth) {
     final isTop = depth == 0;
     final payment = card.payment;
-    final chips = _vm!.chipCategories(card.categoryId);
     final layered = TweenAnimationBuilder<double>(
       tween: Tween(end: depth.toDouble()),
       duration: _reduceMotion ? Duration.zero : _move,
@@ -412,7 +412,6 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
               },
               child: CheckPaymentCard(
                 card: card,
-                chips: chips,
                 stamp: _stamp,
                 onEdit: () => _edit(card),
                 onChooseDirection: (type) => _vm!.edit(
@@ -421,11 +420,10 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                     directionUnclear: false,
                   ),
                 ),
-                onPickCategory: (id) => _setCategory(card, id),
-                onMoreCategories: () => _moreCategories(card),
+                onPickCategory: () => _pickCategory(card),
               ),
             )
-          : CheckPaymentCard(card: card, chips: chips),
+          : CheckPaymentCard(card: card),
     );
     // One widget shape for every depth, so a card keeps its lift animation when it moves up.
     // The drag sits outside the layer, so the tilt does not skew the drag distance.

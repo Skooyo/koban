@@ -30,12 +30,6 @@ Future<void> addOne(
   type: type,
 );
 
-/// The labels of the category chips, in order.
-List<String?> chipLabels(WidgetTester tester) => [
-  for (final c in tester.widgetList<ChoiceChip>(find.byType(ChoiceChip)))
-    (c.label as Text).data,
-];
-
 void main() {
   testWidgets('a long notification text shows one line until Show full text', (
     tester,
@@ -92,13 +86,13 @@ void main() {
       type: TransactionType.receive,
     );
     await openCheck(tester, s);
-    expect(find.textContaining('Looks like a wallet top-up'), findsOneWidget);
-    expect(find.textContaining('Koban did not know'), findsNothing);
-    expect(saveButton, findsNothing);
     expect(
-      find.widgetWithText(OutlinedButton, 'Save payment'),
+      find.text('Looks like a wallet top-up, so usually not a payment.'),
       findsOneWidget,
     );
+    expect(find.textContaining('Koban did not know'), findsNothing);
+    expect(saveButton, findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Save payment'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Not a payment'));
     await tester.pumpAndSettle();
     await endHold(tester);
@@ -106,64 +100,83 @@ void main() {
     expect(await s.db.select(s.db.expenses).get(), isEmpty);
   });
 
-  testWidgets('the chips show the most used categories and a tap sets one', (
+  testWidgets(
+    'the Category row opens the sheet with Most used and a pick saves',
+    (tester) async {
+      final s = await testServices(device: maeDevice());
+      // One shop each: a category on a shop also moves that shop's older payments.
+      for (final (i, c) in ['transport', 'transport', 'shopping'].indexed) {
+        await s.expenses.addManualExpense(
+          amount: Decimal.parse('5'),
+          merchant: 'KEDAI $i',
+          postTime: 1000,
+          categoryId: c,
+          type: TransactionType.withdraw,
+        );
+      }
+      await addOne(s);
+      await openCheck(tester, s);
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.text('Category · tap to pick'), findsOneWidget);
+
+      await tester.tap(find.text('Category · tap to pick'));
+      await tester.pumpAndSettle();
+      expect(find.text('Most used'), findsOneWidget);
+      expect(find.text('All categories'), findsOneWidget);
+      final rows = [
+        for (final t in tester.widgetList<Text>(
+          find.descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(Text),
+          ),
+        ))
+          t.data,
+      ];
+      final most = rows.indexOf('Most used');
+      expect(rows.sublist(most + 1, most + 3), ['Transport', 'Shopping']);
+
+      await tester.tap(find.text('Shopping'));
+      await tester.pumpAndSettle();
+      expect(find.text('Most used'), findsNothing);
+      expect(find.text('Shopping'), findsOneWidget);
+      expect(find.text('Category'), findsOneWidget);
+      expect(find.text('Category · tap to pick'), findsNothing);
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+      await endHold(tester);
+      final saved = await s.db.select(s.db.expenses).get();
+      expect(
+        saved.where((e) => e.merchant == 'RESTORAN CONTOH').single.categoryId,
+        'shopping',
+      );
+    },
+  );
+
+  testWidgets('a top-up card with a long text fits a 390x844 phone', (
     tester,
   ) async {
     final s = await testServices(device: maeDevice());
-    // One shop each: a category on a shop also moves that shop's older payments.
-    for (final (i, c) in ['transport', 'transport', 'shopping'].indexed) {
-      await s.expenses.addManualExpense(
-        amount: Decimal.parse('5'),
-        merchant: 'KEDAI $i',
-        postTime: 1000,
-        categoryId: c,
-        type: TransactionType.withdraw,
+    await addOne(
+      s,
+      rawText: reloadText,
+      merchant: "your Touch 'n Go eWallet balance",
+      format: CaptureFormat.unknown,
+      type: TransactionType.receive,
+    );
+    await openCheck(tester, s);
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+    const screen = Rect.fromLTWH(0, 0, 390, 844);
+    for (final f in [
+      find.widgetWithText(OutlinedButton, 'Save payment'),
+      find.text('Show full text'),
+    ]) {
+      final r = tester.getRect(f);
+      expect(
+        screen.contains(r.topLeft) && screen.contains(r.bottomRight),
+        true,
       );
     }
-    await addOne(s);
-    await openCheck(tester, s);
-    final byName = [
-      for (final c in await s.categories.getAll())
-        if (c.id != 'transport' && c.id != 'shopping') c.name,
-    ];
-    expect(chipLabels(tester), ['Transport', 'Shopping', ...byName.take(2)]);
-    expect(find.text('Category · not set'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Shopping'));
-    await tester.pumpAndSettle();
-    expect(find.text('Category · not set'), findsNothing);
-    expect(
-      tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Shopping'))
-          .selected,
-      true,
-    );
-    await tester.tap(saveButton);
-    await tester.pumpAndSettle();
-    await endHold(tester);
-    final saved = await s.db.select(s.db.expenses).get();
-    expect(
-      saved.where((e) => e.merchant == 'RESTORAN CONTOH').single.categoryId,
-      'shopping',
-    );
-  });
-
-  testWidgets('More opens all categories and the pick shows as a chip', (
-    tester,
-  ) async {
-    final s = await testServices(device: maeDevice());
-    await addOne(s);
-    await openCheck(tester, s);
-    expect(chipLabels(tester), isNot(contains('Other')));
-    await tester.tap(find.text('More…'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Other').last);
-    await tester.pumpAndSettle();
-    expect(chipLabels(tester).last, 'Other');
-    expect(
-      tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Other'))
-          .selected,
-      true,
-    );
   });
 
   testWidgets('notifications off shows a row and Turn on asks Android again', (

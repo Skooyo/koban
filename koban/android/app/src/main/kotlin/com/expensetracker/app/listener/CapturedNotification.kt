@@ -29,7 +29,9 @@ data class CapturedNotification(
     val capturedAt: Long = System.currentTimeMillis(),
     val event: NotificationCaptureEvent = NotificationCaptureEvent.POSTED,
     val disposition: NotificationDisposition = NotificationDisposition.PENDING,
-    val detail: String? = null
+    val detail: String? = null,
+    /** The system key of the notification. Null for a row that Koban wrote itself. */
+    val key: String? = null
 )
 
 data class ListenerDebugState(

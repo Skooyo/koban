@@ -6,30 +6,36 @@ import 'package:flutter/foundation.dart';
 import '../../app/app_services.dart';
 import '../../capture/capture_host.dart';
 import '../../capture/listener_control.dart';
+import '../../data/undoable.dart';
 
-/// Which rows of the log show. Same names as the 0.1.1 `NotificationDebugFilter`.
-enum LogFilter { all, postedOnly, waiting, skipped }
+/// Which rows of the log show. Saved: the text became a payment waiting in Check payments.
+/// Not a payment: Koban skipped it. No text: the notification had no text.
+enum LogFilter { all, saved, notPayment, noText }
 
-/// The rows that [f] lets through. A skipped row is one that is not waiting, pending or info only.
+bool _skipped(NotificationDisposition d) =>
+    d != NotificationDisposition.waiting &&
+    d != NotificationDisposition.pending &&
+    d != NotificationDisposition.infoOnly;
+
+/// The rows that [f] lets through.
 List<LoggedNotification> filterLog(
   List<LoggedNotification> rows,
   LogFilter f,
 ) => switch (f) {
   LogFilter.all => rows,
-  LogFilter.postedOnly => [
-    for (final n in rows)
-      if (n.event == CaptureEvent.posted) n,
-  ],
-  LogFilter.waiting => [
+  LogFilter.saved => [
     for (final n in rows)
       if (n.disposition == NotificationDisposition.waiting) n,
   ],
-  LogFilter.skipped => [
+  LogFilter.notPayment => [
     for (final n in rows)
-      if (n.disposition != NotificationDisposition.waiting &&
-          n.disposition != NotificationDisposition.pending &&
-          n.disposition != NotificationDisposition.infoOnly)
+      if (_skipped(n.disposition) &&
+          n.disposition != NotificationDisposition.skippedEmpty)
         n,
+  ],
+  LogFilter.noText => [
+    for (final n in rows)
+      if (n.disposition == NotificationDisposition.skippedEmpty) n,
   ],
 };
 
@@ -62,6 +68,9 @@ class NotificationLogViewModel extends ChangeNotifier {
   var _generation = 0;
   final Set<String> _marking = {};
 
+  /// The rows that Clear log hides until its Undo time ends.
+  final Set<String> _hidden = {};
+
   /// The rows that got a card while this screen is open. The log can show them as
   /// skipped a little longer, and a forced card skips the duplicate check.
   final Set<String> _marked = {};
@@ -75,12 +84,34 @@ class NotificationLogViewModel extends ChangeNotifier {
     totalCaptured: 0,
   );
   List<LoggedNotification> _rows = const [];
+  Map<String, String> _appLabels = const {};
   var _filter = LogFilter.all;
   String? _message;
 
   bool get isAccessGranted => _isAccessGranted;
   bool get isConnected => _isConnected;
   ListenerState get listenerState => _listenerState;
+
+  /// The name of the app that sent [packageName]. The package name stands in until the label loads.
+  String appLabel(String packageName) => _appLabels[packageName] ?? packageName;
+
+  /// How many rows of the log are from today (by post time, as the list shows them),
+  /// how many of those are saved (waiting in Check payments) and how many were skipped.
+  (int seen, int saved, int skipped) todayCounts(DateTime now) {
+    var seen = 0;
+    var saved = 0;
+    var skipped = 0;
+    for (final n in _rows) {
+      final at = DateTime.fromMillisecondsSinceEpoch(n.postTime);
+      if (at.year != now.year || at.month != now.month || at.day != now.day) {
+        continue;
+      }
+      seen++;
+      if (n.disposition == NotificationDisposition.waiting) saved++;
+      if (_skipped(n.disposition)) skipped++;
+    }
+    return (seen, saved, skipped);
+  }
 
   /// All rows of the log, before the filter.
   List<LoggedNotification> get rows => _rows;
@@ -125,10 +156,15 @@ class NotificationLogViewModel extends ChangeNotifier {
         final connected = await l.isConnected();
         if (_disposed) return;
         if (generation != _generation) continue;
-        _rows = rows;
+        _rows = [
+          for (final n in rows)
+            if (!_hidden.contains(n.id)) n,
+        ];
         _listenerState = state;
         _isConnected = connected;
         _readFailing = false;
+        await _loadLabels(rows);
+        if (_disposed) return;
         notifyListeners();
       } while (_readAgain);
     } catch (e, s) {
@@ -136,6 +172,23 @@ class NotificationLogViewModel extends ChangeNotifier {
       _readFailing = true;
     } finally {
       _reading = false;
+    }
+  }
+
+  /// Asks the phone for the names of the apps that are not known yet. A failure keeps the package names.
+  Future<void> _loadLabels(List<LoggedNotification> rows) async {
+    final missing = {
+      for (final n in rows)
+        if (!_appLabels.containsKey(n.packageName)) n.packageName,
+    };
+    if (missing.isEmpty) return;
+    try {
+      final labels = await _s.device.appLabels(missing);
+      _appLabels = {..._appLabels, for (final p in missing) p: labels[p] ?? p};
+    } catch (e, s) {
+      // Do not ask again at each poll.
+      _appLabels = {..._appLabels, for (final p in missing) p: p};
+      _log('App names failed', e, s);
     }
   }
 
@@ -211,11 +264,34 @@ class NotificationLogViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> clearLog() async {
-    await _s.listener.clearLog();
-    _generation++;
-    _setMessage('Log cleared');
-    await _readLog(again: true);
+  /// Hides the rows that show now. The native log is cleared when the Undo time ends,
+  /// so Undo only shows the rows again. Nothing shows, so nothing to undo: it clears
+  /// at once and returns null.
+  /// ponytail: a process kill in the Undo time keeps the log, which is the safe side.
+  Future<Undoable?> clearLog() async {
+    if (_rows.isEmpty) {
+      await _s.listener.clearLog();
+      _generation++;
+      await _readLog(again: true);
+      return null;
+    }
+    final ids = {for (final n in _rows) n.id};
+    _hidden.addAll(ids);
+    _rows = const [];
+    notifyListeners();
+    return Undoable(
+      undo: () async {
+        _hidden.removeAll(ids);
+        await _readLog(again: true);
+      },
+      commit: () async {
+        // Only the rows that were hidden. A notification of the 6 s stays.
+        await _s.listener.clearLog(ids: ids);
+        _generation++;
+        _hidden.removeAll(ids);
+        if (!_disposed) await _readLog(again: true);
+      },
+    );
   }
 
   /// Reads the notifications that show now and says if it worked.

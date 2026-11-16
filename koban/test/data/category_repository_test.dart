@@ -43,8 +43,8 @@ void main() {
     expect(own.isDefault, isFalse);
     expect(own.colorHex, '#123456');
 
-    expect(await repo.deleteCategory('food'), isFalse);
-    expect(await repo.deleteCategory(own.id), isTrue);
+    expect(await repo.deleteCategory('food'), isNull);
+    expect(await repo.deleteCategory(own.id), isNotNull);
 
     expect(await repo.watchAll().first, hasLength(7));
     expect(await repo.getById(own.id), isNull);

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' hide Category;
 import '../../app/app_services.dart';
 import '../../capture/listener_control.dart';
 import '../../data/database.dart';
+import '../../data/undoable.dart';
 import '../../online/receipt_cloud_client.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/payment_rules.dart';
@@ -228,9 +229,8 @@ class SettingsViewModel extends ChangeNotifier {
   Future<void> addCategory(String name) =>
       _s.categories.addCategory(name, _newCategoryColor);
 
-  Future<void> deleteCategory(String id) async {
-    await _s.categories.deleteCategory(id);
-  }
+  Future<Undoable?> deleteCategory(String id) =>
+      _s.categories.deleteCategory(id);
 
   @override
   void dispose() {

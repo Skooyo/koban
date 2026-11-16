@@ -176,8 +176,8 @@ void main() {
       await s.people.settleUp(ali);
       final (vm, messages) = await open(s, ali);
 
-      vm.delete();
-      vm.delete();
+      vm.delete('Ali deleted');
+      vm.delete('Ali deleted');
       await idle(vm);
       await until(() => vm.gone);
 
@@ -191,7 +191,7 @@ void main() {
     final ali = await seedAli(s);
     final (vm, messages) = await open(s, ali);
 
-    vm.delete();
+    vm.delete('Ali deleted');
     await idle(vm);
 
     expect(messages, ['Settle up with them first.']);
@@ -301,9 +301,9 @@ void main() {
   // Ruling R3: only "That file isn't an image." shows; every other gallery failure is general.
   for (final (native, shown) in [
     ("That file isn't an image.", "That file isn't an image."),
-    ("Couldn't save to gallery.", 'Something went wrong. Try again.'),
-    (null, 'Something went wrong. Try again.'),
-    ('', 'Something went wrong. Try again.'),
+    ("Couldn't save to gallery.", 'Could not save the change. Try again.'),
+    (null, 'Could not save the change. Try again.'),
+    ('', 'Could not save the change. Try again.'),
   ]) {
     test(
       'a failed gallery save with the native text "$native" says "$shown"',
@@ -386,7 +386,7 @@ void main() {
     vm.pickQr();
     await until(() => messages.isNotEmpty);
 
-    expect(messages, ['Something went wrong. Try again.']);
+    expect(messages, ['Could not save the change. Try again.']);
     expect(vm.qrVersion, 0);
     expect((await personRow(s, ali)).qrPath, isNull);
     expect(File(p.join(files.path, 'qr', '$ali.img')).existsSync(), isFalse);

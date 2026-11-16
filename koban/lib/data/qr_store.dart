@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
@@ -60,6 +61,22 @@ class QrStore {
     if (path == null) return;
     final file = File(path);
     if (await file.exists()) await file.delete();
+    await qrImage(path).evict();
+  }
+
+  /// The bytes of the file at [path], or null when there is none. Undo of a delete writes them back.
+  Future<Uint8List?> read(String? path) async {
+    if (path == null) return null;
+    final file = File(path);
+    return await file.exists() ? file.readAsBytes() : null;
+  }
+
+  /// Writes [bytes] back to [path]. A file that is already there stays.
+  Future<void> restore(String path, Uint8List bytes) async {
+    final file = File(path);
+    if (await file.exists()) return;
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(bytes);
     await qrImage(path).evict();
   }
 

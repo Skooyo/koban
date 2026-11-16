@@ -192,7 +192,7 @@ class _PaymentAppsScreenState extends State<PaymentAppsScreen> {
                       minimumSize: const Size.fromHeight(48),
                     ),
                     child: Text(switch (n) {
-                      0 => 'Save',
+                      0 => 'Save without apps',
                       1 => 'Save 1 app',
                       _ => 'Save $n apps',
                     }, style: text.labelLarge),

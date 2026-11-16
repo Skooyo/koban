@@ -40,7 +40,7 @@ Future<String?> _attempt(Future<void> Function() save) async {
       error: e,
       stackTrace: s,
     );
-    return 'Something went wrong. Try again.';
+    return 'Could not save the change. Try again.';
   }
 }
 
@@ -366,24 +366,6 @@ Future<bool> showSettleUpDialog(
     confirm: 'Settle up',
   );
 }
-
-Future<bool> showDeletePersonDialog(BuildContext context, String name) =>
-    _confirm(
-      context,
-      title: 'Delete $name?',
-      text: 'Their QR and paid items are removed. Split bills keep their name.',
-      confirm: 'Delete',
-      destructive: true,
-    );
-
-Future<bool> showDeleteOwedItemDialog(BuildContext context, String text) =>
-    _confirm(
-      context,
-      title: 'Delete this item?',
-      text: text,
-      confirm: 'Delete',
-      destructive: true,
-    );
 
 /// Mark paid for one split debt: pick the received payment, or cash.
 /// [onPick] gets the expense id (null for cash) and returns true when the payment starts.

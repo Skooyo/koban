@@ -119,7 +119,9 @@ class KobanRow extends StatelessWidget {
                         color: subtitleColor ?? muted,
                       ),
                       maxLines: subtitleMaxLines,
-                      overflow: TextOverflow.ellipsis,
+                      overflow: subtitleMaxLines == null
+                          ? null
+                          : TextOverflow.ellipsis,
                     ),
                 ],
               ),

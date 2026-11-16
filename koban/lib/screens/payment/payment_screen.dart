@@ -1,17 +1,15 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
-import '../../data/category_repository.dart';
 import '../../rules/types.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/amount_input.dart';
+import '../../ui/category_chips.dart';
 import '../../ui/date_labels.dart';
 import '../../ui/dialogs.dart';
 import '../../ui/kit.dart';
 import 'category_sheet.dart';
 import 'payment_view_model.dart';
-
-const _padRows = ['123', '456', '789', '.0<'];
 
 /// The add and edit page of a payment. It closes with a [PaymentResult],
 /// or with null when the owner leaves without saving.
@@ -28,11 +26,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
   late final AppServices _s;
   late final PaymentViewModel _vm;
   bool _ready = false;
-  bool _shopFocused = false;
-  bool _noteFocused = false;
-  // Add opens with the pad. Edit opens without it until the amount is tapped.
-  late bool _padRequested = widget.expenseId == null;
-  bool _wasKeyboardUp = false;
   bool _closing = false;
 
   @override
@@ -44,14 +37,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
       _vm = PaymentViewModel(_s, expenseId: widget.expenseId)
         ..addListener(_closeIfMissing);
     }
-    // Back or Done hides the keyboard but leaves focus in Shop or Note.
-    // Drop it so the number pad comes back.
-    final keyboardUp = MediaQuery.viewInsetsOf(context).bottom > 0;
-    if (_wasKeyboardUp && !keyboardUp) {
-      FocusManager.instance.primaryFocus?.unfocus();
-      if (!_vm.isEditing) _padRequested = true;
-    }
-    _wasKeyboardUp = keyboardUp;
   }
 
   @override
@@ -99,32 +84,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  Future<void> _confirmDelete() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final scheme = Theme.of(context).colorScheme;
-        return AlertDialog(
-          backgroundColor: scheme.surfaceContainer,
-          title: const Text('Delete this payment?'),
-          content: const Text('It will no longer count in your totals.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(foregroundColor: scheme.error),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-    if (ok == true) await _delete();
-  }
-
   Future<void> _pickDate(PaymentForm f) async {
     final picked = await showPastDatePicker(
       context,
@@ -132,11 +91,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
       now: _s.now(),
     );
     if (picked != null) _vm.setDate(picked);
-  }
-
-  void _showPad() {
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _padRequested = true);
   }
 
   @override
@@ -164,86 +118,57 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final income = f.type == TransactionType.receive;
     final editing = _vm.isEditing;
     final valid = AmountInput.toAmount(f.amountText) != null;
-    final padVisible = _padRequested && !_shopFocused && !_noteFocused;
-    final categoryName = _vm.categories
-        .where((c) => c.id == f.categoryId)
-        .map((c) => c.name)
-        .firstOrNull;
-    final amount = 'RM ${f.amountText.isEmpty ? '0' : f.amountText}';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _TopRow(
             type: f.type,
             editing: editing,
             onClose: _leave,
             onType: _vm.setType,
-            onDelete: _vm.saving ? null : _confirmDelete,
+            onDelete: _vm.saving ? null : _delete,
+          ),
+          _AmountField(
+            initial: f.amountText,
+            autofocus: !editing,
+            income: income,
+            hint: editing || f.amountText.isNotEmpty
+                ? '${income ? 'Received' : 'Spent'} · ${dateTimeLabel(f.postTime)}'
+                : 'Type the amount.',
+            onChanged: _vm.setAmount,
           ),
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Semantics(
-                    excludeSemantics: true,
-                    button: true,
-                    label: f.amountText.isEmpty
-                        ? 'Amount empty'
-                        : 'Amount RM ${f.amountText}',
-                    onTapHint: 'Type the amount',
-                    onTap: _showPad,
-                    child: InkWell(
-                      onTap: _showPad,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Column(
-                          children: [
-                            MoneyText(
-                              income ? '+ $amount' : amount,
-                              style: theme.textTheme.displayLarge,
-                              color: income
-                                  ? MoneyColors.of(context).received
-                                  : f.amountText.isEmpty
-                                  ? scheme.onSurfaceVariant
-                                  : scheme.onSurface,
-                            ),
-                            Text(
-                              editing
-                                  ? '${income ? 'Received' : 'Spent'} · ${dateTimeLabel(f.postTime)}'
-                                  : 'Tap a number to change it',
-                              style: theme.textTheme.bodyMedium!.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                  const SizedBox(height: 4),
+                  CategoryChips(
+                    chips: _vm.chipCategories,
+                    selectedId: f.categoryId,
+                    flagNotSet: false,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    onPick: _vm.setCategory,
+                    onMore: () => showCategorySheet(
+                      context,
+                      categories: _vm.categories,
+                      selectedId: f.categoryId,
+                      onPick: _vm.setCategory,
                     ),
                   ),
+                  if (!editing && _vm.recentShops.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _RecentShops(
+                      shops: _vm.recentShops,
+                      selected: f.merchant.trim().toLowerCase(),
+                      onPick: _vm.pickRecentShop,
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   ListGroup(
                     children: [
-                      KobanRow(
-                        title:
-                            categoryName ??
-                            CategoryRepository.uncategorizedName,
-                        subtitle: 'Category',
-                        leading: CategoryDot(
-                          categoryColor(context, f.categoryId),
-                          size: 12,
-                        ),
-                        showChevron: true,
-                        onTap: () => showCategorySheet(
-                          context,
-                          categories: _vm.categories,
-                          selectedId: f.categoryId,
-                          onPick: _vm.setCategory,
-                        ),
-                        onTapLabel: 'Change category',
-                      ),
                       KobanRow(
                         title: dateLabel(f.postTime, _s.now()),
                         subtitle: 'Date',
@@ -258,10 +183,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         icon: Icons.storefront,
                         value: f.merchant,
                         onChanged: _vm.setMerchant,
-                        onFocus: (on) => setState(() {
-                          _shopFocused = on;
-                          if (on) _padRequested = false;
-                        }),
                         singleLine: true,
                       ),
                       _TextRow(
@@ -270,10 +191,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         icon: Icons.edit_note,
                         value: f.notes,
                         onChanged: _vm.setNotes,
-                        onFocus: (on) => setState(() {
-                          _noteFocused = on;
-                          if (on) _padRequested = false;
-                        }),
                         singleLine: false,
                       ),
                     ],
@@ -330,8 +247,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ),
           ),
-          if (padVisible)
-            _NumberPad(onKey: _vm.press, onBackspace: _vm.backspace),
           Padding(
             padding: const EdgeInsets.only(top: 4, bottom: 12),
             child: SizedBox(
@@ -344,14 +259,57 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   children: [
                     const Icon(Icons.check, size: 18),
                     const SizedBox(width: 8),
-                    Text(
-                      editing ? 'Save changes' : 'Save payment',
-                      style: weighted(theme.textTheme.titleMedium!, 700),
-                    ),
+                    const Text('Save payment'),
                   ],
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Up to three chips of recent shops. A tap fills Shop and its last category.
+class _RecentShops extends StatelessWidget {
+  const _RecentShops({
+    required this.shops,
+    required this.selected,
+    required this.onPick,
+  });
+
+  final List<RecentShop> shops;
+  final String selected;
+  final ValueChanged<RecentShop> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 8,
+        children: [
+          Text(
+            'Recent shops',
+            style: theme.textTheme.bodyMedium!.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final s in shops)
+                ChoiceChip(
+                  label: Text(s.name),
+                  showCheckmark: false,
+                  selected: s.name.toLowerCase() == selected,
+                  onSelected: (_) => onPick(s),
+                ),
+            ],
           ),
         ],
       ),
@@ -427,7 +385,6 @@ class _TextRow extends StatefulWidget {
     required this.icon,
     required this.value,
     required this.onChanged,
-    required this.onFocus,
     required this.singleLine,
   });
 
@@ -436,7 +393,6 @@ class _TextRow extends StatefulWidget {
   final IconData icon;
   final String value;
   final ValueChanged<String> onChanged;
-  final ValueChanged<bool> onFocus;
   final bool singleLine;
 
   @override
@@ -445,9 +401,14 @@ class _TextRow extends StatefulWidget {
 
 class _TextRowState extends State<_TextRow> {
   late final _controller = TextEditingController(text: widget.value);
-  late final _focus = FocusNode()..addListener(_focusChanged);
+  late final _focus = FocusNode();
 
-  void _focusChanged() => widget.onFocus(_focus.hasFocus);
+  // A recent-shop chip changes the value from outside. Typing already matches it.
+  @override
+  void didUpdateWidget(_TextRow old) {
+    super.didUpdateWidget(old);
+    if (widget.value != _controller.text) _controller.text = widget.value;
+  }
 
   @override
   void dispose() {
@@ -530,65 +491,105 @@ class _TextRowState extends State<_TextRow> {
   }
 }
 
-class _NumberPad extends StatelessWidget {
-  const _NumberPad({required this.onKey, required this.onBackspace});
+/// The big amount: "RM" and a number field that opens the number keyboard.
+/// A tap anywhere on it types. The text shrinks to fit, as the old amount text did.
+class _AmountField extends StatefulWidget {
+  const _AmountField({
+    required this.initial,
+    required this.autofocus,
+    required this.income,
+    required this.hint,
+    required this.onChanged,
+  });
 
-  final ValueChanged<String> onKey;
-  final VoidCallback onBackspace;
+  final String initial;
+  final bool autofocus;
+  final bool income;
+  final String hint;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_AmountField> createState() => _AmountFieldState();
+}
+
+class _AmountFieldState extends State<_AmountField> {
+  late final _controller = TextEditingController(text: widget.initial);
+  final _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        children: [
-          for (final row in _padRows)
-            Padding(
-              padding: EdgeInsets.only(top: row == _padRows.first ? 0 : 8),
+    final scheme = theme.colorScheme;
+    final color = widget.income
+        ? MoneyColors.of(context).received
+        : scheme.onSurface;
+    final style = tabular(theme.textTheme.displayLarge!.copyWith(color: color));
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _focus.requestFocus,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (var i = 0; i < row.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 8),
-                    Expanded(
+                  ExcludeSemantics(
+                    child: Text(widget.income ? '+ RM ' : 'RM ', style: style),
+                  ),
+                  IntrinsicWidth(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 48),
                       child: Semantics(
-                        button: true,
-                        label: switch (row[i]) {
-                          '.' => 'Decimal point',
-                          '<' => 'Delete digit',
-                          _ => null,
-                        },
-                        excludeSemantics: row[i] == '.' || row[i] == '<',
-                        child: Material(
-                          color: theme.colorScheme.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(12),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () =>
-                                row[i] == '<' ? onBackspace() : onKey(row[i]),
-                            child: SizedBox(
-                              height: 52,
-                              child: Center(
-                                child: row[i] == '<'
-                                    ? const Icon(Icons.backspace)
-                                    : Text(
-                                        row[i],
-                                        style: weighted(
-                                          theme.textTheme.titleLarge!,
-                                          700,
-                                        ),
-                                      ),
-                              ),
+                        label: 'Amount',
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focus,
+                          autofocus: widget.autofocus,
+                          onChanged: widget.onChanged,
+                          onSubmitted: (_) => _focus.unfocus(),
+                          inputFormatters: [AmountInput.formatter],
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          textInputAction: TextInputAction.done,
+                          style: style,
+                          cursorColor: scheme.primary,
+                          decoration: InputDecoration(
+                            isCollapsed: true,
+                            filled: false,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            hintText: '0',
+                            hintStyle: style.copyWith(
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
-        ],
+            Text(
+              widget.hint,
+              style: theme.textTheme.bodyMedium!.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

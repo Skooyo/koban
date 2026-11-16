@@ -16,6 +16,7 @@ import '../../ui/kit.dart';
 import '../../ui/listener_status_banner.dart';
 import '../../ui/money.dart';
 import '../../ui/payment_row.dart';
+import '../../ui/undo_snack_bar.dart';
 import '../payment/payment_view_model.dart';
 import 'home_view_model.dart';
 
@@ -63,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final result = await page;
     if (result is PaymentClosed && result.message != null) {
-      messenger.showSnackBar(SnackBar(content: Text(result.message!)));
+      showUndoSnackBar(messenger, result.message!, undo: result.undo);
     }
   }
 
@@ -134,9 +135,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: vm.waitingCount == 1
                                   ? '1 payment to check'
                                   : '${vm.waitingCount} payments to check',
+                              subtitle: vm.waitingSpent > Decimal.zero
+                                  ? '${rm(vm.waitingSpent)} found, not saved yet'
+                                  : 'Found by Koban, not saved yet',
                               leading: Icon(
                                 Icons.receipt,
-                                color: MoneyColors.of(context).goldText,
+                                color: MoneyColors.of(context).review,
                               ),
                               showChevron: true,
                               onTap: () => openCheckPayments(context),
@@ -267,9 +271,20 @@ class _SpentTodayCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Spent today',
-                  style: text.bodyMedium!.copyWith(color: muted),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Spent today',
+                        style: text.bodyMedium!.copyWith(color: muted),
+                      ),
+                    ),
+                    Text(
+                      'See this week',
+                      style: text.bodySmall!.copyWith(color: muted),
+                    ),
+                    Icon(Icons.keyboard_arrow_right, color: muted, size: 20),
+                  ],
                 ),
                 Padding(
                   padding: const EdgeInsets.only(top: 8),

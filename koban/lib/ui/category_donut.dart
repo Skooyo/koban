@@ -84,10 +84,16 @@ List<DonutSlice> donutSlices(List<CategoryBreakdown> breakdown) {
   };
 }
 
-Color _sliceColor(BuildContext context, DonutSlice s) =>
-    s.folded || !_sliceOrder.contains(s.categoryId)
+Color sliceColor(
+  BuildContext context,
+  String? categoryId, {
+  bool folded = false,
+}) => folded || !_sliceOrder.contains(categoryId)
     ? MoneyColors.of(context).other
-    : categoryColor(context, s.categoryId);
+    : categoryColor(context, categoryId);
+
+Color _sliceColor(BuildContext context, DonutSlice s) =>
+    sliceColor(context, s.categoryId, folded: s.folded);
 
 int _percentOf(Decimal part, Decimal whole) => whole == Decimal.zero
     ? 0

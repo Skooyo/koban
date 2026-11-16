@@ -9,7 +9,7 @@ void main() {
     expect(PeopleMath.net([m('23.31')], [m('18.00')]), m('5.31'));
   });
 
-  test('balance pays you when positive', () {
+  test('balance owes you when positive', () {
     expect(PeopleMath.balance([m('23.31')], [m('18.00')]), PaysYou(m('5.31')));
   });
 
@@ -28,11 +28,11 @@ void main() {
   test('headline names who pays', () {
     expect(
       PeopleMath.headline('Jun Wei', PaysYou(m('5.31'))),
-      'Jun Wei pays you RM 5.31',
+      'Jun Wei owes you RM 5.31',
     );
     expect(
       PeopleMath.headline('Jun Wei', YouPay(m('18.00'))),
-      'You pay Jun Wei RM 18.00',
+      'You owe Jun Wei RM 18.00',
     );
   });
 
@@ -47,7 +47,7 @@ void main() {
     );
     expect(
       PeopleMath.statusLine('Jun Wei', YouPay(m('18.00')), hasQr: false),
-      'You pay RM 18.00',
+      'You owe RM 18.00',
     );
   });
 

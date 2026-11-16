@@ -4,7 +4,10 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/app_services.dart';
 import '../../capture/capture_host.dart';
 import '../../capture/listener_control.dart';
+import '../../rules/card_mask.dart';
 import '../../theme/koban_theme.dart';
+import '../../ui/date_labels.dart';
+import '../../ui/undo_snack_bar.dart';
 import 'notification_log_view_model.dart';
 
 /// The notification log: what the listener received and what Koban did with each text.
@@ -114,9 +117,9 @@ class _NotificationLogScreenState extends State<NotificationLogScreen> {
                         children: [
                           for (final (f, label) in const [
                             (LogFilter.all, 'All'),
-                            (LogFilter.postedOnly, 'Posted'),
-                            (LogFilter.waiting, 'Waiting'),
-                            (LogFilter.skipped, 'Skipped'),
+                            (LogFilter.saved, 'Saved'),
+                            (LogFilter.notPayment, 'Not a payment'),
+                            (LogFilter.noText, 'No text'),
                           ])
                             FilterChip(
                               selected: vm.filter == f,
@@ -129,7 +132,7 @@ class _NotificationLogScreenState extends State<NotificationLogScreen> {
                       if (shown.isEmpty)
                         Text(
                           vm.rows.isEmpty
-                              ? 'No notifications captured yet. Make a payment or tap “Snapshot active notifications” after granting access.'
+                              ? 'No notifications captured yet. Make a payment or tap “Scan now” after granting access.'
                               : 'No notifications match this filter.',
                           style: text.bodyMedium!.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -142,6 +145,8 @@ class _NotificationLogScreenState extends State<NotificationLogScreen> {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: _LogCard(
                               n,
+                              app: vm.appLabel(n.packageName),
+                              marked: vm.isMarked(n.id),
                               onMark: vm.isMarked(n.id)
                                   ? null
                                   : () => vm.markAsPayment(n),
@@ -159,11 +164,9 @@ class _NotificationLogScreenState extends State<NotificationLogScreen> {
   }
 }
 
-/// The time of a log row in the local zone, as 0.1.1 shows it.
-String _stamp(int ms) => DateFormat(
-  'MMM d, HH:mm:ss',
-  'en_US',
-).format(DateTime.fromMillisecondsSinceEpoch(ms));
+/// "Today, 19:41" or "Fri, 13 Nov, 19:41".
+String _when(int ms, DateTime now) =>
+    '${dateLabel(ms, now)}, ${DateFormat('HH:mm', 'en_US').format(DateTime.fromMillisecondsSinceEpoch(ms))}';
 
 /// A card with the rounded surface of the 0.1.1 log.
 class _Surface extends StatelessWidget {
@@ -194,9 +197,8 @@ class _StatusCard extends StatelessWidget {
     final text = theme.textTheme;
     final money = MoneyColors.of(context);
     final healthy = vm.isAccessGranted && vm.isConnected;
-    final state = vm.listenerState;
-    final last = state.lastConnectedAt;
     final message = vm.message;
+    final (seen, saved, skipped) = vm.todayCounts(AppScope.of(context).now());
     return _Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,7 +220,7 @@ class _StatusCard extends StatelessWidget {
                       ? 'Notification access not granted'
                       : !vm.isConnected
                       ? 'Access granted, listener not connected'
-                      : 'Listener active',
+                      : 'Koban can read notifications',
                   style: text.titleMedium!.copyWith(color: scheme.onSurface),
                 ),
               ),
@@ -226,8 +228,7 @@ class _StatusCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Captured ${vm.rows.length} · ${state.isConnected ? 'listener connected' : 'listener not connected'}'
-            '${last == null ? '' : ' · last connected ${_stamp(last)}'}',
+            '$seen seen today · $saved saved · $skipped skipped',
             style: text.bodyMedium!.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 8),
@@ -235,18 +236,24 @@ class _StatusCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 4,
             children: [
-              OutlinedButton(
-                onPressed: vm.reconnect,
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-                child: const Text('Reconnect listener'),
-              ),
-              OutlinedButton(
+              TextButton(
                 onPressed: vm.snapshot,
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-                child: const Text('Snapshot'),
+                style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                child: const Text('Scan now'),
               ),
               TextButton(
-                onPressed: vm.clearLog,
+                onPressed: vm.reconnect,
+                style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                child: const Text('Restart payment tracking'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final undo = await vm.clearLog();
+                  if (undo != null) {
+                    showUndoSnackBar(messenger, 'Log cleared', undo: undo);
+                  }
+                },
                 style: TextButton.styleFrom(
                   minimumSize: const Size(0, 48),
                   foregroundColor: scheme.error,
@@ -269,11 +276,20 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _LogCard extends StatelessWidget {
-  const _LogCard(this.n, {required this.onMark});
+  const _LogCard(
+    this.n, {
+    required this.app,
+    required this.marked,
+    required this.onMark,
+  });
 
   final LoggedNotification n;
+  final String app;
 
-  /// Null hides Add as payment: the row has a card already.
+  /// True when Save payment made a card for this row while the screen is open.
+  final bool marked;
+
+  /// Null hides Save payment: the row has a card already.
   final VoidCallback? onMark;
 
   @override
@@ -282,52 +298,28 @@ class _LogCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final text = theme.textTheme;
     final muted = scheme.onSurfaceVariant;
-    final color = _dispositionColor(context, n.disposition);
-    final title = n.title;
-    final detail = n.detail;
+    final waiting = n.disposition == NotificationDisposition.waiting;
     return _Surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${n.packageName} · ${_eventLabel(n.event)} · ${_stamp(n.capturedAt)}',
-                  style: text.labelMedium!.copyWith(color: muted),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  border: Border.all(color: color),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Text(
-                  _dispositionLabel(n.disposition),
-                  style: text.labelSmall!.copyWith(color: color),
-                ),
-              ),
-            ],
+          Text(
+            '$app · ${_when(n.postTime, AppScope.of(context).now())}',
+            style: text.labelMedium!.copyWith(color: muted),
           ),
-          if (title != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: text.titleMedium!.copyWith(color: scheme.onSurface),
-            ),
-          ],
-          const SizedBox(height: 4),
-          Text(n.body, style: text.bodyMedium!.copyWith(color: muted)),
-          if (detail != null) ...[
-            const SizedBox(height: 4),
-            Text(detail, style: text.bodySmall!.copyWith(color: muted)),
-          ],
           const SizedBox(height: 4),
           Text(
-            'Posted ${_stamp(n.postTime)}',
-            style: text.labelSmall!.copyWith(color: muted),
+            maskCardDigits(n.body),
+            style: text.bodyMedium!.copyWith(color: scheme.onSurface),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            marked ? 'Saved as a payment' : _reason(n.disposition),
+            style: text.bodyMedium!.copyWith(
+              color: waiting && !marked
+                  ? MoneyColors.of(context).review
+                  : muted,
+            ),
           ),
           // Any logged notification the app did not turn into a card: skipped, missed or only seen in the tray.
           if (onMark != null &&
@@ -339,7 +331,7 @@ class _LogCard extends StatelessWidget {
                 onPressed: onMark,
                 style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add as payment'),
+                label: const Text('Save payment'),
               ),
             ),
         ],
@@ -348,31 +340,20 @@ class _LogCard extends StatelessWidget {
   }
 }
 
-String _eventLabel(CaptureEvent e) => switch (e) {
-  CaptureEvent.posted => 'Posted',
-  CaptureEvent.removed => 'Removed',
-  CaptureEvent.activeSnapshot => 'Active',
+/// One plain line about what Koban did with the notification.
+String _reason(NotificationDisposition d) => switch (d) {
+  NotificationDisposition.pending => 'Koban is reading this message.',
+  NotificationDisposition.waiting => 'Waiting in Check payments',
+  NotificationDisposition.skippedAllowlist =>
+    'Skipped: this app is not one of your payment apps.',
+  NotificationDisposition.skippedNoRule =>
+    'Skipped: this message has no amount.',
+  NotificationDisposition.skippedDuplicate =>
+    'Skipped: Koban already has this payment.',
+  NotificationDisposition.skippedGroupSummary =>
+    'Skipped: this is a summary of other notifications.',
+  NotificationDisposition.skippedEmpty => 'Skipped: this message has no text.',
+  NotificationDisposition.skippedError =>
+    'Skipped: Koban could not read this message.',
+  NotificationDisposition.infoOnly => 'Seen only. Koban did not save it.',
 };
-
-String _dispositionLabel(NotificationDisposition d) => switch (d) {
-  NotificationDisposition.pending => 'Pending',
-  NotificationDisposition.waiting => 'Waiting for check',
-  NotificationDisposition.skippedAllowlist => 'Not a payment app',
-  NotificationDisposition.skippedNoRule => 'No rule matched',
-  NotificationDisposition.skippedDuplicate => 'Duplicate',
-  NotificationDisposition.skippedGroupSummary => 'Group',
-  NotificationDisposition.skippedEmpty => 'Empty',
-  NotificationDisposition.skippedError => 'Error',
-  NotificationDisposition.infoOnly => 'Info',
-};
-
-Color _dispositionColor(BuildContext context, NotificationDisposition d) {
-  final scheme = Theme.of(context).colorScheme;
-  return switch (d) {
-    NotificationDisposition.waiting => MoneyColors.of(context).review,
-    NotificationDisposition.skippedNoRule ||
-    NotificationDisposition.skippedError => scheme.error,
-    NotificationDisposition.pending => scheme.primary,
-    _ => scheme.onSurfaceVariant,
-  };
-}

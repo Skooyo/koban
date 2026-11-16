@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import 'database.dart';
 import 'ids.dart';
+import 'undoable.dart';
 
 /// The categories. A port of `CategoryRepository.kt` and `DefaultCategories.kt`.
 class CategoryRepository {
@@ -94,9 +95,17 @@ class CategoryRepository {
         );
   }
 
-  /// Deletes an own category. A built-in category stays. It returns true when a row went.
-  Future<bool> deleteCategory(String id) async =>
-      await _db.deleteCustomCategory(id) > 0;
+  /// Deletes an own category. A built-in category stays. It returns null when no row went.
+  /// Payments keep the id, so Undo only puts the row back.
+  Future<Undoable?> deleteCategory(String id) => _db.transaction(() async {
+    final row = await _db.categoryById(id).getSingleOrNull();
+    if (row == null || await _db.deleteCustomCategory(id) == 0) return null;
+    return Undoable(
+      undo: () => _db
+          .into(_db.categories)
+          .insert(row, mode: InsertMode.insertOrReplace),
+    );
+  });
 
   Future<Category?> getById(String? id) async =>
       id == null ? null : await _db.categoryById(id).getSingleOrNull();
