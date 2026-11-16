@@ -8,18 +8,19 @@ import 'package:sqlite3/sqlite3.dart';
 
 /// The user tables of a file, sorted. Room and SQLite own tables are not counted.
 List<String> userTables(Database db) => [
-      for (final r in db.select(
-          "SELECT name FROM sqlite_master WHERE type = 'table' "
-          "AND name NOT LIKE 'sqlite_%' AND name NOT IN ('android_metadata', 'room_master_table') "
-          'ORDER BY name'))
-        r['name'] as String,
-    ];
+  for (final r in db.select(
+    "SELECT name FROM sqlite_master WHERE type = 'table' "
+    "AND name NOT LIKE 'sqlite_%' AND name NOT IN ('android_metadata', 'room_master_table') "
+    'ORDER BY name',
+  ))
+    r['name'] as String,
+];
 
 /// The rows of PRAGMA table_info for one table, as plain lists.
 List<List<Object?>> tableInfo(Database db, String t) => [
-      for (final r in db.select('PRAGMA table_info(`$t`)'))
-        [r['cid'], r['name'], r['type'], r['notnull'], r['dflt_value'], r['pk']],
-    ];
+  for (final r in db.select('PRAGMA table_info(`$t`)'))
+    [r['cid'], r['name'], r['type'], r['notnull'], r['dflt_value'], r['pk']],
+];
 
 /// Each index of one table: name, unique flag and columns, sorted by name.
 List<List<Object?>> indexes(Database db, String t) {
@@ -46,8 +47,10 @@ void main() {
   late Database fresh;
 
   setUp(() async {
-    fixture =
-        sqlite3.open('test/fixtures/room_v11.db', mode: OpenMode.readOnly);
+    fixture = sqlite3.open(
+      'test/fixtures/room_v11.db',
+      mode: OpenMode.readOnly,
+    );
     newDb = KobanDatabase(NativeDatabase.memory());
     await newDb.customSelect('SELECT 1').get();
     fresh = await _freshCopy(newDb);
@@ -76,24 +79,29 @@ void main() {
   });
 
   test('stored values use the Room formats', () async {
-    await newDb.into(newDb.expenses).insert(ExpensesCompanion.insert(
-          id: 'x1',
-          amount: Decimal.parse('12.5'),
-          currency: 'IDR',
-          rawNotificationText: 'raw',
-          sourcePackage: 'pkg',
-          notificationPostTime: 1,
-          createdAt: 2,
-          dedupKey: 'k1',
-          status: ExpenseStatus.edited,
-          confidence: ParseConfidence.high,
-          transactionType: TransactionType.withdraw,
-          privateToGroups: true,
-          countedAmount: const Value(null),
-        ));
+    await newDb
+        .into(newDb.expenses)
+        .insert(
+          ExpensesCompanion.insert(
+            id: 'x1',
+            amount: Decimal.parse('12.5'),
+            currency: 'IDR',
+            rawNotificationText: 'raw',
+            sourcePackage: 'pkg',
+            notificationPostTime: 1,
+            createdAt: 2,
+            dedupKey: 'k1',
+            status: ExpenseStatus.edited,
+            confidence: ParseConfidence.high,
+            transactionType: TransactionType.withdraw,
+            privateToGroups: true,
+            countedAmount: const Value(null),
+          ),
+        );
     final row = await newDb
         .customSelect(
-            'SELECT amount, status, transactionType, privateToGroups, countedAmount FROM expenses')
+          'SELECT amount, status, transactionType, privateToGroups, countedAmount FROM expenses',
+        )
         .getSingle();
     expect(row.data, {
       'amount': '12.50',
@@ -110,7 +118,8 @@ Future<Database> _freshCopy(KobanDatabase db) async {
   final copy = sqlite3.openInMemory();
   final rows = await db
       .customSelect(
-          "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type DESC")
+        "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type DESC",
+      )
       .get();
   for (final r in rows) {
     copy.execute(r.read<String>('sql'));

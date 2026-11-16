@@ -8,13 +8,12 @@ void main() {
   const channel = MethodChannel(ListenerControl.channelName);
   final calls = <MethodCall>[];
 
-  void answer(Object? Function(MethodCall call) reply) => TestDefaultBinaryMessengerBinding
-      .instance
-      .defaultBinaryMessenger
-      .setMockMethodCallHandler(channel, (call) async {
-        calls.add(call);
-        return reply(call);
-      });
+  void answer(Object? Function(MethodCall call) reply) =>
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            return reply(call);
+          });
 
   setUp(calls.clear);
   tearDown(
@@ -35,8 +34,7 @@ void main() {
           'id': 'id-1',
           'packageName': 'com.maybank2u.life',
           'title': 'Maybank',
-          'body':
-              'Successful payment of RM 15.00 to RESTORAN CONTOH. REF: QR123456.',
+          'body': 'Successful payment of RM 15.00 to RESTORAN CONTOH. REF: QR123456.',
           'postTime': 1761999940000,
           'capturedAt': 1761999940500,
           'event': 'POSTED',

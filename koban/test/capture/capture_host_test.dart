@@ -63,29 +63,32 @@ void main() {
     expect(rows[1].notificationKey, isNull);
   });
 
-  test('finish sends the row id, log id, disposition name and detail', () async {
-    const row = QueuedNotification(
-      id: 7,
-      logId: 'log-1',
-      packageName: 'p',
-      title: null,
-      text: 't',
-      postTime: 1,
-      notificationKey: null,
-    );
-    await host.finish(
-      row,
-      NotificationDisposition.skippedNoRule,
-      'No rule matched this text',
-    );
-    expect(calls.single.method, 'finish');
-    expect(calls.single.arguments, {
-      'id': 7,
-      'logId': 'log-1',
-      'disposition': 'SKIPPED_NO_RULE',
-      'detail': 'No rule matched this text',
-    });
-  });
+  test(
+    'finish sends the row id, log id, disposition name and detail',
+    () async {
+      const row = QueuedNotification(
+        id: 7,
+        logId: 'log-1',
+        packageName: 'p',
+        title: null,
+        text: 't',
+        postTime: 1,
+        notificationKey: null,
+      );
+      await host.finish(
+        row,
+        NotificationDisposition.skippedNoRule,
+        'No rule matched this text',
+      );
+      expect(calls.single.method, 'finish');
+      expect(calls.single.arguments, {
+        'id': 7,
+        'logId': 'log-1',
+        'disposition': 'SKIPPED_NO_RULE',
+        'detail': 'No rule matched this text',
+      });
+    },
+  );
 
   test('the other calls send their argument keys', () async {
     await host.updateLog('log-1', NotificationDisposition.skippedError, 'bad');

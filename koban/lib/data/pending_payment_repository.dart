@@ -61,7 +61,11 @@ class PendingPaymentRepository {
       );
       if (isExpense) return null;
       if (await _db
-              .findPendingByKeys(dedupKey, notificationKey, notificationPostTime)
+              .findPendingByKeys(
+                dedupKey,
+                notificationKey,
+                notificationPostTime,
+              )
               .getSingleOrNull() !=
           null) {
         return null;

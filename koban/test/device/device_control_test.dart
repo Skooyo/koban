@@ -8,13 +8,12 @@ void main() {
   const channel = MethodChannel('io.github.skooyo.koban/device');
   final calls = <MethodCall>[];
 
-  void answer(Object? Function(MethodCall call) reply) => TestDefaultBinaryMessengerBinding
-      .instance
-      .defaultBinaryMessenger
-      .setMockMethodCallHandler(channel, (call) async {
-        calls.add(call);
-        return reply(call);
-      });
+  void answer(Object? Function(MethodCall call) reply) =>
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            return reply(call);
+          });
 
   setUp(calls.clear);
   tearDown(
@@ -22,30 +21,35 @@ void main() {
         .setMockMethodCallHandler(channel, null),
   );
 
-  test('installed apps come back as typed rows with their icon bytes', () async {
-    answer(
-      (_) => [
-        {
-          'packageName': 'com.maybank2u.life',
-          'label': 'MAE',
-          'icon': Uint8List.fromList([1, 2, 3]),
-        },
-        {'packageName': 'x.y', 'label': 'XY', 'icon': null},
-      ],
-    );
-    final apps = await DeviceControl().installedApps();
-    expect(calls.single.method, 'installedApps');
-    expect(apps.map((a) => a.packageName), ['com.maybank2u.life', 'x.y']);
-    expect(apps.map((a) => a.label), ['MAE', 'XY']);
-    expect(apps.first.icon, Uint8List.fromList([1, 2, 3]));
-    expect(apps.last.icon, isNull);
-  });
+  test(
+    'installed apps come back as typed rows with their icon bytes',
+    () async {
+      answer(
+        (_) => [
+          {
+            'packageName': 'com.maybank2u.life',
+            'label': 'MAE',
+            'icon': Uint8List.fromList([1, 2, 3]),
+          },
+          {'packageName': 'x.y', 'label': 'XY', 'icon': null},
+        ],
+      );
+      final apps = await DeviceControl().installedApps();
+      expect(calls.single.method, 'installedApps');
+      expect(apps.map((a) => a.packageName), ['com.maybank2u.life', 'x.y']);
+      expect(apps.map((a) => a.label), ['MAE', 'XY']);
+      expect(apps.first.icon, Uint8List.fromList([1, 2, 3]));
+      expect(apps.last.icon, isNull);
+    },
+  );
 
   test('app labels send the package list and give the label map', () async {
     answer((_) => {'x.y': 'x.y'});
     final labels = await DeviceControl().appLabels(['x.y']);
     expect(calls.single.method, 'appLabels');
-    expect(calls.single.arguments, {'packages': ['x.y']});
+    expect(calls.single.arguments, {
+      'packages': ['x.y'],
+    });
     expect(labels, {'x.y': 'x.y'});
   });
 

@@ -18,20 +18,22 @@ const Map<String, int> fixtureCounts = {
 
 /// Count the rows of every table in [fixtureCounts].
 Map<String, int> rowCounts(Database db) => {
-      for (final table in fixtureCounts.keys)
-        table: db.select('SELECT COUNT(*) FROM $table').first.columnAt(0) as int,
-    };
+  for (final table in fixtureCounts.keys)
+    table: db.select('SELECT COUNT(*) FROM $table').first.columnAt(0) as int,
+};
 
 /// The distinct values of one column, sorted.
 List<Object?> distinct(Database db, String table, String column) => [
-      for (final row in db.select(
-          'SELECT DISTINCT $column AS v FROM $table ORDER BY v'))
-        row['v'],
-    ];
+  for (final row in db.select(
+    'SELECT DISTINCT $column AS v FROM $table ORDER BY v',
+  ))
+    row['v'],
+];
 
 /// Count the rows of every table in [fixtureCounts] in a Drift database.
 Future<Map<String, int>> rowCountsOf(KobanDatabase db) async => {
-      for (final table in fixtureCounts.keys)
-        table: (await db.customSelect('SELECT COUNT(*) AS c FROM $table').getSingle())
+  for (final table in fixtureCounts.keys)
+    table:
+        (await db.customSelect('SELECT COUNT(*) AS c FROM $table').getSingle())
             .read<int>('c'),
-    };
+};

@@ -17,11 +17,13 @@ void main() {
   });
 
   test('channel values become Dart types', () async {
-    mock((_) => <Object?, Object?>{
-          'payment_app_allowlist': <Object?>['a', 'b'],
-          'dark_mode': false,
-          'last_update_check': 1762300000000,
-        });
+    mock(
+      (_) => <Object?, Object?>{
+        'payment_app_allowlist': <Object?>['a', 'b'],
+        'dark_mode': false,
+        'last_update_check': 1762300000000,
+      },
+    );
     final s = await ChannelLegacySource().readSettings();
     expect(s['payment_app_allowlist'], isA<List<String>>());
     expect(s, {
@@ -32,8 +34,12 @@ void main() {
   });
 
   test('the database path comes from the channel', () async {
-    mock((_) => '/data/user/0/io.github.skooyo.koban/databases/expense_tracker.db');
-    expect(await ChannelLegacySource().databasePath(),
-        '/data/user/0/io.github.skooyo.koban/databases/expense_tracker.db');
+    mock(
+      (_) => '/data/user/0/io.github.skooyo.koban/databases/expense_tracker.db',
+    );
+    expect(
+      await ChannelLegacySource().databasePath(),
+      '/data/user/0/io.github.skooyo.koban/databases/expense_tracker.db',
+    );
   });
 }

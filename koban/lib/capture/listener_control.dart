@@ -33,7 +33,8 @@ enum BackgroundSettingsResult {
 
   static BackgroundSettingsResult fromDbName(String name) => values.firstWhere(
     (e) => e.dbName == name,
-    orElse: () => throw ArgumentError('Unknown BackgroundSettingsResult: $name'),
+    orElse: () =>
+        throw ArgumentError('Unknown BackgroundSettingsResult: $name'),
   );
 }
 
@@ -167,7 +168,11 @@ class ListenerControl {
     (await _channel.invokeMapMethod<Object?, Object?>('listenerState'))!,
   );
 
-  Future<void> clearLog() => _channel.invokeMethod<void>('clearLog');
+  /// Clears the log. With [ids], only the rows with these ids go.
+  Future<void> clearLog({Iterable<String>? ids}) => _channel.invokeMethod<void>(
+    'clearLog',
+    ids == null ? null : {'ids': ids.toList()},
+  );
 
   /// Read the notifications that show now. False when the listener is not connected.
   Future<bool> snapshotActive() async =>

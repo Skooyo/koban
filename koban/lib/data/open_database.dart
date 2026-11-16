@@ -38,11 +38,8 @@ Future<(KobanDatabase, ImportResult)> _open() async {
     final host = ChannelCaptureHost();
     final result = await openAndImport(
       db: db,
-      runImport: () => importLegacyData(
-        db: db,
-        legacy: ChannelLegacySource(),
-        prefs: prefs,
-      ),
+      runImport: () =>
+          importLegacyData(db: db, legacy: ChannelLegacySource(), prefs: prefs),
       host: host,
       paymentApps: PaymentApps(prefs, host),
       secrets: SecretStore.forPhone(),
