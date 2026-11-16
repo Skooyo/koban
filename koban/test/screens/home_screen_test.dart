@@ -227,7 +227,7 @@ void main() {
     );
   });
 
-  testWidgets('Add payment saves a payment and Home says Expense added', (
+  testWidgets('Add payment saves a payment and Home says Payment saved', (
     tester,
   ) async {
     final s = await testServices();
@@ -238,7 +238,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Save payment'));
     await tester.pumpAndSettle();
-    expect(find.text('Expense added'), findsOneWidget);
+    expect(find.text('Payment saved'), findsOneWidget);
     expect(find.text('RM 12.50'), findsWidgets);
     expect(find.text('No payments yet today.'), findsNothing);
   });

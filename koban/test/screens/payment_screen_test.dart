@@ -162,14 +162,14 @@ void main() {
     expect(amountText(tester), '0.5');
   });
 
-  testWidgets('saving closes the sheet with Expense added', (tester) async {
+  testWidgets('saving closes the sheet with Payment saved', (tester) async {
     final s = await testServices();
     final opener = await openSheet(tester, s);
     await typeAmount(tester, '8');
     await tester.tap(find.text('Save payment'));
     await tester.pumpAndSettle();
     expect(opener.closed, true);
-    expect((opener.result as PaymentClosed).message, 'Expense added');
+    expect((opener.result as PaymentClosed).message, 'Payment saved');
     expect(await countExpenses(s.db), 1);
   });
 

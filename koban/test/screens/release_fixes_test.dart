@@ -145,7 +145,7 @@ void main() {
     final messenger = ScaffoldMessenger.of(
       tester.element(find.byType(NavigationBar)),
     );
-    showUndoSnackBar(messenger, 'Expense added');
+    showUndoSnackBar(messenger, 'Payment saved');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     final fab = tester.getRect(find.byType(FloatingActionButton));

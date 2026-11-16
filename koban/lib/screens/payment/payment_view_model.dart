@@ -305,13 +305,7 @@ class PaymentViewModel extends ChangeNotifier {
       );
       if (split) return PaymentOpenSplit(id);
     }
-    return PaymentClosed(
-      id != null
-          ? null
-          : f.type == TransactionType.receive
-          ? 'Income added'
-          : 'Expense added',
-    );
+    return PaymentClosed(id != null ? null : 'Payment saved');
   }
 
   /// The payment no longer counts in totals. Returns null when a save or delete is under way.
