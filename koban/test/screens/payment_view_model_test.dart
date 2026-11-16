@@ -58,7 +58,7 @@ void main() {
   });
 
   test(
-    'save of a new spend adds one manual payment and says Expense added',
+    'save of a new spend adds one manual payment and says Payment saved',
     () async {
       final s = await testServices();
       final vm = PaymentViewModel(s);
@@ -67,7 +67,7 @@ void main() {
       vm.setMerchant('Kedai Contoh');
       vm.setCategory('food');
       final r = await vm.save();
-      expect((r as PaymentClosed).message, 'Expense added');
+      expect((r as PaymentClosed).message, 'Payment saved');
       final e = (await allExpenses(s.db)).single;
       expect(e.amount, Decimal.parse('12.50'));
       expect(e.merchant, 'Kedai Contoh');
@@ -82,14 +82,14 @@ void main() {
     },
   );
 
-  test('save of a new receive says Income added', () async {
+  test('save of a new receive says Payment saved', () async {
     final s = await testServices();
     final vm = PaymentViewModel(s);
     addTearDown(vm.dispose);
     vm.setType(TransactionType.receive);
     typeAmount(vm, '30');
     final r = await vm.save();
-    expect((r as PaymentClosed).message, 'Income added');
+    expect((r as PaymentClosed).message, 'Payment saved');
     expect(
       (await allExpenses(s.db)).single.transactionType,
       TransactionType.receive,
