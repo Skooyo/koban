@@ -4,10 +4,13 @@ import 'package:flutter/foundation.dart' show ChangeNotifier, immutable;
 
 import '../../app/app_services.dart';
 import '../../data/database.dart';
+import '../../data/undoable.dart';
 import '../../rules/types.dart';
 import '../../ui/amount_input.dart';
+import '../../ui/category_chips.dart';
+import '../../ui/money.dart';
 
-/// What the payment page shows. [amountText] is the raw number-pad text, as `AmountInput` keeps it.
+/// What the payment page shows. [amountText] is the raw typed text, as `AmountInput.formatter` keeps it.
 @immutable
 class PaymentForm {
   const PaymentForm({
@@ -75,16 +78,47 @@ class PaymentForm {
   );
 }
 
+/// A shop from a recent payment, and the category its latest payment had.
+@immutable
+class RecentShop {
+  const RecentShop(this.name, this.categoryId);
+
+  final String name;
+  final String? categoryId;
+}
+
+const _recentShopCount = 3;
+
+/// The distinct shops of [newestFirst], by name without case, at most three.
+List<RecentShop> _recentShopsOf(List<Expense> newestFirst) {
+  final shops = <String, RecentShop>{};
+  for (final e in newestFirst) {
+    final name = e.merchant?.trim() ?? '';
+    final key = name.toLowerCase();
+    if (name.isEmpty) continue;
+    final seen = shops[key];
+    if (seen == null) {
+      if (shops.length == _recentShopCount) continue;
+      shops[key] = RecentShop(name, e.categoryId);
+    } else if (seen.categoryId == null && e.categoryId != null) {
+      shops[key] = RecentShop(seen.name, e.categoryId);
+    }
+  }
+  return shops.values.toList();
+}
+
 /// How the payment page ends.
 sealed class PaymentResult {
   const PaymentResult();
 }
 
 /// The page closes. [message] shows as a snackbar under the page. Null shows nothing.
+/// With [undo], the snackbar has an Undo button.
 final class PaymentClosed extends PaymentResult {
-  const PaymentClosed(this.message);
+  const PaymentClosed(this.message, {this.undo});
 
   final String? message;
+  final Undoable? undo;
 }
 
 /// The payment is saved and the split editor opens for it.
@@ -99,6 +133,17 @@ class PaymentViewModel extends ChangeNotifier {
   PaymentViewModel(this._s, {String? expenseId}) : _expenseId = expenseId {
     _categorySub = _s.categories.watchAll().listen((list) {
       _categories = list;
+      notifyListeners();
+    });
+    _mostUsedSub = _s.categories.watchMostUsedIds(categoryChipCount).listen((
+      ids,
+    ) {
+      _mostUsed = ids;
+      notifyListeners();
+    });
+    // ponytail: reads every saved payment to find 3 shops. Fine for a personal log.
+    _recentSub = _s.expenses.watchAllActive().listen((list) {
+      _recentShops = _recentShopsOf(list);
       notifyListeners();
     });
     if (expenseId == null) {
@@ -121,6 +166,10 @@ class PaymentViewModel extends ChangeNotifier {
   final AppServices _s;
   final String? _expenseId;
   StreamSubscription<List<Category>>? _categorySub;
+  StreamSubscription<List<String>>? _mostUsedSub;
+  StreamSubscription<List<Expense>>? _recentSub;
+  List<String> _mostUsed = const [];
+  List<RecentShop> _recentShops = const [];
 
   /// Completes when the form shows. An edit of a missing payment sets [closeNow] first.
   late final Future<void> ready;
@@ -148,6 +197,13 @@ class PaymentViewModel extends ChangeNotifier {
   bool get saving => _saving;
 
   List<Category> get categories => _categories;
+
+  /// The category chips: the most used four, with the chosen category on the last chip if needed.
+  List<Category> get chipCategories =>
+      chipCategoriesFor(_categories, _mostUsed, _form?.categoryId);
+
+  /// Up to three recent shops, newest first, for the chips under Shop.
+  List<RecentShop> get recentShops => _recentShops;
 
   /// True when the owner is in a group.
   bool get inGroups => _s.inGroups.value;
@@ -189,14 +245,19 @@ class PaymentViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void press(String key) => _edit(
-    (f) => f.copyWith(amountText: AmountInput.press(f.amountText, key)),
-  );
-  void backspace() =>
-      _edit((f) => f.copyWith(amountText: AmountInput.backspace(f.amountText)));
+  void setAmount(String text) => _edit((f) => f.copyWith(amountText: text));
   void setType(TransactionType t) => _edit((f) => f.copyWith(type: t));
   void setCategory(String? id) => _edit((f) => f.copyWith(categoryId: id));
   void setDate(int ms) => _edit((f) => f.copyWith(postTime: ms));
+
+  /// A recent-shop chip: fills Shop, and the category that shop last had.
+  void pickRecentShop(RecentShop shop) => _edit(
+    (f) => f.copyWith(
+      merchant: shop.name,
+      categoryId: shop.categoryId ?? f.categoryId,
+    ),
+  );
+
   void setMerchant(String s) => _edit((f) => f.copyWith(merchant: s));
   void setNotes(String s) => _edit((f) => f.copyWith(notes: s));
   void setPrivateToGroups(bool on) =>
@@ -259,14 +320,22 @@ class PaymentViewModel extends ChangeNotifier {
     if (id == null || _saving) return null;
     _saving = true;
     notifyListeners();
-    await _s.expenses.dismissExpense(id);
-    return const PaymentClosed('Payment deleted');
+    final e = await _s.expenses.getById(id);
+    final undo = await _s.expenses.dismissExpense(id);
+    final shop = e?.merchant?.trim() ?? '';
+    final what = [if (shop.isNotEmpty) shop, if (e != null) rm(e.amount)];
+    return PaymentClosed(
+      what.isEmpty ? 'Payment deleted' : 'Payment deleted: ${what.join(', ')}',
+      undo: undo,
+    );
   }
 
   @override
   void dispose() {
     _disposed = true;
     _categorySub?.cancel();
+    _mostUsedSub?.cancel();
+    _recentSub?.cancel();
     super.dispose();
   }
 }

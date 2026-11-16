@@ -8,6 +8,7 @@ import 'package:koban/app/app_services.dart';
 import 'package:koban/capture/listener_control.dart';
 import 'package:koban/screens/settings/settings_screen.dart';
 import 'package:koban/screens/settings/settings_view_model.dart';
+import 'package:koban/ui/kit.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -103,9 +104,7 @@ void main() {
     expect(find.text('2 apps chosen'), findsOneWidget);
     expect(find.text('2 notifications captured'), findsOneWidget);
     expect(
-      find.text(
-        'Use this when payments stop showing up. It retries for about 60 seconds.',
-      ),
+      find.text('Use this when new payments stop showing up in Koban.'),
       findsOneWidget,
     );
     expect(find.text('App version 0.1.1'), findsOneWidget);
@@ -119,6 +118,34 @@ void main() {
       listener.calls.map((c) => c.method),
       contains('openBatteryOptimizationSettings'),
     );
+  });
+
+  testWidgets('Troubleshooting holds the log and Restart payment tracking', (
+    tester,
+  ) async {
+    final listener = listenerChannel();
+    listener.answers['recentNotifications'] = [logRow('a')];
+    await pumpSettings(tester, await settingsServices(listener: listener));
+    double top(String t) => tester.getTopLeft(find.text(t)).dy;
+    expect(find.text('1 notification captured'), findsOneWidget);
+    expect(find.text('Reconnect listener'), findsNothing);
+    expect(find.byIcon(Icons.bug_report), findsNothing);
+    expect(find.byIcon(Icons.list), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.widgetWithText(KobanRow, 'Notification log'),
+        matching: find.byIcon(Icons.list),
+      ),
+      findsOneWidget,
+    );
+    // The group sits between Tracking and Appearance.
+    expect(top('Troubleshooting'), greaterThan(top('Payment apps')));
+    expect(top('Notification log'), greaterThan(top('Troubleshooting')));
+    expect(
+      top('Restart payment tracking'),
+      greaterThan(top('Notification log')),
+    );
+    expect(top('Appearance'), greaterThan(top('Restart payment tracking')));
   });
 
   testWidgets('the Payment apps row says when no app is chosen', (
@@ -137,7 +164,7 @@ void main() {
     'reconnect shows Reconnecting and then the result after the wait',
     (tester) async {
       await pumpSettings(tester, await settingsServices());
-      await tester.tap(find.text('Reconnect listener'));
+      await tester.tap(find.text('Restart payment tracking'));
       await tester.pump();
       expect(find.text('Reconnecting…$reconnectHint'), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 900));
@@ -155,7 +182,7 @@ void main() {
       tester,
       await settingsServices(listener: listenerChannel(connected: false)),
     );
-    await tester.tap(find.text('Reconnect listener'));
+    await tester.tap(find.text('Restart payment tracking'));
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
     expect(
@@ -173,10 +200,10 @@ void main() {
     await pumpSettings(tester, await settingsServices(listener: listener));
     int reconnects() =>
         listener.calls.where((c) => c.method == 'reconnect').length;
-    await tester.tap(find.text('Reconnect listener'));
+    await tester.tap(find.text('Restart payment tracking'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    await tester.tap(find.text('Reconnect listener'));
+    await tester.tap(find.text('Restart payment tracking'));
     await tester.pump();
     expect(reconnects(), 1);
     // The result shows 1 s after the first tap, not after the second.
@@ -184,7 +211,7 @@ void main() {
     await tester.pump();
     expect(find.text('Listener connected.$reconnectHint'), findsOneWidget);
     // The next tap works again.
-    await tester.tap(find.text('Reconnect listener'));
+    await tester.tap(find.text('Restart payment tracking'));
     await tester.pump();
     expect(find.text('Reconnecting…$reconnectHint'), findsOneWidget);
     expect(reconnects(), 2);
@@ -197,7 +224,7 @@ void main() {
       tester,
       await settingsServices(listener: listenerChannel(reconnect: 'THROTTLED')),
     );
-    await tester.tap(find.text('Reconnect listener'));
+    await tester.tap(find.text('Restart payment tracking'));
     await tester.pump();
     await tester.pump();
     expect(
@@ -223,7 +250,9 @@ void main() {
     tester,
   ) async {
     await pumpSettings(tester, await settingsServices());
-    expect(find.text('Built in'), findsNWidgets(7));
+    expect(find.text('7 built-in categories'), findsOneWidget);
+    expect(find.text('Built in'), findsNothing);
+    expect(find.textContaining('Food & Dining, '), findsOneWidget);
     expect(find.text('Your own'), findsNothing);
     expect(find.byTooltip('Remove category Food & Dining'), findsNothing);
     final add = find.widgetWithText(FilledButton, 'Add');
@@ -241,7 +270,7 @@ void main() {
     await tester.tap(find.byTooltip('Remove category Gym'));
     await tester.pumpAndSettle();
     expect(find.text('Gym'), findsNothing);
-    expect(find.text('Built in'), findsNWidgets(7));
+    expect(find.text('7 built-in categories'), findsOneWidget);
   });
 
   testWidgets('the parser tool reads a sample text', (tester) async {

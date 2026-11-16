@@ -27,6 +27,13 @@ abstract final class NotificationParser {
     caseSensitive: false,
   );
 
+  /// "received from" and "received RM 5.00 from" say money came in, whatever else the text says.
+  /// "Payment received from ALI" has a debit word too, but it is not a spend.
+  static final RegExp _receivedFrom = RegExp(
+    r'\breceived\s+(?:(?:MYR|RM)\s*[\d,]+(?:\.[\d]{1,2})?\s+)?from\b|(?:MYR|RM)\s*[\d,]+(?:\.[\d]{1,2})?\s+received\s+from\b',
+    caseSensitive: false,
+  );
+
   /// Stop before card and account tails that banks add after the shop name.
   static const String _merchantStop =
       r'(?:\s+with\s+your\b|\s+using\s+your\b|\s+via\s+your\b|\s+from\s+your\b|\.|$)';
@@ -74,6 +81,7 @@ abstract final class NotificationParser {
   }
 
   static TransactionType detectTransactionType(String text) {
+    if (_receivedFrom.hasMatch(text)) return TransactionType.receive;
     final credit = _creditKeywords.hasMatch(text);
     final debit = _debitKeywords.hasMatch(text);
     return credit && !debit
@@ -84,6 +92,7 @@ abstract final class NotificationParser {
   /// True when exactly one of a debit word or a credit word shows,
   /// so [detectTransactionType] is not a guess.
   static bool isDirectionClear(String text) =>
+      _receivedFrom.hasMatch(text) ||
       _creditKeywords.hasMatch(text) != _debitKeywords.hasMatch(text);
 
   static List<Decimal> findAllAmounts(String text) {

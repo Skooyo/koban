@@ -6,6 +6,7 @@ import 'package:koban/data/split_repository.dart';
 import 'package:drift/drift.dart' show TableUpdateQuery;
 import 'package:koban/screens/people/people_screen.dart';
 import 'package:koban/theme/koban_theme.dart';
+import 'package:koban/theme/mon.dart';
 import 'package:koban/screens/person/person_screen.dart';
 import 'package:koban/ui/kit.dart';
 import 'package:material_ui/material_ui.dart';
@@ -51,7 +52,7 @@ Future<void> saveBill(AppServices s, String? merchant) => s.splits.saveSplit(
   ),
 );
 
-/// Ali pays you 14.00, you pay Mei 4.00, and Abu is all paid with no QR.
+/// Ali owes you 14.00, you owe Mei 4.00, and Abu is all paid with no QR.
 Future<void> seedThree(AppServices s) async {
   final ali = await s.people.addPerson('Ali');
   final mei = await s.people.addPerson('Mei');
@@ -80,8 +81,8 @@ void main() {
         .map((h) => h.text);
     expect(headings, ['You owe', 'Owes you', 'Everyone else']);
     for (final (name, line) in [
-      ('Mei', 'You pay RM 4.00'),
-      ('Ali', 'Pays you RM 14.00'),
+      ('Mei', 'You owe RM 4.00'),
+      ('Ali', 'Owes you RM 14.00'),
       ('Abu', 'No QR saved yet'),
     ]) {
       expect(
@@ -128,10 +129,11 @@ void main() {
     final s = await testServices();
     await openPeople(tester, s);
 
-    expect(
-      find.text('No people yet. Add someone, or split a bill to start.'),
-      findsOneWidget,
-    );
+    expect(find.text('No people yet.'), findsOneWidget);
+    expect(find.text('Add someone, or split a bill to start.'), findsOneWidget);
+    expect(find.byType(Mon), findsOneWidget);
+    // No people: nothing to search.
+    expect(find.widgetWithText(TextField, 'Search people'), findsNothing);
     expect(find.text('Nobody matches that search.'), findsNothing);
   });
 

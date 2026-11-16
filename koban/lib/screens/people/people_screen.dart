@@ -6,6 +6,7 @@ import '../../data/people_repository.dart';
 import '../../data/user_error.dart';
 import '../../rules/people_math.dart';
 import '../../theme/koban_theme.dart';
+import '../../theme/mon.dart';
 import '../../ui/kit.dart';
 import '../person/person_dialogs.dart' show personDate;
 import 'people_view_model.dart';
@@ -80,6 +81,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
       builder: (context, _) {
         final sections = vm.sections;
         final bills = vm.bills;
+        final noPeople = sections.isEmpty && vm.query.trim().isEmpty;
         return Stack(
           children: [
             ListView(
@@ -89,22 +91,23 @@ class _PeopleScreenState extends State<PeopleScreen> {
                   title: 'People',
                   subtitle: 'Payment QRs, and what you owe each other',
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
-                    onChanged: vm.setQuery,
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      hintText: 'Search people',
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: scheme.surfaceContainerHigh,
-                      border: field,
-                      enabledBorder: field,
-                      focusedBorder: field,
+                if (!noPeople)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      onChanged: vm.setQuery,
+                      textInputAction: TextInputAction.search,
+                      decoration: InputDecoration(
+                        hintText: 'Search people',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: scheme.surfaceContainerHigh,
+                        border: field,
+                        enabledBorder: field,
+                        focusedBorder: field,
+                      ),
                     ),
                   ),
-                ),
                 Padding(
                   padding: const EdgeInsets.only(left: 16, right: 16, top: 12),
                   child: TonalButton(
@@ -113,7 +116,29 @@ class _PeopleScreenState extends State<PeopleScreen> {
                     icon: Icons.receipt,
                   ),
                 ),
-                if (sections.isEmpty)
+                if (noPeople)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                    child: Column(
+                      children: [
+                        const Mon(MonFace.idle, size: 64),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No people yet.',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Add someone, or split a bill to start.',
+                          style: theme.textTheme.bodyMedium!.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  )
+                else if (sections.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(
                       left: 16,
@@ -121,9 +146,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                       top: 16,
                     ),
                     child: Text(
-                      vm.query.trim().isEmpty
-                          ? 'No people yet. Add someone, or split a bill to start.'
-                          : 'Nobody matches that search.',
+                      'Nobody matches that search.',
                       style: theme.textTheme.bodyLarge!.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -196,10 +219,8 @@ class _PeopleScreenState extends State<PeopleScreen> {
                 heroTag: null,
                 onPressed: _add,
                 icon: const Icon(Icons.person_add),
-                label: Text(
-                  'Add person',
-                  style: weighted(theme.textTheme.titleMedium!, 700),
-                ),
+                label: const Text('Add person'),
+                extendedTextStyle: weighted(theme.textTheme.titleMedium!, 700),
                 backgroundColor: scheme.primary,
                 foregroundColor: scheme.onPrimary,
               ),
@@ -276,7 +297,7 @@ class _AddPersonDialogState extends State<_AddPersonDialog> {
       FlutterError.reportError(
         FlutterErrorDetails(exception: e, stack: s, library: 'PeopleScreen'),
       );
-      error = 'Something went wrong. Try again.';
+      error = 'Could not add the person. Try again.';
     }
     if (!mounted) return;
     setState(() {

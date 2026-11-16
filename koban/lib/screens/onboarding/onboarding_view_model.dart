@@ -76,6 +76,14 @@ class OnboardingViewModel extends ChangeNotifier {
     if (_step == OnboardingStep.apps) _go(OnboardingStep.running);
   }
 
+  /// True when the owner chose the payment apps and chose none.
+  bool get listensToNoApp =>
+      _s.settings.paymentAppsChosen.value &&
+      _s.settings.paymentApps.value.isEmpty;
+
+  /// The Choose apps button of the Ready step with no app.
+  void chooseApps() => _go(OnboardingStep.apps);
+
   void back() => switch (_step) {
     OnboardingStep.access ||
     OnboardingStep.blocked => _go(OnboardingStep.welcome),

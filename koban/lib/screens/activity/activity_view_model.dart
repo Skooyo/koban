@@ -9,6 +9,7 @@ import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../data/summaries.dart';
 import '../../rules/periods.dart';
+import '../../rules/types.dart';
 import '../../ui/category_donut.dart';
 
 /// What the Activity tab shows. A port of `ActivityUiState`.
@@ -26,6 +27,7 @@ class ActivityUiState {
     this.breakdown = const [],
     this.categoryNames = const {},
     this.categoryFilter,
+    this.query = '',
     this.showAll = false,
   }) : monthTotal = monthTotal ?? Decimal.zero,
        monthReceived = monthReceived ?? Decimal.zero;
@@ -43,7 +45,26 @@ class ActivityUiState {
   final List<CategoryBreakdown> breakdown;
   final Map<String, String> categoryNames;
   final String? categoryFilter;
+
+  /// The search text. The list shows payments whose shop or note holds it.
+  final String query;
   final bool showAll;
+}
+
+/// True when [e] has [query] in its shop or its note. Case does not matter. A blank query matches all.
+bool matchesSearch(Expense e, String query) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return true;
+  return (e.merchant ?? '').toLowerCase().contains(q) ||
+      (e.notes ?? '').toLowerCase().contains(q);
+}
+
+/// How many payments the view shows now, and what they add up to (spent only).
+class ActivitySummary {
+  const ActivitySummary(this.count, this.total);
+
+  final int count;
+  final Decimal total;
 }
 
 /// One month of the All view: its spent total (as the Month view total)
@@ -133,6 +154,7 @@ class ActivityViewModel extends ChangeNotifier {
   var _generation = 0;
   _MonthData? _data;
   List<Category> _categories = const [];
+  String _query = '';
   List<MonthSummary>? _monthly;
   List<Expense>? _allActive;
   List<ActivityMonthGroup>? _allMonths;
@@ -140,6 +162,34 @@ class ActivityViewModel extends ChangeNotifier {
   List<CategoryBreakdown>? _allTimeBreakdown;
 
   List<Category> get categories => _categories;
+
+  String get query => _query;
+
+  /// The payments that the list shows now, after the category filter and the search.
+  List<Expense> get _shown {
+    if (_s.activitySelection.value.showAll) {
+      return [for (final g in _allMonths ?? const []) ...g.expenses];
+    }
+    return state.expenses;
+  }
+
+  /// The count and the spent total of the shown payments, or null when no filter and no search is on.
+  ActivitySummary? get summary {
+    if (_s.activitySelection.value.categoryFilter == null &&
+        _query.trim().isEmpty) {
+      return null;
+    }
+    final shown = _shown;
+    var total = Decimal.zero;
+    var count = 0;
+    for (final e in shown) {
+      if (e.transactionType == TransactionType.withdraw) {
+        total += e.countedAmount ?? e.amount;
+        count++;
+      }
+    }
+    return ActivitySummary(count, total);
+  }
 
   YearMonth get _currentMonth {
     final n = _s.now();
@@ -167,12 +217,15 @@ class ActivityViewModel extends ChangeNotifier {
       selectedWeek: d.selectedWeek,
       expenses: [
         for (final e in d.expenses)
-          if (matchesCategory(e, sel.categoryFilter)) e,
+          if (matchesCategory(e, sel.categoryFilter) &&
+              matchesSearch(e, _query))
+            e,
       ],
       slices: donutSlices(d.breakdown),
       breakdown: d.breakdown,
       categoryNames: names,
       categoryFilter: sel.categoryFilter,
+      query: _query,
       showAll: sel.showAll,
     );
   }
@@ -335,7 +388,7 @@ class ActivityViewModel extends ChangeNotifier {
     };
     final groups = <YearMonth, List<Expense>>{};
     for (final x in expenses) {
-      if (!matchesCategory(x, filter)) continue;
+      if (!matchesCategory(x, filter) || !matchesSearch(x, _query)) continue;
       final d = DateTime.fromMillisecondsSinceEpoch(x.notificationPostTime);
       groups.putIfAbsent(YearMonth(d.year, d.month), () => []).add(x);
     }
@@ -389,6 +442,14 @@ class ActivityViewModel extends ChangeNotifier {
 
   void setCategoryFilter(String? filter) =>
       _s.activitySelection.setCategoryFilter(filter);
+
+  /// Filters the list on the device. A blank text shows every payment.
+  void setQuery(String text) {
+    if (text == _query) return;
+    _query = text;
+    _rebuildAll();
+    notifyListeners();
+  }
 
   void setShowAll(bool value) => _s.activitySelection.setShowAll(value);
 

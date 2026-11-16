@@ -10,10 +10,11 @@ import '../../app/app_services.dart';
 import '../../data/database.dart';
 import '../../data/people_repository.dart';
 import '../../data/split_repository.dart';
+import '../../data/undoable.dart';
 import '../../data/user_error.dart';
 
 const _tryAgain = 'Try again in a moment.';
-const _failed = 'Something went wrong. Try again.';
+const _failed = 'Could not save the change. Try again.';
 
 /// The split debt that the owner marks paid, with the received payments that can match it.
 @immutable
@@ -66,6 +67,10 @@ class PersonViewModel extends ChangeNotifier {
   /// The messages for the snackbar. Only one listener.
   Stream<String> get messages => _messages.stream;
 
+  /// Shows a delete that the owner can take back: the message, and what Undo runs.
+  /// The screen sets it. A delete that closes the page still calls it after the page is gone.
+  void Function(String message, Undoable undo)? onUndo;
+
   void showMessage(String message) {
     if (!_disposed) _messages.add(message);
   }
@@ -88,14 +93,17 @@ class PersonViewModel extends ChangeNotifier {
     int itemDate,
   ) => _s.people.updateOwedToMe(debtId, description, amount, itemDate);
 
-  void deleteItem(String id) => _run(() => _s.people.deleteOwedItem(id));
+  /// The delete shows [message] with Undo on [undos].
+  void deleteItem(String id, String message) =>
+      _runUndo(message, () => _s.people.deleteOwedItem(id));
 
   void markItemPaid(String id) => _run(() => _s.people.markOwedItemPaid(id));
 
-  void deleteOwedToMe(String debtId) =>
-      _run(() => _s.people.deleteOwedToMe(debtId));
+  void deleteOwedToMe(String debtId, String message) =>
+      _runUndo(message, () => _s.people.deleteOwedToMe(debtId));
 
-  void delete() => _run(() => _s.people.archivePerson(personId));
+  void delete(String message) =>
+      _runUndo(message, () => _s.people.archivePerson(personId));
 
   /// Opens the photo picker and imports the picked picture as the QR. A cancel does nothing.
   void pickQr() => unawaited(_pickQr());
@@ -194,6 +202,12 @@ class PersonViewModel extends ChangeNotifier {
 
   void dismissDebtSuggestion(String debtId) =>
       _run(() => _s.splits.dismissSuggestion(debtId));
+
+  void _runUndo(String message, Future<Undoable?> Function() action) =>
+      _run(() async {
+        final undo = await action();
+        if (undo != null) onUndo?.call(message, undo);
+      });
 
   /// Runs one action at a time. A [KobanUserError] sends its message; another error sends a general one.
   void _run(Future<void> Function() action) {

@@ -5,9 +5,11 @@ import 'package:koban/app/home_shell.dart';
 import 'package:koban/capture/listener_control.dart';
 import 'package:koban/data/legacy_import.dart';
 import 'package:koban/rules/types.dart';
+import 'package:koban/theme/koban_theme.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
+import 'check_payments_view_model_test.dart' show addCard, addThreeCards;
 
 Future<void> pay(
   AppServices s,
@@ -174,6 +176,57 @@ void main() {
     },
   );
 
+  testWidgets('the waiting row sums the Spent payments in the review color', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await addThreeCards(s);
+    await pumpHome(tester, s);
+    expect(find.text('3 payments to check'), findsOneWidget);
+    // RM 15.00 + RM 8.00. The RM 50.00 received is not in the sum.
+    expect(find.text('RM 23.00 found, not saved yet'), findsOneWidget);
+    final icon = tester.widget<Icon>(find.byIcon(Icons.receipt).first);
+    expect(
+      icon.color,
+      MoneyColors.of(tester.element(find.byIcon(Icons.receipt).first)).review,
+    );
+  });
+
+  testWidgets('the waiting row with no Spent payment has no sum', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await addCard(
+      s,
+      order: 0,
+      amount: '50.00',
+      merchant: 'ALI',
+      type: TransactionType.receive,
+      rawText: 'ALI has transferred RM 50.00 to you.',
+    );
+    await pumpHome(tester, s);
+    expect(find.text('1 payment to check'), findsOneWidget);
+    expect(find.text('Found by Koban, not saved yet'), findsOneWidget);
+  });
+
+  testWidgets('Spent today says See this week and opens the week', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await pay(s, '12.50', DateTime(2026, 11, 13, 9));
+    await pumpHome(tester, s);
+    await tester.tap(find.text('See this week'));
+    await tester.pump();
+    expect(
+      s.activitySelection.value.weekStart,
+      DateTime(2026, 11, 9).millisecondsSinceEpoch,
+    );
+    expect(
+      tester.state<HomeShellState>(find.byType(HomeShell)).tab,
+      KobanTab.activity,
+    );
+  });
+
   testWidgets('Add payment saves a payment and Home says Expense added', (
     tester,
   ) async {
@@ -181,10 +234,8 @@ void main() {
     await pumpHome(tester, s);
     await tester.tap(find.text('Add payment'));
     await tester.pumpAndSettle();
-    for (final k in '12.5'.split('')) {
-      await tester.tap(find.text(k));
-      await tester.pump();
-    }
+    await tester.enterText(find.byType(TextField).first, '12.5');
+    await tester.pump();
     await tester.tap(find.text('Save payment'));
     await tester.pumpAndSettle();
     expect(find.text('Expense added'), findsOneWidget);
@@ -215,5 +266,20 @@ void main() {
     await pay(s, '12.50', DateTime(2026, 11, 13, 9));
     await pumpHome(tester, s, textScale: 1.3);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the Add payment label has the gold button text color', (
+    tester,
+  ) async {
+    await pumpHome(tester, await testServices());
+    final label = find.text('Add payment');
+    final color = tester
+        .widget<RichText>(
+          find.descendant(of: label, matching: find.byType(RichText)),
+        )
+        .text
+        .style!
+        .color;
+    expect(color, Theme.of(tester.element(label)).colorScheme.onPrimary);
   });
 }

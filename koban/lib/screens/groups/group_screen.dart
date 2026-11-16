@@ -7,6 +7,7 @@ import '../../data/category_repository.dart';
 import '../../online/group_repository.dart';
 import '../../rules/periods.dart';
 import '../../theme/koban_theme.dart';
+import '../../theme/mon.dart';
 import '../../ui/kit.dart';
 import '../../ui/money.dart';
 import 'group_dialogs.dart';
@@ -48,6 +49,40 @@ Color _categoryColor(BuildContext context, String name) {
       .map((c) => c.id)
       .firstOrNull;
   return categoryColor(context, id ?? 'other');
+}
+
+/// The group did not load: what happened and what to do.
+class _LoadFailed extends StatelessWidget {
+  const _LoadFailed({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        const SizedBox(height: 48),
+        const Mon(MonFace.worry, size: 96),
+        const SizedBox(height: 16),
+        Text(
+          'Could not load the group.',
+          style: theme.textTheme.titleMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Check the internet connection, then try again.',
+          style: theme.textTheme.bodyMedium!.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        TonalButton('Try again', onRetry),
+      ],
+    );
+  }
 }
 
 /// The page of one group. A port of the 0.1.1 `GroupsScreen.kt` `GroupScreen` and `GroupBody`.
@@ -273,6 +308,11 @@ class _GroupScreenState extends State<GroupScreen> {
                         child: d == null
                             ? ListView(
                                 physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.all(24),
+                                children: [
+                                  if (vm.loadFailed && !state.loading)
+                                    _LoadFailed(onRetry: _pull),
+                                ],
                               )
                             : _body(context, vm, d, isOwner),
                       ),

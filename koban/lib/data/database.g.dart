@@ -5815,13 +5815,14 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
 
   Selectable<TotalsByCategoryResult> totalsByCategory(int start, int end) {
     return customSelect(
-      'SELECT categoryId, CAST(COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) AS TEXT) AS total FROM expenses WHERE status != \'DISMISSED\' AND notificationPostTime >= ?1 AND notificationPostTime < ?2 GROUP BY categoryId HAVING COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) != 0 ORDER BY COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) DESC',
+      'SELECT categoryId, CAST(COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) AS TEXT) AS total, SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE 1 END) AS spentCount FROM expenses WHERE status != \'DISMISSED\' AND notificationPostTime >= ?1 AND notificationPostTime < ?2 GROUP BY categoryId HAVING COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) != 0 ORDER BY COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) DESC',
       variables: [Variable<int>(start), Variable<int>(end)],
       readsFrom: {this.expenses},
     ).map(
       (QueryRow row) => TotalsByCategoryResult(
         categoryId: row.readNullable<String>('categoryId'),
         total: const MoneyConverter().fromSql(row.read<String>('total')),
+        spentCount: row.readNullable<int>('spentCount'),
       ),
     );
   }
@@ -5874,6 +5875,14 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
       variables: [],
       readsFrom: {this.categories},
     ).asyncMap(this.categories.mapFromRow);
+  }
+
+  Selectable<String?> mostUsedCategoryIds(int count) {
+    return customSelect(
+      'SELECT categoryId FROM expenses WHERE status != \'DISMISSED\' AND categoryId IS NOT NULL GROUP BY categoryId ORDER BY COUNT(*) DESC, MAX(notificationPostTime) DESC LIMIT ?1',
+      variables: [Variable<int>(count)],
+      readsFrom: {this.expenses},
+    ).map((QueryRow row) => row.readNullable<String>('categoryId'));
   }
 
   Selectable<int> categoryCount() {
@@ -9267,7 +9276,12 @@ class GroupTotalsResult {
 class TotalsByCategoryResult {
   final String? categoryId;
   final Decimal total;
-  TotalsByCategoryResult({this.categoryId, required this.total});
+  final int? spentCount;
+  TotalsByCategoryResult({
+    this.categoryId,
+    required this.total,
+    this.spentCount,
+  });
 }
 
 class MonthlyTotalsResult {

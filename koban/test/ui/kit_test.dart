@@ -46,6 +46,30 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('a row subtitle wraps and is not cut with an ellipsis', (
+    tester,
+  ) async {
+    const long =
+        'Use this when new payments stop showing up in Koban, and nothing else helps.';
+    await tester.pumpWidget(
+      app(
+        const Center(
+          child: SizedBox(
+            width: 220,
+            child: KobanRow(title: 'Restart payment tracking', subtitle: long),
+          ),
+        ),
+      ),
+    );
+    final text = tester.widget<Text>(find.text(long));
+    expect(text.overflow, isNull);
+    expect(text.maxLines, isNull);
+    final lines =
+        tester.getSize(find.text(long)).height /
+        (text.style!.fontSize! * text.style!.height!);
+    expect(lines, greaterThan(2));
+  });
+
   testWidgets('a list group puts dividers between rows only', (tester) async {
     await tester.pumpWidget(
       app(

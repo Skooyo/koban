@@ -90,10 +90,14 @@ SplitEditorViewModel editorOf(WidgetTester tester) => tester
     .viewModel;
 
 /// One spend of 24.00 at 11 Nov 20:15, and its id.
-Future<String> addPayment(AppServices s) async {
+Future<String> addPayment(
+  AppServices s, {
+  String amount = '24.00',
+  String merchant = 'Kedai Contoh',
+}) async {
   await s.expenses.addManualExpense(
-    amount: d('24.00'),
-    merchant: 'Kedai Contoh',
+    amount: d(amount),
+    merchant: merchant,
     postTime: DateTime(2026, 11, 11, 20, 15).millisecondsSinceEpoch,
     type: TransactionType.withdraw,
   );
@@ -155,7 +159,7 @@ bool bottomOn(WidgetTester tester, String label) =>
 Future<void> typeToAssign(WidgetTester tester) async {
   await tester.tap(find.text('Type items instead'));
   await tester.pumpAndSettle();
-  await typeInto(tester, field('Place'), 'Kedai Contoh');
+  await typeInto(tester, field('Shop'), 'Kedai Contoh');
   await typeInto(tester, field('Item'), 'Nasi lemak');
   await typeInto(tester, field('Line price (RM)'), '20.00');
   await tester.ensureVisible(find.text('Add item'));
@@ -267,6 +271,22 @@ OutlinedButton galleryButton(WidgetTester tester) =>
     tester.widget(find.widgetWithText(OutlinedButton, 'Choose from gallery'));
 
 void main() {
+  testWidgets(
+    'the receipt step says the photo goes to the server with online access',
+    (tester) async {
+      await openEditor(
+        tester,
+        await testServices(secrets: {'device_token': 'test-token'}),
+      );
+      expect(
+        find.text(
+          "Koban reads the items on your phone and with Claude. The photo goes to Koban's server, which deletes it after reading.",
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('the receipt step offers the photo buttons and typing', (
     tester,
   ) async {
@@ -276,7 +296,7 @@ void main() {
     expect(find.text('Start with the receipt'), findsOneWidget);
     expect(
       find.text(
-        'Koban reads the items for you. The photo is read once and then deleted. It is not kept.',
+        'Koban reads the items on your phone. The photo is not sent anywhere.',
       ),
       findsOneWidget,
     );
@@ -425,7 +445,7 @@ void main() {
     expect(find.byIcon(Icons.check), findsOneWidget);
     expect(
       tester.getTopLeft(find.text(line)).dy,
-      lessThan(tester.getTopLeft(find.text('Place')).dy),
+      lessThan(tester.getTopLeft(find.text('Shop')).dy),
     );
   });
 
@@ -634,15 +654,64 @@ void main() {
       find.text('Tap names to share each item. A shared item splits evenly.'),
       findsOneWidget,
     );
-    expect(find.text('Pick at least one person'), findsNWidgets(2));
+    expect(find.text('Pick who had this item.'), findsNWidgets(2));
     expect(bottomOn(tester, 'Next'), false);
     await tester.tap(chip('Me', 0));
     await tester.pumpAndSettle();
-    expect(find.text('Pick at least one person'), findsOneWidget);
+    expect(find.text('Pick who had this item.'), findsOneWidget);
     expect(bottomOn(tester, 'Next'), false);
     await tester.tap(chip('Ali', 1));
     await tester.pumpAndSettle();
-    expect(find.text('Pick at least one person'), findsNothing);
+    expect(find.text('Pick who had this item.'), findsNothing);
+    expect(bottomOn(tester, 'Next'), true);
+  });
+
+  testWidgets('a disabled Next says how many items have no one yet', (
+    tester,
+  ) async {
+    await openEditor(tester, await testServices());
+    await typeToAssign(tester);
+    expect(
+      find.text('2 items have no one yet. Pick someone to go on.'),
+      findsOneWidget,
+    );
+    await tester.tap(chip('Me', 0));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('1 item has no one yet. Pick someone to go on.'),
+      findsOneWidget,
+    );
+    await tester.tap(chip('Me', 1));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('has no one yet'), findsNothing);
+    expect(find.textContaining('have no one yet'), findsNothing);
+    expect(bottomOn(tester, 'Next'), true);
+  });
+
+  testWidgets('the Everyone chip and Split everything evenly share the items', (
+    tester,
+  ) async {
+    await openEditor(tester, await testServices());
+    await typeToAssign(tester);
+    // One item to Me and Ali with its Everyone chip.
+    await tester.tap(chip('Everyone', 0));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(chip('Me', 0)).selected, true);
+    expect(tester.widget<FilterChip>(chip('Ali', 0)).selected, true);
+    expect(tester.widget<FilterChip>(chip('Everyone', 0)).selected, true);
+    expect(tester.widget<FilterChip>(chip('Me', 1)).selected, false);
+    // A second tap takes everyone off again.
+    await tester.tap(chip('Everyone', 0));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilterChip>(chip('Me', 0)).selected, false);
+    // Split everything evenly sets every item.
+    await tester.tap(find.text('Split everything evenly'));
+    await tester.pumpAndSettle();
+    for (final i in [0, 1]) {
+      expect(tester.widget<FilterChip>(chip('Me', i)).selected, true);
+      expect(tester.widget<FilterChip>(chip('Ali', i)).selected, true);
+      expect(tester.widget<FilterChip>(chip('Everyone', i)).selected, true);
+    }
     expect(bottomOn(tester, 'Next'), true);
   });
 
@@ -664,33 +733,14 @@ void main() {
     });
   });
 
-  testWidgets('delete split asks first and then closes', (tester) async {
+  testWidgets('delete split closes at once, with no dialog', (tester) async {
     final s = await testServices();
     final billId = await saveDraft(s);
     final opener = await openEditor(tester, s, billId: billId);
     await tester.ensureVisible(find.text('Delete split'));
     await tester.tap(find.text('Delete split'));
     await tester.pumpAndSettle();
-    expect(find.text('Delete this split?'), findsOneWidget);
-    expect(
-      find.text(
-        'The bill and what people owe are removed. Your payment counts in full again.',
-      ),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
     expect(find.text('Delete this split?'), findsNothing);
-    expect(opener.closed, false);
-    await tester.tap(find.text('Delete split'));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Delete split'),
-      ),
-    );
-    await tester.pumpAndSettle();
     expect(opener.closed, true);
     expect(await s.db.select(s.db.splitBills).get(), isEmpty);
   });
@@ -702,16 +752,8 @@ void main() {
       final s = await testServices();
       final id = await addPayment(s);
       await openEditor(tester, s, payment: id);
-      await tester.tap(find.text('RM 24.00'));
+      await tester.enterText(find.byType(TextField).first, '26');
       await tester.pumpAndSettle();
-      for (var i = 0; i < 5; i++) {
-        await tester.tap(find.bySemanticsLabel('Delete digit'));
-        await tester.pump();
-      }
-      await tester.tap(find.text('2'));
-      await tester.tap(find.text('6'));
-      await tester.pumpAndSettle();
-      expect(find.text('RM 26'), findsOneWidget);
       await tester.ensureVisible(find.text('Split this bill'));
       await tester.tap(find.text('Split this bill'));
       await tester.pumpAndSettle();
@@ -726,6 +768,56 @@ void main() {
     },
   );
 
+  /// From a payment: typed items to the assign step with every item given, then Next.
+  Future<void> assignAndNext(WidgetTester tester) async {
+    await typeToAssign(tester);
+    await tester.tap(chip('Me', 0));
+    await tester.tap(chip('Ali', 1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('a split from a payment skips the link step both ways', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final id = await addPayment(s);
+    await openEditor(tester, s, expenseId: id);
+    await assignAndNext(tester);
+    expect(find.text('Which payment was this?'), findsNothing);
+    expect(find.text('Split done'), findsOneWidget);
+    expect(find.textContaining('Your share absorbs'), findsNothing);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('Step 4 of 6 · Who had what'), findsOneWidget);
+  });
+
+  testWidgets('the summary of a split from a payment shows the mismatch note', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final id = await addPayment(s, amount: '26.00');
+    await openEditor(tester, s, expenseId: id);
+    await assignAndNext(tester);
+    expect(
+      find.text(
+        'The payment is RM 26.00, the receipt is RM 24.00. '
+        'Your share absorbs the difference.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a split without a payment still shows the link step', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await openEditor(tester, s);
+    await assignAndNext(tester);
+    expect(find.text('Which payment was this?'), findsOneWidget);
+  });
+
   testWidgets(
     'a payment linked to another split shows the refusal on the summary',
     (tester) async {
@@ -736,9 +828,6 @@ void main() {
       await tester.tap(chip('Me', 0));
       await tester.tap(chip('Ali', 1));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Next'));
-      await tester.pumpAndSettle();
-      expect(find.text('Kedai Contoh'), findsOneWidget);
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
       expect(find.text('Split done'), findsOneWidget);
@@ -786,4 +875,199 @@ void main() {
       handle.dispose();
     },
   );
+
+  // No receipt and custom amounts
+
+  /// Taps the no-receipt button [button], adds [people] and goes to the summary.
+  Future<void> noReceiptToSummary(
+    WidgetTester tester,
+    String button,
+    List<String> people,
+  ) async {
+    await tester.tap(find.text(button));
+    await tester.pumpAndSettle();
+    expect(find.text('Who is sharing?'), findsOneWidget);
+    for (final name in people) {
+      await typeInto(tester, field('New person'), name);
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Next · ${people.length + 1} people'));
+    await tester.pumpAndSettle();
+  }
+
+  String fieldText(WidgetTester tester, String label) =>
+      tester.widget<TextField>(field(label)).controller!.text;
+
+  testWidgets(
+    'a payment split with no receipt goes from People to the summary',
+    (tester) async {
+      final s = await testServices();
+      final id = await addPayment(s, amount: '18.80', merchant: 'Grab');
+      final opener = await openEditor(tester, s, expenseId: id);
+      await noReceiptToSummary(tester, 'Split RM 18.80 evenly, no receipt', [
+        'Ali',
+      ]);
+      expect(find.text('Step 6 of 6 · Summary'), findsOneWidget);
+      expect(find.text('Ali now owes you.'), findsOneWidget);
+      expect(find.text('RM 9.40'), findsNWidgets(2));
+      expect(find.text('RM 18.80'), findsOneWidget);
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(find.text('Who is sharing?'), findsOneWidget);
+      await tester.tap(find.text('Next · 2 people'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      expect(opener.closed, true);
+      final debt = (await s.db.select(s.db.splitDebts).get()).single;
+      expect(debt.amount, d('9.40'));
+      final item = (await s.db.select(s.db.splitItems).get()).single;
+      expect((item.name, item.price), ('Grab', d('18.80')));
+      final bill = (await s.db.select(s.db.splitBills).get()).single;
+      expect((bill.merchant, bill.linkedExpenseId), ('Grab', id));
+      expect((await s.expenses.getById(id))!.countedAmount, d('9.40'));
+    },
+  );
+
+  testWidgets('RM 10.00 for 3 people gives Me the odd cent', (tester) async {
+    final s = await testServices();
+    final id = await addPayment(s, amount: '10.00', merchant: 'Grab');
+    await openEditor(tester, s, expenseId: id);
+    await noReceiptToSummary(tester, 'Split RM 10.00 evenly, no receipt', [
+      'Ali',
+      'Bala',
+    ]);
+    expect(find.text('RM 3.33'), findsNWidgets(2));
+    expect(find.text('RM 3.34'), findsOneWidget);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    final debts = await s.db.select(s.db.splitDebts).get();
+    expect([for (final x in debts) x.amount], [d('3.33'), d('3.33')]);
+  });
+
+  testWidgets('a split with no payment asks for the amount and the name', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await openEditor(tester, s);
+    await tester.tap(find.text('Split one amount, no receipt'));
+    await tester.pumpAndSettle();
+    expect(fieldText(tester, 'Name'), 'Shared cost');
+    bool nextOn() =>
+        tester
+            .widget<TextButton>(find.widgetWithText(TextButton, 'Next'))
+            .onPressed !=
+        null;
+    expect(nextOn(), false);
+    await tester.enterText(field('Amount (RM)'), '1.234');
+    await tester.pump();
+    expect(fieldText(tester, 'Amount (RM)'), '');
+    await tester.enterText(field('Amount (RM)'), '0');
+    await tester.pump();
+    expect(nextOn(), false);
+    await tester.enterText(field('Amount (RM)'), '12.5');
+    await tester.enterText(field('Name'), 'Taxi');
+    await tester.pump();
+    expect(nextOn(), true);
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await typeInto(tester, field('New person'), 'Ali');
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next · 2 people'));
+    await tester.pumpAndSettle();
+    expect(find.text('Which payment was this?'), findsNothing);
+    expect(find.text('RM 6.25'), findsNWidgets(2));
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect((await s.db.select(s.db.splitDebts).get()).single.amount, d('6.25'));
+    final bill = (await s.db.select(s.db.splitBills).get()).single;
+    expect((bill.merchant, bill.linkedExpenseId), ('Taxi', null));
+  });
+
+  testWidgets('custom amounts save only when they add up to the total', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final id = await addPayment(s, amount: '18.80', merchant: 'Grab');
+    await openEditor(tester, s, expenseId: id);
+    await noReceiptToSummary(tester, 'Split RM 18.80 evenly, no receipt', [
+      'Ali',
+    ]);
+    await tester.tap(find.text('Change amounts'));
+    await tester.pumpAndSettle();
+    expect(fieldText(tester, 'Ali (RM)'), '9.40');
+    expect(fieldText(tester, 'Me (RM)'), '9.40');
+    expect(find.text('Amounts add up to RM 18.80'), findsOneWidget);
+    await typeInto(tester, field('Ali (RM)'), '10');
+    expect(find.text('RM 0.60 more than the total'), findsOneWidget);
+    expect(bottomOn(tester, 'Done'), false);
+    await typeInto(tester, field('Me (RM)'), '8');
+    expect(find.text('RM 0.80 left to share'), findsOneWidget);
+    expect(bottomOn(tester, 'Done'), false);
+    await typeInto(tester, field('Me (RM)'), '8.80');
+    expect(find.text('Amounts add up to RM 18.80'), findsOneWidget);
+    expect(bottomOn(tester, 'Done'), true);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(
+      (await s.db.select(s.db.splitDebts).get()).single.amount,
+      d('10.00'),
+    );
+    expect((await s.expenses.getById(id))!.countedAmount, d('8.80'));
+    final billId = (await s.db.select(s.db.splitBills).get()).single.id;
+    await tester.pumpWidget(const SizedBox());
+    await openEditor(tester, s, billId: billId);
+    expect(find.text('RM 10.00'), findsOneWidget);
+    expect(find.text('RM 8.80'), findsOneWidget);
+    expect(find.text('RM 18.80'), findsOneWidget);
+  });
+
+  testWidgets('Split evenly puts the even split back in the fields', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final id = await addPayment(s, amount: '18.80', merchant: 'Grab');
+    await openEditor(tester, s, expenseId: id);
+    await noReceiptToSummary(tester, 'Split RM 18.80 evenly, no receipt', [
+      'Ali',
+    ]);
+    await tester.tap(find.text('Change amounts'));
+    await tester.pumpAndSettle();
+    await typeInto(tester, field('Ali (RM)'), '10');
+    await typeInto(tester, field('Me (RM)'), '8.80');
+    await tester.tap(find.text('Split evenly'));
+    await tester.pumpAndSettle();
+    expect(fieldText(tester, 'Ali (RM)'), '9.40');
+    expect(fieldText(tester, 'Me (RM)'), '9.40');
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect((await s.db.select(s.db.splitDebts).get()).single.amount, d('9.40'));
+    final item = (await s.db.select(s.db.splitItems).get()).single;
+    expect((item.name, item.price), ('Grab', d('18.80')));
+  });
+
+  testWidgets('only a one-item split offers Change amounts', (tester) async {
+    final s = await testServices();
+    await openEditor(tester, s);
+    await typeToAssign(tester);
+    await tester.tap(find.text('Split everything evenly'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Not paid by card'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    expect(find.text('Split done'), findsOneWidget);
+    expect(find.text('Change amounts'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    final id = await addPayment(s, amount: '18.80', merchant: 'Grab');
+    await openEditor(tester, s, expenseId: id);
+    await noReceiptToSummary(tester, 'Split RM 18.80 evenly, no receipt', [
+      'Ali',
+    ]);
+    expect(find.text('Change amounts'), findsOneWidget);
+  });
 }

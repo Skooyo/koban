@@ -6,6 +6,8 @@ import 'package:koban/rules/periods.dart';
 import 'package:koban/screens/activity/activity_view_model.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/activity/activity_screen.dart';
+import 'package:koban/theme/mon.dart';
+import 'package:koban/ui/kit.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
@@ -112,9 +114,64 @@ void main() {
   ) async {
     await pumpActivity(tester, await testServices());
     expect(find.text('No payments in November 2026.'), findsOneWidget);
+    expect(
+      find.text('Add one, or turn on tracking to find them.'),
+      findsOneWidget,
+    );
+    expect(find.byType(Mon), findsOneWidget);
+    expect(find.text('Clear filter'), findsNothing);
     await tester.tap(find.text('9 Nov – 15 Nov'));
     await tester.pumpAndSettle();
     expect(find.text('No payments in this week.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'By category lists the top four by amount, folds the rest, and a tap filters',
+    (tester) async {
+      final s = await testServices();
+      final at = DateTime(2026, 11, 10, 9);
+      await pay(s, '20.00', at, merchant: 'Kedai A');
+      await pay(s, '20.00', at, merchant: 'Kedai B');
+      await pay(s, '10.00', at, merchant: 'Kedai C');
+      await pay(s, '15.00', at, category: 'transport', merchant: 'Grab 1');
+      await pay(s, '15.00', at, category: 'transport', merchant: 'Grab 2');
+      await pay(s, '20.00', at, category: 'shopping', merchant: 'Mall');
+      await pay(s, '15.00', at, category: 'bills', merchant: 'Telco');
+      await pay(s, '8.00', at, category: 'health', merchant: 'Klinik');
+      await pay(s, '5.00', at, category: 'other', merchant: 'Misc');
+      // Money received does not count as a payment in the list.
+      await pay(s, '99.00', at, merchant: 'Ali', type: TransactionType.receive);
+      await pumpActivity(tester, s);
+
+      expect(find.text('By category'), findsOneWidget);
+      Finder row(String name) => find.widgetWithText(KobanRow, name);
+      Finder inRow(String name, String text) =>
+          find.descendant(of: row(name), matching: find.text(text));
+      expect(inRow('Food & Dining', '3 payments'), findsOneWidget);
+      expect(inRow('Food & Dining', 'RM 50.00'), findsOneWidget);
+      expect(inRow('Transport', '2 payments'), findsOneWidget);
+      expect(inRow('Transport', 'RM 30.00'), findsOneWidget);
+      expect(inRow('Shopping', '1 payment'), findsOneWidget);
+      expect(inRow('Bills & Utilities', 'RM 15.00'), findsOneWidget);
+      // Health (8.00) and Other (5.00) fold into one row.
+      expect(row('Health'), findsNothing);
+      expect(inRow('Other categories', '2 payments'), findsOneWidget);
+      expect(inRow('Other categories', 'RM 13.00'), findsOneWidget);
+
+      await tester.tap(row('Transport'));
+      await tester.pumpAndSettle();
+      expect(find.text('Grab 1'), findsOneWidget);
+      expect(find.text('Grab 2'), findsOneWidget);
+      expect(find.text('Kedai A'), findsNothing);
+      expect(find.text('Mall'), findsNothing);
+    },
+  );
+
+  testWidgets('By category does not show for a month with no payment', (
+    tester,
+  ) async {
+    await pumpActivity(tester, await testServices());
+    expect(find.text('By category'), findsNothing);
   });
 
   testWidgets('Next month is off at the current month', (tester) async {
@@ -150,7 +207,193 @@ void main() {
     expect(find.text('Kedai Ali'), findsOneWidget);
   });
 
-  testWidgets('the category sheet filters the list and the chip clears it', (
+  testWidgets(
+    'the category sheet filters the list and All categories clears it',
+    (tester) async {
+      final s = await testServices();
+      await pay(s, '5.00', DateTime(2026, 11, 13, 9));
+      await pay(
+        s,
+        '7.00',
+        DateTime(2026, 11, 12, 9),
+        category: 'transport',
+        merchant: 'Kedai Contoh',
+      );
+      final semantics = tester.ensureSemantics();
+      await pumpActivity(tester, s);
+      await tester.tap(find.text('Filter'));
+      await tester.pumpAndSettle();
+      expect(find.text('Show one category'), findsOneWidget);
+      expect(find.text('All categories'), findsOneWidget);
+      // 5 categories and Uncategorized have no spending in the month.
+      expect(find.bySemanticsLabel(RegExp('No spending')), findsNWidgets(6));
+      await tester.tap(find.text('Food & Dining').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Show one category'), findsNothing);
+      expect(find.text('RESTORAN CONTOH'), findsOneWidget);
+      expect(find.text('Kedai Contoh'), findsNothing);
+      // The summary row shows the category, the count and the spent total of the month.
+      expect(find.text('1 payment, November 2026'), findsOneWidget);
+      expect(find.text('Filter \u00b7 1'), findsOneWidget);
+      await tester.tap(find.text('Filter \u00b7 1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All categories'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 payment, November 2026'), findsNothing);
+      expect(find.text('Filter'), findsOneWidget);
+      expect(find.text('RESTORAN CONTOH'), findsOneWidget);
+      expect(find.text('Kedai Contoh'), findsOneWidget);
+      semantics.dispose();
+    },
+  );
+
+  Finder searchField() => find.widgetWithText(TextField, 'Search shop or note');
+
+  Future<void> searchSeed(AppServices s) async {
+    await pay(
+      s,
+      '18.80',
+      DateTime(2026, 11, 13, 8, 15),
+      category: 'transport',
+      merchant: 'Grab',
+    );
+    await pay(
+      s,
+      '11.00',
+      DateTime(2026, 11, 12, 9),
+      category: 'transport',
+      merchant: 'GRAB Food',
+    );
+    await pay(s, '14.20', DateTime(2026, 11, 11, 9), merchant: 'Mamak Corner');
+    await s.expenses.addManualExpense(
+      amount: Decimal.parse('6.50'),
+      merchant: '7-Eleven',
+      postTime: DateTime(2026, 11, 10, 9).millisecondsSinceEpoch,
+      categoryId: 'food',
+      notes: 'drink for the grab driver',
+      type: TransactionType.withdraw,
+    );
+    await pay(
+      s,
+      '24.40',
+      DateTime(2026, 10, 30, 9),
+      category: 'transport',
+      merchant: 'Grab',
+    );
+  }
+
+  testWidgets('search filters by shop or note on the device', (tester) async {
+    final s = await testServices();
+    await searchSeed(s);
+    await pumpActivity(tester, s);
+    expect(find.text('Search shop or note'), findsOneWidget);
+    expect(find.text('Filter'), findsOneWidget);
+    expect(find.text('Mamak Corner'), findsOneWidget);
+
+    await tester.enterText(searchField(), 'grab');
+    await tester.pumpAndSettle();
+
+    // Two shops (any case) and one note match. The Mamak payment and October stay out.
+    expect(find.text('Grab'), findsOneWidget);
+    expect(find.text('GRAB Food'), findsOneWidget);
+    expect(find.text('7-Eleven'), findsOneWidget);
+    expect(find.text('Mamak Corner'), findsNothing);
+    // The summary row: the text, the count and the spent total of the view.
+    expect(find.text('"grab"'), findsOneWidget);
+    expect(find.text('3 payments, November 2026'), findsOneWidget);
+    expect(find.text('RM 36.30'), findsOneWidget);
+    // A search alone is not a category filter.
+    expect(find.text('Filter'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Clear search'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mamak Corner'), findsOneWidget);
+    expect(find.text('"grab"'), findsNothing);
+    expect(tester.widget<TextField>(searchField()).controller!.text, '');
+  });
+
+  testWidgets('search and a category filter together, in the All view', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await searchSeed(s);
+    await pumpActivity(tester, s);
+    await tester.enterText(searchField(), 'grab');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Filter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Transport').last);
+    await tester.pumpAndSettle();
+
+    // The Filter button counts the category filter. The 7-Eleven note match is Food.
+    expect(find.text('Filter \u00b7 1'), findsOneWidget);
+    final button = find.ancestor(
+      of: find.text('Filter \u00b7 1'),
+      matching: find.byType(Material),
+    );
+    expect(
+      tester.widget<Material>(button.first).color,
+      Theme.of(tester.element(button.first)).colorScheme.primaryContainer,
+    );
+    expect(find.text('Transport, "grab"'), findsOneWidget);
+    expect(find.text('2 payments, November 2026'), findsOneWidget);
+    final summary = find.widgetWithText(KobanRow, 'Transport, "grab"');
+    expect(
+      find.descendant(of: summary, matching: find.text('RM 29.80')),
+      findsOneWidget,
+    );
+    expect(find.text('7-Eleven'), findsNothing);
+
+    await tester.tap(find.text('All'));
+    await tester.pumpAndSettle();
+    expect(find.text('Transport, "grab"'), findsOneWidget);
+    expect(find.text('3 payments, all months'), findsOneWidget);
+    expect(
+      find.descendant(of: summary, matching: find.text('RM 54.20')),
+      findsOneWidget,
+    );
+    expect(find.text('October 2026'), findsOneWidget);
+  });
+
+  testWidgets('the summary count matches the spent total, not received', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await searchSeed(s);
+    await pay(
+      s,
+      '5.00',
+      DateTime(2026, 11, 9, 9),
+      merchant: 'Grab refund',
+      type: TransactionType.receive,
+    );
+    await pumpActivity(tester, s);
+    await tester.enterText(searchField(), 'grab');
+    await tester.pumpAndSettle();
+    expect(find.text('Grab refund'), findsOneWidget);
+    expect(find.text('3 payments, November 2026'), findsOneWidget);
+    expect(find.text('RM 36.30'), findsOneWidget);
+  });
+
+  testWidgets('a search with no match says so and Clear search resets it', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await searchSeed(s);
+    await pumpActivity(tester, s);
+    await tester.enterText(searchField(), 'zzz');
+    await tester.pumpAndSettle();
+    expect(find.text('No payments match "zzz".'), findsOneWidget);
+    expect(find.text('Try another word, or clear the search.'), findsOneWidget);
+    expect(find.text('0 payments, November 2026'), findsOneWidget);
+    expect(find.text('RM 0.00'), findsWidgets);
+    await tester.tap(find.text('Clear search'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mamak Corner'), findsOneWidget);
+    expect(find.text('No payments match "zzz".'), findsNothing);
+  });
+
+  testWidgets('an empty month with a filter offers Clear filter', (
     tester,
   ) async {
     final s = await testServices();
@@ -158,33 +401,29 @@ void main() {
     await pay(
       s,
       '7.00',
-      DateTime(2026, 11, 12, 9),
+      DateTime(2026, 10, 12, 9),
       category: 'transport',
       merchant: 'Kedai Contoh',
     );
-    final semantics = tester.ensureSemantics();
     await pumpActivity(tester, s);
+    await tester.tap(find.byTooltip('Previous month'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
-    expect(find.text('Show one category'), findsOneWidget);
-    expect(find.text('All categories'), findsOneWidget);
-    // 5 categories and Uncategorized have no spending in the month.
-    expect(find.bySemanticsLabel(RegExp('No spending')), findsNWidgets(6));
-    await tester.tap(find.text('Food & Dining'));
+    await tester.tap(find.text('Transport').last);
     await tester.pumpAndSettle();
-    expect(find.text('Show one category'), findsNothing);
-    expect(find.text('RESTORAN CONTOH'), findsOneWidget);
-    expect(find.text('Kedai Contoh'), findsNothing);
-    final chip = find.bySemanticsLabel(
-      'Filtered by Food & Dining. Clear filter',
+    await tester.tap(find.byTooltip('Next month'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('No Transport payments in November 2026.'),
+      findsOneWidget,
     );
-    expect(chip, findsOneWidget);
-    await tester.tap(chip);
+    expect(find.text('Clear the filter to see all payments.'), findsOneWidget);
+    expect(find.byType(Mon), findsOneWidget);
+    await tester.tap(find.text('Clear filter'));
     await tester.pumpAndSettle();
-    expect(chip, findsNothing);
     expect(find.text('RESTORAN CONTOH'), findsOneWidget);
-    expect(find.text('Kedai Contoh'), findsOneWidget);
-    semantics.dispose();
+    expect(find.text('Clear filter'), findsNothing);
   });
 
   testWidgets('the All view shows a header for each month', (tester) async {
@@ -220,7 +459,7 @@ void main() {
     await tester.tap(find.text('RESTORAN CONTOH'));
     await tester.pumpAndSettle();
     expect(find.text('Payment'), findsOneWidget);
-    expect(find.text('Save changes'), findsOneWidget);
+    expect(find.text('Save payment'), findsOneWidget);
   });
 
   testWidgets('Add payment opens the payment sheet', (tester) async {
@@ -249,7 +488,7 @@ void main() {
     await pumpActivity(tester, s, textScale: 1.3);
     await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Food & Dining'));
+    await tester.tap(find.text('Food & Dining').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('All'));
     await tester.pumpAndSettle();

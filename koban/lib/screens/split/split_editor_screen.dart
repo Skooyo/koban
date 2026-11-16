@@ -10,8 +10,10 @@ import '../../receipts/receipt_photos.dart';
 import '../../rules/amount_formatter.dart';
 import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
+import '../../ui/amount_input.dart';
 import '../../ui/dialogs.dart';
 import '../../ui/kit.dart';
+import '../../ui/sheets.dart';
 import 'split_editor_steps.dart';
 import 'split_editor_view_model.dart';
 
@@ -154,17 +156,33 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
                           horizontal: 16,
                           vertical: 12,
                         ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: action.enabled && !state.saving
-                                ? action.onPressed
-                                : null,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(0, 48),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton(
+                                onPressed: action.enabled && !state.saving
+                                    ? action.onPressed
+                                    : null,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(0, 48),
+                                ),
+                                child: Text(action.label),
+                              ),
                             ),
-                            child: Text(action.label),
-                          ),
+                            if (action.hint != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  action.hint!,
+                                  style: theme.textTheme.bodySmall!.copyWith(
+                                    color: MoneyColors.of(context).review,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -196,7 +214,7 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
       );
     }
     return switch (state.step) {
-      SplitStep.photo => _PhotoStep(online: state.onlineAccess, vm: vm),
+      SplitStep.photo => _PhotoStep(state: state, vm: vm),
       SplitStep.reading => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -232,7 +250,12 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
   }
 }
 
-typedef _BottomAction = ({String label, bool enabled, VoidCallback onPressed});
+typedef _BottomAction = ({
+  String label,
+  bool enabled,
+  VoidCallback onPressed,
+  String? hint,
+});
 
 _BottomAction? _bottomAction(SplitEditorState s, SplitEditorViewModel vm) {
   if (s.loading) return null;
@@ -245,17 +268,24 @@ _BottomAction? _bottomAction(SplitEditorState s, SplitEditorViewModel vm) {
           SplitEditorViewModel.parseItems(s) != null &&
           SplitEditorViewModel.chargesOf(s) != null,
       onPressed: vm.next,
+      hint: null,
     ),
     SplitStep.people => (
       label:
           'Next · ${s.people.length + 1} ${s.people.isEmpty ? 'person' : 'people'}',
       enabled: true,
       onPressed: vm.next,
+      hint: null,
     ),
     SplitStep.assign => (
       label: 'Next',
       enabled: SplitEditorViewModel.unassigned(s).isEmpty,
       onPressed: vm.next,
+      hint: switch (SplitEditorViewModel.unassigned(s).length) {
+        0 => null,
+        1 => '1 item has no one yet. Pick someone to go on.',
+        final n => '$n items have no one yet. Pick someone to go on.',
+      },
     ),
     SplitStep.link =>
       s.locked
@@ -263,17 +293,27 @@ _BottomAction? _bottomAction(SplitEditorState s, SplitEditorViewModel vm) {
               label: 'Save payment',
               enabled: true,
               onPressed: vm.saveLockedPayment,
+              hint: null,
             )
-          : (label: 'Next', enabled: true, onPressed: vm.next),
+          : (label: 'Next', enabled: true, onPressed: vm.next, hint: null),
     SplitStep.summary =>
-      s.locked ? null : (label: 'Done', enabled: true, onPressed: vm.done),
+      s.locked
+          ? null
+          : (
+              label: 'Done',
+              enabled:
+                  s.amounts == null ||
+                  SplitEditorViewModel.amountsLeft(s)?.sign == 0,
+              onPressed: vm.done,
+              hint: null,
+            ),
   };
 }
 
 class _PhotoStep extends StatefulWidget {
-  const _PhotoStep({required this.online, required this.vm});
+  const _PhotoStep({required this.state, required this.vm});
 
-  final bool online;
+  final SplitEditorState state;
   final SplitEditorViewModel vm;
 
   @override
@@ -322,9 +362,29 @@ class _PhotoStepState extends State<_PhotoStep> {
     }
   }
 
+  /// One amount, shared by everyone. A split of a payment uses its amount and shop.
+  Future<void> _splitWithoutReceipt() async {
+    final payment = widget.state.linkedPayment;
+    if (payment != null) {
+      final shop = payment.merchant?.trim() ?? '';
+      return widget.vm.splitWithoutReceipt(
+        payment.amount,
+        shop.isEmpty ? _sharedCost : shop,
+      );
+    }
+    final picked = await showDialog<(Decimal, String)>(
+      context: context,
+      builder: (_) => const _OneAmountDialog(),
+    );
+    if (picked != null && mounted) {
+      widget.vm.splitWithoutReceipt(picked.$1, picked.$2);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final payment = widget.state.linkedPayment;
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -345,9 +405,9 @@ class _PhotoStepState extends State<_PhotoStep> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      widget.online
-                          ? "Koban reads the items for you. With online access, the photo goes to Koban's server to be read, then it is deleted."
-                          : 'Koban reads the items for you. The photo is read once and then deleted. It is not kept.',
+                      widget.state.onlineAccess
+                          ? "Koban reads the items on your phone and with Claude. The photo goes to Koban's server, which deletes it after reading."
+                          : 'Koban reads the items on your phone. The photo is not sent anywhere.',
                       style: theme.textTheme.bodyMedium!.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -380,6 +440,15 @@ class _PhotoStepState extends State<_PhotoStep> {
           ),
           const SizedBox(height: 8),
           _WideButton(
+            TonalButton(
+              payment == null
+                  ? 'Split one amount, no receipt'
+                  : 'Split ${splitRm(payment.amount)} evenly, no receipt',
+              _picking ? null : _splitWithoutReceipt,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _WideButton(
             TextButton(
               onPressed: widget.vm.typeItemsInstead,
               child: const Text('Type items instead'),
@@ -387,6 +456,83 @@ class _PhotoStepState extends State<_PhotoStep> {
           ),
         ],
       ),
+    );
+  }
+}
+
+const _sharedCost = 'Shared cost';
+
+/// Asks for the amount and the name of a split with no receipt and no payment.
+class _OneAmountDialog extends StatefulWidget {
+  const _OneAmountDialog();
+
+  @override
+  State<_OneAmountDialog> createState() => _OneAmountDialogState();
+}
+
+class _OneAmountDialogState extends State<_OneAmountDialog> {
+  final _amount = TextEditingController();
+  final _name = TextEditingController(text: _sharedCost);
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _next() {
+    final amount = AmountInput.toAmount(_amount.text);
+    if (amount == null) return;
+    final name = _name.text.trim();
+    Navigator.pop(context, (amount, name.isEmpty ? _sharedCost : name));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AlertDialog(
+      backgroundColor: scheme.surfaceContainer,
+      title: const Text('Split one amount'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _amount,
+            autofocus: true,
+            inputFormatters: [AmountInput.formatter],
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Amount (RM)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _name,
+            textCapitalization: TextCapitalization.sentences,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _next(),
+            decoration: const InputDecoration(
+              labelText: 'Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ValueListenableBuilder(
+          valueListenable: _amount,
+          builder: (context, value, _) => TextButton(
+            onPressed: AmountInput.toAmount(value.text) == null ? null : _next,
+            child: const Text('Next'),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -470,8 +616,10 @@ class MismatchCard extends StatelessWidget {
 
 /// The Fix sheet of 0.1.1. It closes when no mismatch is left and Claude does not read.
 Future<void> showFixSheet(BuildContext context, SplitEditorViewModel vm) =>
-    showModalBottomSheet<void>(
+    showKobanSheet<void>(
       context: context,
+      isScrollControlled: false,
+      showDragHandle: false,
       builder: (context) => _FixSheet(vm: vm),
     );
 
@@ -667,8 +815,8 @@ class _ItemsStep extends StatelessWidget {
           ),
           gap,
         ],
-        _Field(
-          label: 'Place',
+        SplitField(
+          label: 'Shop',
           value: state.merchant,
           onChanged: vm.setMerchant,
         ),
@@ -755,7 +903,7 @@ class _ItemEditor extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _Field(
+                child: SplitField(
                   label: 'Item',
                   value: row.name,
                   onChanged: (v) =>
@@ -779,7 +927,7 @@ class _ItemEditor extends StatelessWidget {
             children: [
               SizedBox(
                 width: 88,
-                child: _Field(
+                child: SplitField(
                   label: 'Qty',
                   value: row.quantity,
                   keyboard: TextInputType.number,
@@ -789,7 +937,7 @@ class _ItemEditor extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _Field(
+                child: SplitField(
                   label: 'Line price (RM)',
                   value: row.price,
                   keyboard: const TextInputType.numberWithOptions(
@@ -827,7 +975,7 @@ class _MoneyField extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    child: _Field(
+    child: SplitField(
       label: '$label (RM)',
       value: value,
       onChanged: onChanged,
@@ -835,62 +983,6 @@ class _MoneyField extends StatelessWidget {
       hint: hint,
       isError:
           value.trim().isNotEmpty && AmountFormatter.parseInput(value) == null,
-    ),
-  );
-}
-
-/// An outlined one-line text field. It shows [value] again when the state changes it.
-class _Field extends StatefulWidget {
-  const _Field({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-    this.keyboard,
-    this.hint,
-    this.isError = false,
-  });
-
-  final String label;
-  final String value;
-  final ValueChanged<String> onChanged;
-  final TextInputType? keyboard;
-  final String? hint;
-  final bool isError;
-
-  @override
-  State<_Field> createState() => _FieldState();
-}
-
-class _FieldState extends State<_Field> {
-  late final _controller = TextEditingController(text: widget.value);
-
-  @override
-  void didUpdateWidget(_Field old) {
-    super.didUpdateWidget(old);
-    if (widget.value != _controller.text) {
-      _controller.value = TextEditingValue(
-        text: widget.value,
-        selection: TextSelection.collapsed(offset: widget.value.length),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => TextField(
-    controller: _controller,
-    onChanged: widget.onChanged,
-    keyboardType: widget.keyboard,
-    decoration: InputDecoration(
-      labelText: widget.label,
-      border: const OutlineInputBorder(),
-      helperText: widget.isError ? null : widget.hint,
-      errorText: widget.isError ? (widget.hint ?? '') : null,
     ),
   );
 }

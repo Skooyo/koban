@@ -6,8 +6,10 @@ import 'package:koban/app/app_services.dart';
 import 'package:koban/app/routes.dart';
 import 'package:koban/data/database.dart';
 import 'package:koban/data/expense_repository.dart';
+import 'package:koban/data/undoable.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/payment/payment_view_model.dart';
+import 'package:koban/ui/kit.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../online/group_repository_test.dart' show jsonReply;
@@ -87,11 +89,15 @@ Future<String> addOne(AppServices s) async {
   return (await s.db.select(s.db.expenses).get()).single.id;
 }
 
-Future<void> tapKeys(WidgetTester tester, String keys) async {
-  for (final k in keys.split('')) {
-    await tester.tap(find.text(k));
-    await tester.pump();
-  }
+/// The amount field is the first text field on the page.
+Finder get amountField => find.byType(TextField).first;
+
+String amountText(WidgetTester tester) =>
+    tester.widget<TextField>(amountField).controller!.text;
+
+Future<void> typeAmount(WidgetTester tester, String text) async {
+  await tester.enterText(amountField, text);
+  await tester.pump();
 }
 
 bool saveOn(WidgetTester tester, String label) =>
@@ -101,32 +107,65 @@ bool saveOn(WidgetTester tester, String label) =>
     null;
 
 void main() {
-  testWidgets('a new payment opens with the number pad and Save payment off', (
+  testWidgets('a new payment opens with the keyboard and Save payment off', (
     tester,
   ) async {
     final handle = tester.ensureSemantics();
     await openSheet(tester, await testServices());
-    expect(find.text('Tap a number to change it'), findsOneWidget);
-    expect(find.text('RM 0'), findsOneWidget);
+    expect(find.text('Type the amount.'), findsOneWidget);
+    expect(find.text('RM '), findsOneWidget);
     expect(find.text('Save payment'), findsOneWidget);
     expect(saveOn(tester, 'Save payment'), false);
-    for (final k in '1234567890'.split('')) {
-      expect(find.text(k), findsOneWidget);
-    }
-    expect(find.bySemanticsLabel('Decimal point'), findsOneWidget);
-    expect(find.bySemanticsLabel('Delete digit'), findsOneWidget);
-    expect(find.bySemanticsLabel('Amount empty'), findsOneWidget);
-    await tapKeys(tester, '12.5');
-    expect(find.text('RM 12.5'), findsOneWidget);
-    expect(find.bySemanticsLabel('Amount RM 12.5'), findsOneWidget);
+    final field = tester.widget<TextField>(amountField);
+    expect(field.focusNode!.hasFocus, true);
+    expect(
+      field.keyboardType,
+      const TextInputType.numberWithOptions(decimal: true),
+    );
+    expect(find.text('7'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Amount')), findsOneWidget);
+    await typeAmount(tester, '12.5');
+    expect(find.text('Type the amount.'), findsNothing);
+    expect(amountText(tester), '12.5');
     expect(saveOn(tester, 'Save payment'), true);
     handle.dispose();
+  });
+
+  testWidgets('typing 12.5 then Save stores 12.50', (tester) async {
+    final s = await testServices();
+    await openSheet(tester, s);
+    await typeAmount(tester, '12.5');
+    await tester.tap(find.text('Save payment'));
+    await tester.pumpAndSettle();
+    expect(
+      (await s.db.select(s.db.expenses).get()).single.amount,
+      Decimal.parse('12.50'),
+    );
+  });
+
+  testWidgets('letters, a second dot and a third decimal are rejected', (
+    tester,
+  ) async {
+    await openSheet(tester, await testServices());
+    await typeAmount(tester, '12.5');
+    await typeAmount(tester, '12.5x');
+    expect(amountText(tester), '12.5');
+    await typeAmount(tester, '12.5.');
+    expect(amountText(tester), '12.5');
+    await typeAmount(tester, '12.55');
+    expect(amountText(tester), '12.55');
+    await typeAmount(tester, '12.555');
+    expect(amountText(tester), '12.55');
+    await typeAmount(tester, '1234567890');
+    expect(amountText(tester), '12.55');
+    await typeAmount(tester, '.5');
+    expect(amountText(tester), '0.5');
   });
 
   testWidgets('saving closes the sheet with Expense added', (tester) async {
     final s = await testServices();
     final opener = await openSheet(tester, s);
-    await tapKeys(tester, '8');
+    await typeAmount(tester, '8');
     await tester.tap(find.text('Save payment'));
     await tester.pumpAndSettle();
     expect(opener.closed, true);
@@ -135,48 +174,36 @@ void main() {
   });
 
   testWidgets(
-    'an edit shows Payment, the direction and date line and Save changes',
+    'an edit shows Payment, the direction and date line and Save payment',
     (tester) async {
       final s = await testServices();
       final id = await addOne(s);
       await openSheet(tester, s, expenseId: id);
       expect(find.text('Payment'), findsOneWidget);
       expect(find.text('Spent · Wed, 11 Nov, 20:15'), findsOneWidget);
-      expect(find.text('Save changes'), findsOneWidget);
-      expect(find.text('RM 15.00'), findsOneWidget);
+      expect(find.text('Save payment'), findsOneWidget);
       expect(find.text('Food & Dining'), findsOneWidget);
       expect(find.text('Kedai Contoh'), findsOneWidget);
       expect(find.byTooltip('Delete payment'), findsOneWidget);
-      expect(find.text('7'), findsNothing);
-      await tester.tap(find.text('RM 15.00'));
+      expect(amountText(tester), '15.00');
+      expect(tester.widget<TextField>(amountField).focusNode!.hasFocus, false);
+      await tester.tap(amountField);
       await tester.pumpAndSettle();
-      expect(find.text('7'), findsOneWidget);
+      expect(tester.widget<TextField>(amountField).focusNode!.hasFocus, true);
     },
   );
 
-  testWidgets('delete asks first and then closes with Payment deleted', (
-    tester,
-  ) async {
+  testWidgets('delete closes the page at once with no dialog', (tester) async {
     final s = await testServices();
     final id = await addOne(s);
     final opener = await openSheet(tester, s, expenseId: id);
     await tester.tap(find.byTooltip('Delete payment'));
     await tester.pumpAndSettle();
-    expect(find.text('Delete this payment?'), findsOneWidget);
-    expect(
-      find.text('It will no longer count in your totals.'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
     expect(find.text('Delete this payment?'), findsNothing);
-    expect(opener.closed, false);
-    await tester.tap(find.byTooltip('Delete payment'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
     expect(opener.closed, true);
-    expect((opener.result as PaymentClosed).message, 'Payment deleted');
+    final closed = opener.result as PaymentClosed;
+    expect(closed.message, 'Payment deleted: Kedai Contoh, RM 15.00');
+    expect(closed.undo, isNotNull);
     expect(
       (await s.db.select(s.db.expenses).get()).single.status,
       ExpenseStatus.dismissed,
@@ -187,14 +214,14 @@ void main() {
   testWidgets('Back with typed data asks before it discards', (tester) async {
     final s = await testServices();
     final opener = await openSheet(tester, s);
-    await tapKeys(tester, '5');
+    await typeAmount(tester, '5');
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Discard changes?'), findsOneWidget);
     await tester.tap(find.text('Keep editing'));
     await tester.pumpAndSettle();
     expect(opener.closed, false);
-    expect(find.text('RM 5'), findsOneWidget);
+    expect(amountText(tester), '5');
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Discard'));
@@ -217,7 +244,7 @@ void main() {
 
     await tester.tap(find.text('Open sheet'));
     await tester.pumpAndSettle();
-    await tapKeys(tester, '5');
+    await typeAmount(tester, '5');
     await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
     expect(find.text('Discard changes?'), findsOneWidget);
@@ -246,26 +273,39 @@ void main() {
     await tester.ensureVisible(find.text('Shop'));
     await tester.tap(find.text('Shop'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).first, 'Kedai Contoh');
+    await tester.enterText(find.byType(TextField).at(1), 'Kedai Contoh');
     await tester.pump();
     expect(find.text(hint), findsNothing);
-    await tester.tap(find.text('Uncategorized'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Transport'));
+    await tester.tap(find.text('Health'));
     await tester.pumpAndSettle();
     expect(find.text(hint), findsOneWidget);
   });
 
   testWidgets(
-    'the category sheet lists categories by name and marks the chosen one',
+    'the category chips show four, More opens the full sheet, a pick moves the chip',
     (tester) async {
       final handle = tester.ensureSemantics();
       final s = await testServices();
       final id = await addOne(s);
       await openSheet(tester, s, expenseId: id);
-      await tester.tap(find.text('Food & Dining'));
+      ChoiceChip chip(String n) =>
+          tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, n));
+      expect(find.text('Category'), findsOneWidget);
+      for (final n in [
+        'Bills & Utilities',
+        'Entertainment',
+        'Food & Dining',
+        'Health',
+      ]) {
+        expect(find.widgetWithText(ChoiceChip, n), findsOneWidget);
+      }
+      expect(find.widgetWithText(ChoiceChip, 'Transport'), findsNothing);
+      expect(chip('Food & Dining').selected, true);
+      expect(chip('Health').selected, false);
+      await tester.ensureVisible(find.text('More…'));
+      await tester.tap(find.text('More…'));
       await tester.pumpAndSettle();
-      expect(find.text('Category'), findsWidgets);
+      Finder inSheet(String n) => find.widgetWithText(KobanRow, n);
       for (final n in [
         'Uncategorized',
         'Bills & Utilities',
@@ -275,18 +315,130 @@ void main() {
         'Shopping',
         'Transport',
       ]) {
-        expect(find.text(n), findsOneWidget);
+        expect(inSheet(n), findsOneWidget);
       }
       expect(find.bySemanticsLabel(RegExp('Selected')), findsOneWidget);
-      await tester.tap(find.text('Transport'));
+      await tester.tap(inSheet('Transport'));
       await tester.pumpAndSettle();
-      expect(find.text('Transport'), findsOneWidget);
-      expect(find.text('Food & Dining'), findsNothing);
+      // The chosen category takes the last chip.
+      expect(chip('Transport').selected, true);
+      expect(find.widgetWithText(ChoiceChip, 'Health'), findsNothing);
       handle.dispose();
     },
   );
 
+  testWidgets(
+    'a new payment hints how to type the amount, then the date line',
+    (tester) async {
+      await openSheet(tester, await testServices());
+      expect(find.text('Type the amount.'), findsOneWidget);
+      await typeAmount(tester, '5');
+      expect(find.text('Type the amount.'), findsNothing);
+      expect(find.textContaining('Spent · '), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'with the keyboard up, Save payment, the amount and the chips stay usable',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 2772);
+      tester.view.devicePixelRatio = 1280 / 390;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 1000);
+      addTearDown(tester.view.reset);
+      final s = await testServices();
+      await s.expenses.addManualExpense(
+        amount: Decimal.parse('5.00'),
+        merchant: 'Grab',
+        postTime: DateTime(2026, 11, 5, 12).millisecondsSinceEpoch,
+        categoryId: 'transport',
+        notes: null,
+        type: TransactionType.withdraw,
+      );
+      await openSheet(tester, s);
+      expect(find.text('Save payment').hitTestable(), findsOneWidget);
+      expect(amountField.hitTestable(), findsOneWidget);
+      await tester.ensureVisible(find.text('Food & Dining'));
+      expect(find.text('Food & Dining').hitTestable(), findsOneWidget);
+      await typeAmount(tester, '9');
+      await tester.tap(find.text('Save payment'));
+      await tester.pumpAndSettle();
+      expect(await countExpenses(s.db), 2);
+    },
+  );
+
+  testWidgets('the Save payment label has the button text color', (
+    tester,
+  ) async {
+    await openSheet(tester, await testServices());
+    await typeAmount(tester, '5');
+    await tester.pumpAndSettle();
+    final label = find.text('Save payment');
+    final color = tester
+        .widget<RichText>(
+          find.descendant(of: label, matching: find.byType(RichText)),
+        )
+        .text
+        .style!
+        .color;
+    expect(color, Theme.of(tester.element(label)).colorScheme.onPrimary);
+  });
+
+  testWidgets('an edit shows no recent shops', (tester) async {
+    final s = await testServices();
+    final id = await addOne(s);
+    await openSheet(tester, s, expenseId: id);
+    expect(find.text('Recent shops'), findsNothing);
+  });
+
+  testWidgets(
+    'recent shops: three distinct chips, a tap fills Shop and its last category',
+    (tester) async {
+      final s = await testServices();
+      Future<void> add(String shop, String? cat, int day) =>
+          s.expenses.addManualExpense(
+            amount: Decimal.parse('5.00'),
+            merchant: shop,
+            postTime: DateTime(2026, 11, day, 12).millisecondsSinceEpoch,
+            categoryId: cat,
+            notes: null,
+            type: TransactionType.withdraw,
+          );
+      await add('Old Shop', 'other', 1);
+      await add('Grab', 'transport', 5);
+      await add('Mamak Corner', 'food', 8);
+      await add('grab', 'transport', 9);
+      await add('7-Eleven', 'shopping', 10);
+      await openSheet(tester, s);
+      expect(find.text('Recent shops'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, '7-Eleven'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, 'grab'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, 'Mamak Corner'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, 'Old Shop'), findsNothing);
+      await tester.ensureVisible(
+        find.widgetWithText(ChoiceChip, 'Mamak Corner'),
+      );
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Mamak Corner'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(find.byType(TextField).at(1)).controller!.text,
+        'Mamak Corner',
+      );
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.widgetWithText(ChoiceChip, 'Food & Dining'),
+            )
+            .selected,
+        true,
+      );
+    },
+  );
+
   testWidgets('the date picker offers no day after today', (tester) async {
+    // A tall view: the chips leave no room for the Date row on the default one.
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await openSheet(tester, await testServices());
     await tester.tap(find.text('Today'));
     await tester.pumpAndSettle();
@@ -347,7 +499,7 @@ void main() {
       expect(s.inGroups.value, true);
 
       await openSheet(tester, s);
-      await tapKeys(tester, '8');
+      await typeAmount(tester, '8');
       final row = find.text('Count in group totals');
       await tester.ensureVisible(row);
       await tester.pumpAndSettle();
@@ -377,7 +529,7 @@ void main() {
       final s = await testServices();
       final id = await addOne(s);
       await openSheet(tester, s, expenseId: id, textScale: 1.3);
-      await tester.tap(find.text('RM 15.00'));
+      await tester.tap(amountField);
       await tester.pumpAndSettle();
       expect(tester.takeException(), null);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -401,7 +553,7 @@ void main() {
   testWidgets('two fast taps on Save add one payment', (tester) async {
     final s = await testServices();
     await openSheet(tester, s);
-    await tapKeys(tester, '7');
+    await typeAmount(tester, '7');
     final save = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Save payment'),
     );
@@ -418,7 +570,7 @@ void main() {
     final gate = Completer<void>();
     final s = _GatedServices(base, gate);
     await openSheet(tester, s);
-    await tapKeys(tester, '7');
+    await typeAmount(tester, '7');
     await tester.tap(find.text('Save payment'));
     await tester.pump();
     await tester.binding.handlePopRoute();
@@ -439,8 +591,6 @@ void main() {
       final s = _GatedServices(base, gate);
       await openSheet(tester, s, expenseId: id);
       await tester.tap(find.byTooltip('Delete payment'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Delete'));
       await tester.pump();
       await tester.binding.handlePopRoute();
       await tester.pump(const Duration(milliseconds: 100));
@@ -512,7 +662,7 @@ class _GatedExpenses extends ExpenseRepository {
   }
 
   @override
-  Future<void> dismissExpense(String id) async {
+  Future<Undoable?> dismissExpense(String id) async {
     await gate.future;
     return super.dismissExpense(id);
   }

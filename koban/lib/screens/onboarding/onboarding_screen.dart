@@ -123,7 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       OnboardingStep.access => _access(context),
                       OnboardingStep.blocked => _blocked(context),
                       OnboardingStep.running => _runningStep(context, vm),
-                      OnboardingStep.ready => _ready(context),
+                      OnboardingStep.ready => _ready(context, vm),
                       OnboardingStep.apps => const <Widget>[],
                     },
                   ],
@@ -168,6 +168,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     Center(
                       child: TextButton(
                         onPressed: vm.next,
+                        child: const Text('Skip for now'),
+                      ),
+                    ),
+                  ],
+                  OnboardingStep.ready when vm.listensToNoApp => [
+                    _MainButton('Choose apps', vm.chooseApps),
+                    Center(
+                      child: TextButton(
+                        onPressed: _finish,
                         child: const Text('Skip for now'),
                       ),
                     ),
@@ -316,19 +325,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ];
   }
 
-  List<Widget> _ready(BuildContext context) => [
-    const Center(child: Mon(MonFace.happy, size: 140)),
-    Text(
-      'Koban is ready',
-      style: Theme.of(context).textTheme.headlineMedium,
-      textAlign: TextAlign.center,
-    ),
-    Text(
-      'Pay with a card or e-wallet. The payment shows up in Koban within a few seconds.',
-      style: _body(context),
-      textAlign: TextAlign.center,
-    ),
-  ];
+  List<Widget> _ready(BuildContext context, OnboardingViewModel vm) =>
+      vm.listensToNoApp
+      ? [
+          const Center(child: Mon(MonFace.idle, size: 140)),
+          Text(
+            'Koban listens to no app yet.',
+            style: Theme.of(context).textTheme.headlineMedium,
+            textAlign: TextAlign.center,
+          ),
+          Text(
+            'Choose the bank and wallet apps you pay with. Koban finds payments only in those apps.',
+            style: _body(context),
+            textAlign: TextAlign.center,
+          ),
+        ]
+      : [
+          const Center(child: Mon(MonFace.happy, size: 140)),
+          Text(
+            'Koban is ready',
+            style: Theme.of(context).textTheme.headlineMedium,
+            textAlign: TextAlign.center,
+          ),
+          Text(
+            'Pay with a card or e-wallet. The payment shows up in Koban within a few seconds.',
+            style: _body(context),
+            textAlign: TextAlign.center,
+          ),
+        ];
 }
 
 class _MainButton extends StatelessWidget {

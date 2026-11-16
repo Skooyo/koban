@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:flutter/services.dart' show TextInputFormatter;
 import 'package:material_ui/material_ui.dart';
 
 import '../../data/database.dart';
@@ -6,12 +7,27 @@ import '../../rules/amount_formatter.dart';
 import '../../rules/split_math.dart';
 import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
+import '../../ui/amount_input.dart';
 import '../../ui/date_labels.dart';
 import '../../ui/kit.dart';
+import '../../ui/undo_snack_bar.dart';
 import 'split_editor_view_model.dart';
 
 /// `RM 12.50`, grouped.
 String splitRm(Decimal amount) => 'RM ${AmountFormatter.formatGrouped(amount)}';
+
+/// The note for a linked payment that is not the receipt total, or null. The link and summary steps show it.
+String? paymentNote(SplitEditorState s) {
+  final total = SplitEditorViewModel.totalOf(s);
+  final payment = s.linkedPayment;
+  if (payment == null ||
+      total == null ||
+      payment.amount.compareTo(total) == 0) {
+    return null;
+  }
+  return 'The payment is ${splitRm(payment.amount)}, the receipt is ${splitRm(total)}. '
+      'Your share absorbs the difference.';
+}
 
 /// Selected: a primaryContainer fill with a check. Not selected: an outline.
 class _PersonChip extends StatelessWidget {
@@ -181,6 +197,14 @@ class AssignStep extends StatelessWidget {
         const _StepIntro(
           'Tap names to share each item. A shared item splits evenly.',
         ),
+        _gap,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TonalButton(
+            'Split everything evenly',
+            vm.splitEverythingEvenly,
+          ),
+        ),
         for (final row in state.items) ...[
           _gap,
           _AssignCard(
@@ -221,7 +245,7 @@ class _AssignCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: unassigned
-            ? BorderSide(color: scheme.error, width: 2)
+            ? BorderSide(color: MoneyColors.of(context).review, width: 2)
             : BorderSide.none,
       ),
       child: Padding(
@@ -249,6 +273,11 @@ class _AssignCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 _PersonChip(
+                  'Everyone',
+                  selected: row.sharedBy.length == people.length + 1,
+                  onTap: () => vm.toggleEveryone(row.key),
+                ),
+                _PersonChip(
                   'Me',
                   selected: row.sharedBy.contains(meId),
                   onTap: () => vm.toggleShare(row.key, meId),
@@ -264,8 +293,10 @@ class _AssignCard extends StatelessWidget {
             if (unassigned) ...[
               const SizedBox(height: 12),
               Text(
-                'Pick at least one person',
-                style: theme.textTheme.bodySmall!.copyWith(color: scheme.error),
+                'Pick who had this item.',
+                style: theme.textTheme.bodySmall!.copyWith(
+                  color: MoneyColors.of(context).review,
+                ),
               ),
             ],
           ],
@@ -288,10 +319,7 @@ class LinkStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final total = SplitEditorViewModel.totalOf(state);
-    final selected = state.candidates
-        .where((e) => e.id == state.selectedExpenseId)
-        .firstOrNull;
+    final note = paymentNote(state);
     final error = state.error;
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -333,15 +361,7 @@ class LinkStep extends StatelessWidget {
             ),
           ),
         ],
-        if (selected != null &&
-            total != null &&
-            selected.amount.compareTo(total) != 0) ...[
-          _gap,
-          _ReviewNote(
-            'The payment is ${splitRm(selected.amount)}, the receipt is ${splitRm(total)}. '
-            'Your share absorbs the difference.',
-          ),
-        ],
+        if (note != null) ...[_gap, _ReviewNote(note)],
       ],
     );
   }
@@ -394,41 +414,35 @@ class SummaryStep extends StatelessWidget {
   final SplitEditorViewModel vm;
   final ValueChanged<String> onShare;
 
-  Future<void> _confirmDelete(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-        title: const Text('Delete this split?'),
-        content: const Text(
-          'The bill and what people owe are removed. Your payment counts in full again.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete split'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) await vm.deleteSplit();
+  /// Deletes at once. The editor closes, and the page under it shows Undo.
+  Future<void> _delete(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final merchant = state.merchant.trim();
+    final undo = await vm.deleteSplit();
+    if (undo != null) {
+      showUndoSnackBar(
+        messenger,
+        merchant.isEmpty ? 'Split deleted' : 'Split deleted: $merchant',
+        undo: undo,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final lines = SplitEditorViewModel.summaryLines(state) ?? const [];
+    final lines = SplitEditorViewModel.shareLines(state) ?? const [];
     final total = SplitEditorViewModel.totalOf(state);
-    // The last line is always Me. Everyone before it owes the owner.
+    final amounts = state.amounts;
+    final left = SplitEditorViewModel.amountsLeft(state);
+    // The last line is always Me. Everyone before it with a share owes the owner.
     final owing = [
-      for (final l in lines.take(lines.isEmpty ? 0 : lines.length - 1)) l.$1,
+      for (final l in lines.take(lines.isEmpty ? 0 : lines.length - 1))
+        if (l.$3.sign > 0) l.$2,
     ];
     final error = state.error;
+    final note = paymentNote(state);
     final saved = state.billId != null;
     final edit = state.locked
         ? ('Change payment', vm.changePayment)
@@ -467,14 +481,47 @@ class SummaryStep extends StatelessWidget {
         _gap,
         ListGroup(
           children: [
-            for (final (name, amount) in lines)
-              KobanRow(
-                title: name,
-                leading: InitialsAvatar(name),
-                trailing: MoneyText(splitRm(amount)),
-              ),
+            for (final (id, name, amount) in lines)
+              amounts == null
+                  ? KobanRow(
+                      title: name,
+                      leading: InitialsAvatar(name),
+                      trailing: MoneyText(splitRm(amount)),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: SplitField(
+                        label: '$name (RM)',
+                        value: amounts[id] ?? '',
+                        onChanged: (v) => vm.setAmount(id, v),
+                        keyboard: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        formatters: [AmountInput.formatter],
+                      ),
+                    ),
           ],
         ),
+        if (amounts != null && total != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            left?.sign == 0
+                ? 'Amounts add up to ${splitRm(total)}'
+                : left == null
+                ? 'Type an amount for everyone'
+                : left.sign > 0
+                ? '${splitRm(left)} left to share'
+                : '${splitRm(-left)} more than the total',
+            style: theme.textTheme.bodyMedium!.copyWith(
+              color: left?.sign == 0
+                  ? scheme.onSurfaceVariant
+                  : MoneyColors.of(context).review,
+            ),
+          ),
+        ],
         if (total != null) ...[
           _gap,
           ListGroup(
@@ -489,6 +536,7 @@ class SummaryStep extends StatelessWidget {
             ],
           ),
         ],
+        if (note != null) ...[_gap, _ReviewNote(note)],
         if (error != null) ...[
           _gap,
           Text(
@@ -505,6 +553,19 @@ class SummaryStep extends StatelessWidget {
               final text = SplitEditorViewModel.shareText(state);
               if (text != null) onShare(text);
             }, icon: Icons.share),
+            // Change amounts replaces the items, so only a one-item split offers it.
+            if (!state.locked && lines.isNotEmpty && state.items.length == 1)
+              TextButton(
+                onPressed: state.saving
+                    ? null
+                    : amounts == null
+                    ? vm.changeAmounts
+                    : vm.splitAmountsEvenly,
+                style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                child: Text(
+                  amounts == null ? 'Change amounts' : 'Split evenly',
+                ),
+              ),
             if (saved)
               TextButton.icon(
                 onPressed: state.saving ? null : edit.$2,
@@ -517,7 +578,7 @@ class SummaryStep extends StatelessWidget {
         if (saved) ...[
           _gap,
           TextButton.icon(
-            onPressed: state.saving ? null : () => _confirmDelete(context),
+            onPressed: state.saving ? null : () => _delete(context),
             style: TextButton.styleFrom(
               minimumSize: const Size(double.infinity, 48),
               foregroundColor: scheme.error,
@@ -529,4 +590,64 @@ class SummaryStep extends StatelessWidget {
       ],
     );
   }
+}
+
+/// An outlined one-line text field. It shows [value] again when the state changes it.
+class SplitField extends StatefulWidget {
+  const SplitField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    this.keyboard,
+    this.hint,
+    this.isError = false,
+    this.formatters,
+  });
+
+  final String label;
+  final String value;
+  final ValueChanged<String> onChanged;
+  final TextInputType? keyboard;
+  final String? hint;
+  final bool isError;
+  final List<TextInputFormatter>? formatters;
+
+  @override
+  State<SplitField> createState() => _SplitFieldState();
+}
+
+class _SplitFieldState extends State<SplitField> {
+  late final _controller = TextEditingController(text: widget.value);
+
+  @override
+  void didUpdateWidget(SplitField old) {
+    super.didUpdateWidget(old);
+    if (widget.value != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.value,
+        selection: TextSelection.collapsed(offset: widget.value.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => TextField(
+    controller: _controller,
+    onChanged: widget.onChanged,
+    keyboardType: widget.keyboard,
+    inputFormatters: widget.formatters,
+    decoration: InputDecoration(
+      labelText: widget.label,
+      border: const OutlineInputBorder(),
+      helperText: widget.isError ? null : widget.hint,
+      errorText: widget.isError ? (widget.hint ?? '') : null,
+    ),
+  );
 }

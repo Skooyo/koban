@@ -10,6 +10,7 @@ class CategoryBreakdown {
     required this.colorHex,
     required this.total,
     required this.fraction,
+    this.count = 0,
   });
 
   final String? categoryId;
@@ -19,6 +20,9 @@ class CategoryBreakdown {
 
   /// The share of all category totals, from 0 to 1, rounded to 4 decimals.
   final double fraction;
+
+  /// How many Spent payments make up [total].
+  final int count;
 }
 
 /// The spending of one day, week or month with its newest payments.

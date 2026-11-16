@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/capture/listener_control.dart';
 import 'package:koban/screens/onboarding/onboarding_screen.dart';
+import 'package:koban/theme/mon.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -296,6 +297,68 @@ void main() {
     expect(await SharedPreferencesAsync().getBool('onboarding_done'), true);
     expect(s.settings.onboardingDone.value, true);
     expect(find.text('Koban is ready'), findsNothing);
+    expect(find.byType(NavigationBar), findsOneWidget);
+  });
+
+  /// Goes to Ready with no app chosen.
+  Future<AppServices> toReadyWithNoApp(
+    WidgetTester tester,
+    FakeChannel listener,
+  ) async {
+    final s = await pumpNewFriend(
+      tester,
+      listener: listener,
+      device: android14(),
+    );
+    await toApps(tester, listener);
+    await tester.tap(find.text('MAE'));
+    await tester.tap(find.text("Touch 'n Go"));
+    await tester.pump();
+    await tester.tap(find.text('Save without apps'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    return s;
+  }
+
+  testWidgets(
+    'Ready with no app says so and Choose apps goes back to the picker',
+    (tester) async {
+      final listener = newListener();
+      await toReadyWithNoApp(tester, listener);
+      for (final t in [
+        'Step 4 of 4 · Ready',
+        'Koban listens to no app yet.',
+        'Choose the bank and wallet apps you pay with. Koban finds payments only in those apps.',
+        'Choose apps',
+        'Skip for now',
+      ]) {
+        expect(find.text(t), findsOneWidget, reason: t);
+      }
+      expect(find.byType(Mon), findsOneWidget);
+      expect(find.text('Koban is ready'), findsNothing);
+      expect(find.text('Go to Home'), findsNothing);
+      await tester.tap(find.text('Choose apps'));
+      await tester.pumpAndSettle();
+      expect(find.text('Search apps'), findsOneWidget);
+      await tester.tap(find.text('MAE'));
+      await tester.pump();
+      await tester.tap(find.text('Save 1 app'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(find.text('Koban is ready'), findsOneWidget);
+      expect(find.text('Go to Home'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Skip for now on Ready with no app stores onboarding as done', (
+    tester,
+  ) async {
+    final s = await toReadyWithNoApp(tester, newListener());
+    await tester.tap(find.text('Skip for now'));
+    await tester.pumpAndSettle();
+    expect(s.settings.onboardingDone.value, true);
     expect(find.byType(NavigationBar), findsOneWidget);
   });
 

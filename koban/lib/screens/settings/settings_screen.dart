@@ -6,6 +6,7 @@ import '../../app/routes.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/kit.dart';
 import '../../ui/listener_status_banner.dart';
+import '../../ui/undo_snack_bar.dart';
 import 'settings_view_model.dart';
 
 /// Makes the typed text upper case.
@@ -66,6 +67,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _code.dispose();
     _parserInput.dispose();
     super.dispose();
+  }
+
+  Future<void> _deleteCategory(
+    SettingsViewModel vm,
+    String id,
+    String name,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final undo = await vm.deleteCategory(id);
+    if (undo != null) {
+      showUndoSnackBar(messenger, 'Category deleted: $name', undo: undo);
+    }
   }
 
   void _addCategory() {
@@ -133,19 +146,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             showChevron: true,
                             onTap: () => openPaymentApps(context),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      const SectionHeading('Troubleshooting'),
+                      ListGroup(
+                        children: [
                           KobanRow(
                             title: 'Notification log',
                             subtitle: vm.capturedCount > 0
-                                ? '${vm.capturedCount} notifications captured'
+                                ? '${vm.capturedCount} ${vm.capturedCount == 1 ? 'notification' : 'notifications'} captured'
                                 : 'Every notification the listener receives, with save and skip reasons',
-                            leading: const Icon(Icons.bug_report),
+                            leading: const Icon(Icons.list),
                             showChevron: true,
                             onTap: () => openNotificationLog(context),
                           ),
                           KobanRow(
-                            title: 'Reconnect listener',
+                            title: 'Restart payment tracking',
                             subtitle: reconnect == null
-                                ? 'Use this when payments stop showing up. It retries for about 60 seconds.'
+                                ? 'Use this when new payments stop showing up in Koban.'
                                 : '$reconnect If an alert appears, tap it or open notification access settings.',
                             subtitleColor: reconnect == null
                                 ? null
@@ -174,22 +193,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (vm.categories.isNotEmpty)
                         ListGroup(
                           children: [
-                            for (final c in vm.categories)
+                            if (vm.categories.any((c) => c.isDefault))
+                              KobanRow(
+                                title:
+                                    '${vm.categories.where((c) => c.isDefault).length} built-in categories',
+                                subtitle: [
+                                  for (final c in vm.categories)
+                                    if (c.isDefault) c.name,
+                                ].join(', '),
+                              ),
+                            for (final c in vm.categories.where(
+                              (c) => !c.isDefault,
+                            ))
                               KobanRow(
                                 key: ValueKey(c.id),
                                 title: c.name,
-                                subtitle: c.isDefault ? 'Built in' : 'Your own',
+                                subtitle: 'Your own',
                                 leading: CategoryDot(
                                   categoryColor(context, c.id),
                                 ),
-                                trailing: c.isDefault
-                                    ? null
-                                    : IconButton(
-                                        onPressed: () =>
-                                            vm.deleteCategory(c.id),
-                                        tooltip: 'Remove category ${c.name}',
-                                        icon: const Icon(Icons.delete),
-                                      ),
+                                trailing: IconButton(
+                                  onPressed: () =>
+                                      _deleteCategory(vm, c.id, c.name),
+                                  tooltip: 'Remove category ${c.name}',
+                                  icon: const Icon(Icons.delete),
+                                ),
                               ),
                           ],
                         ),

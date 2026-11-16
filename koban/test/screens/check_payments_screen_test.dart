@@ -1,4 +1,5 @@
 import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/app/routes.dart';
@@ -165,6 +166,53 @@ void main() {
     await endHold(tester);
     expect(await expenseShops(s), isEmpty);
     expect(await cardIds(s), hasLength(3));
+  });
+
+  testWidgets('the Save payment text has the dark text color on gold', (
+    tester,
+  ) async {
+    final s = await testServices(device: maeDevice());
+    await addCard(
+      s,
+      order: 0,
+      amount: '15.00',
+      merchant: 'RESTORAN CONTOH',
+      rawText: firstText,
+    );
+    await openCheck(tester, s);
+    final onPrimary = Theme.of(tester.element(find.text('Save payment')))
+        .colorScheme
+        .onPrimary;
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.text('Save payment'),
+    );
+    expect(paragraph.text.style!.color, onPrimary);
+  });
+
+  testWidgets('a tap on Received switches a known direction on the card', (
+    tester,
+  ) async {
+    final s = await testServices(device: maeDevice());
+    await addCard(
+      s,
+      order: 0,
+      amount: '15.00',
+      merchant: 'RESTORAN CONTOH',
+      rawText: firstText,
+    );
+    await openCheck(tester, s);
+    await tester.tap(find.text('Received'));
+    await tester.pumpAndSettle();
+    expect(find.text('Change payment'), findsNothing);
+    expect(find.text('+ RM 15.00'), findsOneWidget);
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    await endHold(tester);
+    final saved = await s.db.select(s.db.expenses).get();
+    expect(
+      [for (final e in saved) e.transactionType],
+      [TransactionType.receive],
+    );
   });
 
   testWidgets(

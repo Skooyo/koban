@@ -74,6 +74,10 @@ class ExpenseNotificationListener : NotificationListenerService() {
 
     private fun handleNotification(sbn: StatusBarNotification, event: NotificationCaptureEvent) {
         try {
+            // A repost of the same notification is already in the log.
+            if (event == NotificationCaptureEvent.POSTED &&
+                RecentNotificationsStore.hasSeen(sbn.packageName, sbn.key, sbn.postTime)
+            ) return
             val notification = sbn.notification
             if (notification == null) {
                 recordNotification(
@@ -194,10 +198,12 @@ class ExpenseNotificationListener : NotificationListenerService() {
             postTime = sbn.postTime,
             event = event,
             disposition = disposition,
-            detail = detail
+            detail = detail,
+            key = sbn.key
         )
         // Only watched apps go in the log, so other apps do not push payments out of its 200 rows.
-        if (PaymentAppsMirror.read(this)?.contains(sbn.packageName) != false) RecentNotificationsStore.add(captured)
+        // One row for each notification: a scan or a removal of a logged one adds no copy.
+        if (PaymentAppsMirror.read(this)?.contains(sbn.packageName) != false) RecentNotificationsStore.addUnlessSeen(captured)
         return captured.id
     }
 }

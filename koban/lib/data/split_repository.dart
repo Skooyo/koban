@@ -7,6 +7,7 @@ import '../rules/split_math.dart';
 import '../rules/types.dart';
 import 'database.dart';
 import 'ids.dart';
+import 'undoable.dart';
 import 'user_error.dart';
 import 'watch.dart';
 
@@ -329,21 +330,40 @@ class SplitRepository {
     if (bill != null) await _recomputeCounted(bill.id, expenseId);
   });
 
-  Future<void> deleteSplit(String billId) => _db.transaction(() async {
+  /// Deletes the split with its items, shares and debts. Undo puts every row back with its
+  /// id, and sets back what the delete changed: the counted amount of the linked payment
+  /// and of a freed repayment, and the settle suggestions it cleared. Returns null when
+  /// the split is missing.
+  Future<Undoable?> deleteSplit(String billId) => _db.transaction(() async {
     final bill = await _db.bill(billId).getSingleOrNull();
-    if (bill == null) return;
+    if (bill == null) return null;
     final debts = await _db.debts(billId).get();
+    final items = await _db.items(billId).get();
+    final shares = await _db.shares(billId).get();
     final repaymentIds = [
       for (final d in debts)
         if (d.repaymentExpenseId != null) d.repaymentExpenseId!,
     ];
+    // Only people who were active get un-archived by Undo.
+    final activeBefore = <String>{};
+    for (final id in {
+      for (final d in debts) d.personId,
+      for (final s in shares) s.personId,
+    }..remove(meId)) {
+      final person = await _db.person(id).getSingleOrNull();
+      if (person != null && !person.archived) activeBefore.add(id);
+    }
+    final suggestedBefore = <String, String?>{};
+    for (final d in debts) {
+      if (d.status != DebtStatus.open) continue;
+      suggestedBefore[d.personId] =
+          (await _db.person(d.personId).getSingleOrNull())
+              ?.suggestedSettleExpenseId;
+    }
     await _db.deleteSharesByBill(billId);
     await _db.deleteItemsByBill(billId);
     await _db.deleteDebtsByBill(billId);
-    for (final id in {
-      for (final d in debts)
-        if (d.status == DebtStatus.open) d.personId,
-    }) {
+    for (final id in suggestedBefore.keys) {
       await clearSettleSuggestion(id);
     }
     await _db.deleteBill(billId);
@@ -352,13 +372,69 @@ class SplitRepository {
     for (final id in repaymentIds) {
       if ((await _db.debtsByRepayment(id).get()).isEmpty) freed.add(id);
     }
+    final countedBefore = <String, Decimal>{};
     for (final id in {
       if (bill.linkedExpenseId != null) bill.linkedExpenseId!,
       ...freed,
     }) {
+      final counted =
+          (await _db.expenseById(id).getSingleOrNull())?.countedAmount;
+      if (counted != null) countedBefore[id] = counted;
       await _setCounted(id, null);
     }
+    return Undoable(
+      undo: () => _db.transaction(() async {
+        if (await _db.bill(billId).getSingleOrNull() != null) return;
+        final linked = bill.linkedExpenseId;
+        // Another split took the payment in the meantime: this one comes back without it.
+        final taken = linked != null && await billForExpense(linked) != null;
+        await _insertBill(
+          taken ? bill.copyWith(linkedExpenseId: const Value(null)) : bill,
+        );
+        await _db.batch((b) {
+          b.insertAll(_db.splitItems, items, mode: InsertMode.insertOrReplace);
+          b.insertAll(
+            _db.splitItemShares,
+            shares,
+            mode: InsertMode.insertOrReplace,
+          );
+          b.insertAll(_db.splitDebts, debts, mode: InsertMode.insertOrReplace);
+        });
+        // A person that was archived in the meantime has an open debt again.
+        // A person who was archived before the delete stays archived.
+        for (final id in activeBefore) {
+          final person = await _db.person(id).getSingleOrNull();
+          if (person != null && person.archived) {
+            await _upsertPerson(person.copyWith(archived: false));
+          }
+        }
+        for (final e in suggestedBefore.entries) {
+          await restoreSettleSuggestion(e.key, e.value);
+        }
+        for (final e in countedBefore.entries) {
+          final expense = await _db.expenseById(e.key).getSingleOrNull();
+          if (expense != null && expense.countedAmount == null) {
+            await _updateExpense(
+              expense.copyWith(countedAmount: Value(e.value)),
+            );
+          }
+        }
+      }),
+    );
   });
+
+  /// Sets a settle suggestion back after a delete cleared it. A newer suggestion stays.
+  Future<void> restoreSettleSuggestion(
+    String personId,
+    String? expenseId,
+  ) async {
+    if (expenseId == null) return;
+    final person = await _db.person(personId).getSingleOrNull();
+    if (person == null || person.suggestedSettleExpenseId != null) return;
+    await _upsertPerson(
+      person.copyWith(suggestedSettleExpenseId: Value(expenseId)),
+    );
+  }
 
   /// Unlinked withdrawals within 3 days of the bill: exact-amount ones first, newest first.
   Future<List<Expense>> paymentCandidates(

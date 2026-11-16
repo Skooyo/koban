@@ -35,7 +35,8 @@ totalsByCategory:
 SELECT categoryId,
 CAST(COALESCE(SUM(
     CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
-), 0) AS TEXT) MAPPED BY `const MoneyConverter()` AS total
+), 0) AS TEXT) MAPPED BY `const MoneyConverter()` AS total,
+SUM(CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE 1 END) AS spentCount
 FROM expenses
 WHERE status != 'DISMISSED'
 AND notificationPostTime >= :start AND notificationPostTime < :end
@@ -74,6 +75,14 @@ AND notificationPostTime >= :start AND notificationPostTime < :end;
 
 allCategories:
 SELECT * FROM categories ORDER BY name ASC;
+
+-- The categories of the saved payments, most used first. Check payments shows them as chips.
+mostUsedCategoryIds:
+SELECT categoryId FROM expenses
+WHERE status != 'DISMISSED' AND categoryId IS NOT NULL
+GROUP BY categoryId
+ORDER BY COUNT(*) DESC, MAX(notificationPostTime) DESC
+LIMIT :count;
 
 categoryCount:
 SELECT COUNT(*) FROM categories;

@@ -47,6 +47,10 @@ class GroupsViewModel extends ChangeNotifier {
   bool _groupExists = true;
   bool get groupExists => _groupExists;
 
+  /// True when the last read of the open group failed.
+  bool _loadFailed = false;
+  bool get loadFailed => _loadFailed;
+
   /// When [detail] loaded.
   DateTime? _loadedAt;
   DateTime? get loadedAt => _loadedAt;
@@ -126,6 +130,7 @@ class GroupsViewModel extends ChangeNotifier {
       // ponytail: RM only until the Rp account ships; then pass the Settings active account.
       _detail = await _repo.loadGroup(id, _period, 'MYR');
       _loadedAt = _s.now();
+      _loadFailed = false;
     } catch (e) {
       final unreachable =
           isNoConnection(e) &&
@@ -134,9 +139,13 @@ class GroupsViewModel extends ChangeNotifier {
         // ONLINE LOGS rule R1: the type only.
         debugPrint('Koban: group load failed (${e.runtimeType})');
       }
-      _message = unreachable
-          ? "Could not reach Koban's server. Check the internet connection."
-          : 'Could not load the group. Try again.';
+      _loadFailed = true;
+      // With no group on screen, the page shows the failure and Try again.
+      if (_detail != null) {
+        _message = unreachable
+            ? "Could not reach Koban's server. Check the internet connection."
+            : 'Could not load the group. Try again.';
+      }
     }
     _notify();
   }

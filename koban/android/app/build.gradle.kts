@@ -38,7 +38,10 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
-    buildFeatures { buildConfig = true }
+    buildFeatures {
+        buildConfig = true
+        resValues = true
+    }
     testOptions { unitTests { isIncludeAndroidResources = true } }
 
     compileOptions {
@@ -62,11 +65,14 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"https://ydrlxhqdalomlkqkdjyb.supabase.co\"")
         buildConfigField("String", "SUPABASE_KEY", "\"${escapeBuildConfig(supabaseKey)}\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"221621530092-1n4jia2b9v4ctjue56d1gilej11q9l8h.apps.googleusercontent.com\"")
+        resValue("string", "app_name", "Koban")
     }
 
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            // The launcher shows which Koban is the test build.
+            resValue("string", "app_name", "Koban (Debug)")
         }
         release {
             // Milestone 6: sign with the release key from ~/.koban, never the debug key.

@@ -83,6 +83,8 @@ flutter:
     - family: Bricolage
       fonts:
         - asset: assets/fonts/BricolageGrotesque.ttf
+          # The default instance is weight 800; this stops a fake bold on top of it.
+          weight: 800
 
   # To add assets to your application, add an assets section, like this:
   # assets:

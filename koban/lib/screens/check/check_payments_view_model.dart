@@ -8,6 +8,7 @@ import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../data/payment_checks.dart';
 import '../../rules/amount_formatter.dart';
+import '../../ui/category_chips.dart';
 
 /// One card on the swipe screen. [categoryId] is the card's own category, or else the shop memory.
 class CheckCard {
@@ -32,6 +33,12 @@ class CheckPaymentsViewModel extends ChangeNotifier {
         _s.categories.watchAll().listen((list) {
           _categories = list;
           _build();
+        }),
+      )
+      ..add(
+        _s.categories.watchMostUsedIds(chipCount).listen((ids) {
+          _mostUsed = ids;
+          notifyListeners();
         }),
       )
       ..add(
@@ -75,6 +82,13 @@ class CheckPaymentsViewModel extends ChangeNotifier {
   String? get undoLabel => _undoLabel;
 
   List<Category> get categories => _categories ?? const [];
+
+  /// How many most used categories the sheet shows.
+  static const chipCount = categoryChipCount;
+  List<String> _mostUsed = const [];
+
+  /// The most used category ids, for the top of the category sheet.
+  List<String> get mostUsedIds => _mostUsed;
 
   /// The messages for a snackbar.
   Stream<String> get messages => _s.paymentChecks.results

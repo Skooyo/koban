@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../app/app_services.dart';
 import '../../data/legacy_import.dart';
 import '../../data/summaries.dart';
 import '../../rules/periods.dart';
+import '../../rules/types.dart';
+import '../../ui/alerts_off_row.dart';
 
 /// The state of the Home tab: the access status, the 3 period summaries and the category names.
 class HomeViewModel extends ChangeNotifier {
@@ -18,8 +21,14 @@ class HomeViewModel extends ChangeNotifier {
       }),
     );
     _subs.add(
-      _s.paymentChecks.watchVisibleCount().listen((v) {
-        _waitingCount = v;
+      _s.paymentChecks.watchVisible().listen((v) {
+        _waitingCount = v.length;
+        _waitingSpent = [
+          for (final p in v)
+            if (p.transactionType == TransactionType.withdraw &&
+                !p.directionUnclear)
+              p.amount,
+        ].fold(Decimal.zero, (a, b) => a + b);
         notifyListeners();
       }),
     );
@@ -47,8 +56,14 @@ class HomeViewModel extends ChangeNotifier {
   Map<String, String> _categoryNames = const {};
   bool _hasAnyPayment = true;
   int _waitingCount = 0;
+  Decimal _waitingSpent = Decimal.zero;
+
+  bool _alertsOff = false;
 
   bool get isAccessGranted => _isAccessGranted;
+
+  /// True when Android blocks Koban's own notifications.
+  bool get alertsOff => _alertsOff;
   PeriodSummary? get today => _today;
   PeriodSummary? get week => _week;
   PeriodSummary? get month => _month;
@@ -56,6 +71,9 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Waiting payments. Home shows a row when there is one or more.
   int get waitingCount => _waitingCount;
+
+  /// The sum of the waiting payments that are Spent. Zero when none is known to be Spent.
+  Decimal get waitingSpent => _waitingSpent;
 
   /// True when the owner chose the payment apps and chose none.
   bool get listensToNoApp =>
@@ -100,9 +118,17 @@ class HomeViewModel extends ChangeNotifier {
     // The day moves first: a failed platform call must not freeze it.
     if (_dayStamp() != _day) _watchPeriods();
     final granted = await _s.listener.isAccessGranted();
+    final alertsOff = await alertsBlocked(_s.device);
     if (_disposed) return;
     _isAccessGranted = granted;
+    _alertsOff = alertsOff;
     notifyListeners();
+  }
+
+  /// Asks for the notification permission, then reads it again.
+  Future<void> askForAlerts() async {
+    await turnOnAlerts(_s.device);
+    await refresh();
   }
 
   /// Points the Activity tab at the current month, with the current week when [withWeek].

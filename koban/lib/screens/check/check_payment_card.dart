@@ -10,6 +10,7 @@ import '../../app/app_services.dart';
 import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../rules/amount_formatter.dart';
+import '../../rules/top_up.dart';
 import '../../rules/types.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/amount_input.dart';
@@ -27,7 +28,7 @@ String _timeText(BuildContext context, int ms) =>
     );
 
 /// One waiting payment. [stamp] gives the drag as -1 (full "Not a payment") to 1 (full "Save").
-/// [onEdit] and [onChooseDirection] are null on the cards under the top one.
+/// The callbacks are null on the cards under the top one.
 class CheckPaymentCard extends StatelessWidget {
   const CheckPaymentCard({
     super.key,
@@ -35,12 +36,14 @@ class CheckPaymentCard extends StatelessWidget {
     this.stamp,
     this.onEdit,
     this.onChooseDirection,
+    this.onPickCategory,
   });
 
   final CheckCard card;
   final ValueListenable<double>? stamp;
   final VoidCallback? onEdit;
   final ValueChanged<TransactionType>? onChooseDirection;
+  final VoidCallback? onPickCategory;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +65,8 @@ class CheckPaymentCard extends StatelessWidget {
       color: received ? money.received : scheme.onSurface,
     );
     final stamp = this.stamp;
+    final topUp = looksLikeTopUp(payment.rawNotificationText);
+    final guessed = payment.format == CaptureFormat.unknown && !topUp;
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: ColoredBox(
@@ -88,11 +93,23 @@ class CheckPaymentCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (payment.format == CaptureFormat.unknown)
-                          _Tag('Unknown format', money.review),
                       ],
                     ),
                   ),
+                  if (topUp)
+                    _Note(
+                      icon: Icons.swap_horiz,
+                      color: scheme.primary,
+                      text: 'Looks like a wallet top-up, so usually not a payment.',
+                    )
+                  else if (guessed)
+                    _Note(
+                      icon: Icons.help_outline,
+                      color: money.review,
+                      text:
+                          'Koban did not know this message, so it guessed the shop '
+                          'and Spent or Received. Check them before you save.',
+                    ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: onEdit == null
@@ -119,10 +136,9 @@ class CheckPaymentCard extends StatelessWidget {
                       selected: payment.directionUnclear
                           ? null
                           : payment.transactionType,
-                      onPick: payment.directionUnclear
-                          ? onChooseDirection
-                          : null,
-                      onTapWhenFixed: onEdit,
+                      // A tap switches Spent or Received on the card, also when the
+                      // direction is known (owner decision; 0.1.1 opened the sheet).
+                      onPick: onChooseDirection,
                     ),
                   ),
                   if (payment.directionUnclear)
@@ -137,18 +153,8 @@ class CheckPaymentCard extends StatelessWidget {
                     children: [
                       KobanRow(
                         title: payment.merchant ?? 'Not set',
-                        subtitle: 'Shop',
-                        showChevron: true,
-                        onTap: onEdit,
-                        onTapLabel: 'Change payment',
-                      ),
-                      KobanRow(
-                        title: card.categoryName,
-                        subtitle: 'Category',
-                        leading: CategoryDot(
-                          categoryColor(context, card.categoryId),
-                          size: 12,
-                        ),
+                        subtitle: guessed ? 'Shop · guessed' : 'Shop',
+                        subtitleColor: guessed ? money.review : null,
                         showChevron: true,
                         onTap: onEdit,
                         onTapLabel: 'Change payment',
@@ -161,24 +167,29 @@ class CheckPaymentCard extends StatelessWidget {
                         onTap: onEdit,
                         onTapLabel: 'Change payment',
                       ),
+                      KobanRow(
+                        title: card.categoryId == null
+                            ? 'Not set'
+                            : card.categoryName,
+                        subtitle: card.categoryId == null
+                            ? 'Category · tap to pick'
+                            : 'Category',
+                        subtitleColor: card.categoryId == null
+                            ? money.review
+                            : null,
+                        leading: CategoryDot(
+                          categoryColor(context, card.categoryId),
+                          size: 12,
+                        ),
+                        showChevron: true,
+                        onTap: onPickCategory,
+                        onTapLabel: 'Change category',
+                      ),
                     ],
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '“${payment.rawNotificationText}”',
-                        style: text.bodyMedium!.copyWith(color: muted),
-                      ),
-                    ),
+                    child: _RawText('“${payment.rawNotificationText}”'),
                   ),
                 ],
               ),
@@ -215,24 +226,98 @@ class CheckPaymentCard extends StatelessWidget {
   }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag(this.text, this.color);
+/// A short note on the card with an icon in [color].
+class _Note extends StatelessWidget {
+  const _Note({required this.icon, required this.color, required this.text});
 
-  final String text;
+  final IconData icon;
   final Color color;
+  final String text;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: ShapeDecoration(
-      shape: const StadiumBorder(),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    ),
-    child: Text(
-      text,
-      style: Theme.of(context).textTheme.labelLarge!.copyWith(color: color),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 10,
+        children: [
+          Icon(icon, size: 20, color: color),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+        ],
+      ),
     ),
   );
+}
+
+/// The notification text in one line, with "Show full text" when it is longer.
+class _RawText extends StatefulWidget {
+  const _RawText(this.text);
+
+  final String text;
+
+  @override
+  State<_RawText> createState() => _RawTextState();
+}
+
+class _RawTextState extends State<_RawText> {
+  static const _pad = 12.0;
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodyMedium!.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    return LayoutBuilder(
+      builder: (context, box) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          maxLines: 1,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: box.maxWidth - 2 * _pad);
+        final long = painter.didExceedMaxLines;
+        painter.dispose();
+        final folded = long && !_open;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: _pad,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                widget.text,
+                style: style,
+                maxLines: folded ? 1 : null,
+                overflow: folded ? TextOverflow.ellipsis : null,
+              ),
+            ),
+            if (long)
+              TextButton(
+                onPressed: () => setState(() => _open = !_open),
+                child: Text(_open ? 'Show less' : 'Show full text'),
+              ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 /// A stamp at an angle. It shows only while the drag goes in its direction ([sign]).
@@ -297,8 +382,14 @@ Future<void> showEditPaymentSheet(
   final localizations = MaterialLocalizations.of(context);
   return navigator.push(
     _EditSheetRoute(
-      builder: (_) =>
-          EditPaymentSheet(card: card, categories: categories, onSave: onSave),
+      builder: (_) => SafeArea(
+        top: false,
+        child: EditPaymentSheet(
+          card: card,
+          categories: categories,
+          onSave: onSave,
+        ),
+      ),
       capturedThemes: InheritedTheme.capture(
         from: context,
         to: navigator.context,
@@ -517,10 +608,7 @@ class _EditPaymentSheetState extends State<EditPaymentSheet> {
               height: 56,
               child: FilledButton(
                 onPressed: amount == null ? null : () => _save(amount),
-                child: Text(
-                  'Save changes',
-                  style: weighted(theme.textTheme.titleMedium!, 700),
-                ),
+                child: const Text('Save changes'),
               ),
             ),
           ),

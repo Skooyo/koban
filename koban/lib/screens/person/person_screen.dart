@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -8,10 +9,14 @@ import '../../data/database.dart';
 import '../../data/people_repository.dart';
 import '../../data/qr_store.dart';
 import '../../data/split_repository.dart';
+import '../../rules/amount_formatter.dart';
 import '../../rules/people_math.dart';
 import '../../theme/koban_theme.dart';
+import '../../ui/date_labels.dart';
 import '../../ui/kit.dart';
 import '../../ui/money.dart';
+import '../../ui/sheets.dart';
+import '../../ui/undo_snack_bar.dart';
 import 'person_dialogs.dart';
 import 'person_view_model.dart';
 
@@ -29,6 +34,8 @@ class PersonScreen extends StatefulWidget {
 class PersonScreenState extends State<PersonScreen> {
   PersonViewModel? _vm;
   StreamSubscription<String>? _messages;
+  // Read early: a delete that closes this page still shows its snackbar.
+  late ScaffoldMessengerState _messenger;
   bool _closing = false;
   bool _asking = false;
 
@@ -39,10 +46,13 @@ class PersonScreenState extends State<PersonScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _messenger = ScaffoldMessenger.of(context);
     if (_vm == null) {
       final vm = _vm = PersonViewModel(AppScope.of(context), widget.personId)
         ..addListener(_onChange);
       _messages = vm.messages.listen(_showMessage);
+      vm.onUndo = (message, undo) =>
+          showUndoSnackBar(_messenger, message, undo: undo);
     }
   }
 
@@ -100,11 +110,7 @@ class PersonScreenState extends State<PersonScreen> {
   Future<void> _rename(String name) =>
       _ask(() => showRenameDialog(context, name: name, onSave: _vm!.rename));
 
-  Future<void> _delete(String name) async {
-    if (await _ask(() => showDeletePersonDialog(context, name)) == true) {
-      _vm!.delete();
-    }
-  }
+  void _delete(String name) => _vm!.delete('$name deleted');
 
   Future<void> _settleUp(PersonDetail d) async {
     final ok = await _ask(
@@ -151,14 +157,11 @@ class PersonScreenState extends State<PersonScreen> {
             vm.updateOwedToMe(view.debt.id, description, amount, itemDate),
       ),
     );
-    if (result != OwedItemResult.delete || !mounted) return;
-    final ok = await _ask(
-      () => showDeleteOwedItemDialog(
-        context,
-        'This removes what $name owes you for it.',
-      ),
+    if (result != OwedItemResult.delete) return;
+    vm.deleteOwedToMe(
+      view.debt.id,
+      'Item deleted: ${view.billMerchant ?? name}, ${rm(view.debt.amount)}',
     );
-    if (ok == true) vm.deleteOwedToMe(view.debt.id);
   }
 
   Future<void> _editItem(OwedItem item) async {
@@ -180,14 +183,11 @@ class PersonScreenState extends State<PersonScreen> {
         ),
       ),
     );
-    if (result != OwedItemResult.delete || !mounted) return;
-    final ok = await _ask(
-      () => showDeleteOwedItemDialog(
-        context,
-        'This removes what you owe for it.',
-      ),
+    if (result != OwedItemResult.delete) return;
+    vm.deleteItem(
+      item.id,
+      'Item deleted: ${item.description}, ${rm(item.amount)}',
     );
-    if (ok == true) vm.deleteItem(item.id);
   }
 
   @override
@@ -265,37 +265,12 @@ class PersonScreenState extends State<PersonScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
-        Center(
-          child: _QrFrame(
-            name: name,
-            path: qrPath,
-            version: vm.qrVersion,
-            onTap: vm.pickQr,
-          ),
-        ),
-        if (qrPath != null) ...[
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: TonalButton(
-              'Save QR to gallery',
-              vm.saveQrToGallery,
-              icon: Icons.download,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Then open your bank app and pick it from the gallery',
-            style: Theme.of(context).textTheme.bodySmall!.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-        const SizedBox(height: 16),
-        _Headline(
+        _BalanceCard(
           name: name,
           balance: d.balance,
+          bills: d.balance is YouPay ? d.iOwe.length : d.owedToMe.length,
+          oldest: _oldest(d),
+          onRemind: () => _remind(d),
           onSettleUp: () => _settleUp(d),
         ),
         if (d.settleSuggestion case final receive?) ...[
@@ -343,9 +318,94 @@ class PersonScreenState extends State<PersonScreen> {
             ],
           ),
         _AddButton('Add what I owe', _addItem),
+        const SizedBox(height: 16),
+        ListGroup(
+          children: [
+            KobanRow(
+              title: "$name's payment QR",
+              subtitle: qrPath == null ? 'Not added yet. Tap to add it.' : null,
+              leading: const Icon(Icons.qr_code_2),
+              showChevron: true,
+              onTap: qrPath == null
+                  ? vm.pickQr
+                  : () => _showQr(vm, name, qrPath),
+              onTapLabel: qrPath == null ? 'Add QR' : 'Open QR',
+            ),
+          ],
+        ),
       ],
     );
   }
+
+  /// The oldest date among the open bills of the side that the balance card counts.
+  int? _oldest(PersonDetail d) {
+    final times = d.balance is YouPay
+        ? [for (final i in d.iOwe) i.itemDate]
+        : [for (final v in d.owedToMe) v.billTime];
+    return times.isEmpty ? null : times.reduce((a, b) => a < b ? a : b);
+  }
+
+  Future<void> _remind(PersonDetail d) async {
+    final balance = d.balance;
+    if (balance is! PaysYou) return;
+    final n = d.owedToMe.length;
+    try {
+      await AppScope.of(context).device.shareText(
+        'Hi ${d.person.name}, you owe me RM '
+        '${AmountFormatter.formatGrouped(balance.amount)} for '
+        '$n ${n == 1 ? 'bill' : 'bills'} (Koban).',
+        chooserTitle: 'Send reminder',
+      );
+    } catch (e, s) {
+      developer.log(
+        'Send reminder failed',
+        name: 'PersonScreen',
+        error: e,
+        stackTrace: s,
+      );
+    }
+  }
+
+  /// The QR big, with Save QR to gallery. A tap on the QR itself replaces it.
+  Future<void> _showQr(PersonViewModel vm, String name, String path) =>
+      showKobanSheet<void>(
+        context: context,
+        builder: (context) => ListenableBuilder(
+          listenable: vm,
+          builder: (context, _) => Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: _QrFrame(
+                      name: name,
+                      path: path,
+                      version: vm.qrVersion,
+                      onTap: vm.pickQr,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TonalButton(
+                    'Save QR to gallery',
+                    vm.saveQrToGallery,
+                    icon: Icons.download,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Then open your bank app and pick it from the gallery',
+                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 /// The QR on a white box with a gold frame. A tap adds or replaces it.
@@ -427,57 +487,90 @@ class _QrFrame extends StatelessWidget {
   }
 }
 
-class _Headline extends StatelessWidget {
-  const _Headline({
+/// The balance first: who owes whom, the amount, and the one or two actions.
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({
     required this.name,
     required this.balance,
+    required this.bills,
+    required this.oldest,
+    required this.onRemind,
     required this.onSettleUp,
   });
 
   final String name;
   final Balance balance;
+  final int bills;
+  final int? oldest;
+  final VoidCallback onRemind;
   final VoidCallback onSettleUp;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final money = MoneyColors.of(context);
-    final headline = PeopleMath.headline(name, balance);
-    final amountColor = switch (balance) {
-      YouPay() => money.goldText,
-      PaysYou() => money.received,
-      _ => null,
+    final scheme = theme.colorScheme;
+    final muted = theme.textTheme.bodyMedium!.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    final (label, amount) = switch (balance) {
+      PaysYou(:final amount) => ('$name owes you', amount),
+      YouPay(:final amount) => ('You owe $name', amount),
+      _ => (PeopleMath.headline(name, balance), null),
     };
-    // Only the amount at the end of the line ("… RM 5.31") gets the color.
-    final cut = headline.lastIndexOf('RM ');
-    final text = amountColor != null && cut >= 0
-        ? TextSpan(
-            children: [
-              TextSpan(text: headline.substring(0, cut)),
-              TextSpan(
-                text: headline.substring(cut),
-                style: TextStyle(color: amountColor),
-              ),
-            ],
-          )
-        : TextSpan(text: headline);
+    final oldest = this.oldest;
+    final now = AppScope.of(context).now();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
+        color: scheme.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 12,
+        spacing: 8,
         children: [
-          Text.rich(text, style: weighted(theme.textTheme.titleLarge!, 700)),
-          if (balance is! AllPaid)
-            FilledButton(
-              onPressed: onSettleUp,
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-              child: Text('Settle up', style: theme.textTheme.labelLarge),
+          Text(
+            label,
+            style: amount == null
+                ? weighted(theme.textTheme.titleLarge!, 700)
+                : muted,
+          ),
+          if (amount != null) ...[
+            MoneyText(
+              balance is PaysYou ? '+ ${rm(amount)}' : rm(amount),
+              style: theme.textTheme.displayMedium,
+              color: balance is PaysYou
+                  ? MoneyColors.of(context).received
+                  : scheme.onSurface,
             ),
+            if (oldest != null)
+              Text(
+                'From $bills split ${bills == 1 ? 'bill' : 'bills'}. '
+                'Oldest: ${dateLabel(oldest, now)}.',
+                style: muted,
+              ),
+          ],
+          if (balance is! AllPaid) ...[
+            const SizedBox(height: 4),
+            if (balance is PaysYou) ...[
+              FilledButton.icon(
+                onPressed: onRemind,
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+                icon: const Icon(Icons.share, size: 18),
+                label: const Text('Send reminder'),
+              ),
+              OutlinedButton(
+                onPressed: onSettleUp,
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                child: const Text('Settle up'),
+              ),
+            ] else
+              FilledButton(
+                onPressed: onSettleUp,
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+                child: const Text('Settle up'),
+              ),
+          ],
         ],
       ),
     );
@@ -667,7 +760,7 @@ class _ItemRow extends StatelessWidget {
         trailing: MoneyAmount(
           amount: item.amount,
           style: Theme.of(context).textTheme.titleMedium!,
-          color: MoneyColors.of(context).goldText,
+          color: Theme.of(context).colorScheme.onSurface,
         ),
         onTap: onEdit,
         onTapLabel: 'Edit',
