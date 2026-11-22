@@ -103,8 +103,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 112),
                     children: [
+                      // The 0.1.1 data did not move and is safe.
                       if (vm.importFailed) ...[
-                        const _ImportFailedRow(),
+                        const WarningRow(importFailedMessage),
+                        const SizedBox(height: 12),
+                      ],
+                      if (vm.loadError case final error?) ...[
+                        WarningRow(error),
                         const SizedBox(height: 12),
                       ],
                       ListenerStatusBanner(
@@ -222,24 +227,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         );
       },
-    );
-  }
-}
-
-/// The row that says the 0.1.1 data did not move and is safe.
-class _ImportFailedRow extends StatelessWidget {
-  const _ImportFailedRow();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return ListGroup(
-      children: [
-        KobanRow(
-          title: importFailedMessage,
-          leading: Icon(Icons.warning, color: scheme.error),
-        ),
-      ],
     );
   }
 }

@@ -71,44 +71,49 @@ void main() {
     expect(vm.week!.total, Decimal.parse('12.5'));
   });
 
-  test('a new day moves on even when the access check throws', () async {
-    var time = DateTime(2026, 11, 13, 12);
-    final s = await testServices();
-    final moving = AppServices(
-      db: s.db,
-      settings: s.settings,
-      importResult: s.importResult,
-      listener: s.listener,
-      paymentApps: s.paymentApps,
-      captureHost: s.captureHost,
-      device: s.device,
-      online: s.online,
-      now: () => time,
-    );
-    await pay(moving, '12.50', DateTime(2026, 11, 13, 9));
-    final vm = HomeViewModel(moving);
-    addTearDown(vm.dispose);
-    await vm.refresh();
-    await settle();
-    expect(vm.today!.total, Decimal.parse('12.5'));
+  test(
+    'a new day moves on and refresh ends when the access check throws',
+    () async {
+      var time = DateTime(2026, 11, 13, 12);
+      final s = await testServices();
+      final moving = AppServices(
+        db: s.db,
+        settings: s.settings,
+        importResult: s.importResult,
+        listener: s.listener,
+        paymentApps: s.paymentApps,
+        captureHost: s.captureHost,
+        device: s.device,
+        online: s.online,
+        now: () => time,
+      );
+      await pay(moving, '12.50', DateTime(2026, 11, 13, 9));
+      final vm = HomeViewModel(moving);
+      addTearDown(vm.dispose);
+      await vm.refresh();
+      await settle();
+      expect(vm.today!.total, Decimal.parse('12.5'));
 
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(
-      const MethodChannel(ListenerControl.channelName),
-      (call) async => throw PlatformException(code: 'boom'),
-    );
-    addTearDown(
-      () => messenger.setMockMethodCallHandler(
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
         const MethodChannel(ListenerControl.channelName),
-        null,
-      ),
-    );
-    time = DateTime(2026, 11, 14, 0, 1);
-    await expectLater(vm.refresh(), throwsA(isA<PlatformException>()));
-    await settle();
-    expect(vm.today!.total, Decimal.zero);
-  });
+        (call) async => throw PlatformException(code: 'boom'),
+      );
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(
+          const MethodChannel(ListenerControl.channelName),
+          null,
+        ),
+      );
+      time = DateTime(2026, 11, 14, 0, 1);
+      // The screen calls refresh without a wait, so a platform error must stay inside.
+      await vm.refresh();
+      await settle();
+      expect(vm.today!.total, Decimal.zero);
+      expect(vm.isAccessGranted, true);
+    },
+  );
 
   test(
     'select activity with the week shows this month and this week',

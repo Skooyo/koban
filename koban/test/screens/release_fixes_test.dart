@@ -4,14 +4,20 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/app/koban_app.dart';
 import 'package:koban/app/routes.dart';
+import 'package:koban/data/user_error.dart';
+import 'package:koban/main.dart' show appRoot, startFailedMessage;
 import 'package:koban/screens/payment/category_sheet.dart';
 import 'package:koban/theme/koban_theme.dart';
 import 'package:koban/ui/undo_snack_bar.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
+import 'activity_screen_test.dart' show inActivity, pumpActivity;
+import 'check_payments_screen_test.dart' show openCheck;
 import 'home_screen_test.dart' show pumpHome;
+import 'payment_screen_test.dart' show addOne, openSheet;
 import 'person_screen_test.dart' show settle;
+import 'settings_test.dart' show pumpSettings;
 
 void main() {
   testWidgets('the system bars follow the theme and the app sets them', (
@@ -160,5 +166,56 @@ void main() {
     );
     expect(bar.overlaps(fab), isFalse, reason: 'snackbar $bar, button $fab');
     await tester.pump(const Duration(seconds: 6));
+  });
+
+  // Milestone 6: a failed start or a failed first load shows a text, not a blank screen.
+
+  testWidgets('a failed start shows one line, not the splash', (tester) async {
+    await tester.pumpWidget(
+      await appRoot(() async => throw StateError('test-start-failure')),
+    );
+    expect(find.text(startFailedMessage), findsOneWidget);
+  });
+
+  testWidgets('Home says when its data cannot load', (tester) async {
+    final s = await testServices();
+    await s.db.customStatement('DROP TABLE expenses');
+    await pumpHome(tester, s);
+    expect(find.text(loadFailedMessage), findsOneWidget);
+  });
+
+  testWidgets('Activity says when its data cannot load', (tester) async {
+    final s = await testServices();
+    await s.db.customStatement('DROP TABLE expenses');
+    await pumpActivity(tester, s);
+    expect(inActivity(find.text(loadFailedMessage)), findsOneWidget);
+  });
+
+  testWidgets('Check payments says when its data cannot load', (tester) async {
+    final s = await testServices();
+    await s.db.customStatement('DROP TABLE pending_payments');
+    await openCheck(tester, s);
+    expect(find.text(loadFailedMessage), findsOneWidget);
+    expect(find.text('All checked'), findsNothing);
+  });
+
+  testWidgets('an edited payment that cannot load shows the text and Close', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final id = await addOne(s);
+    await s.db.customStatement('DROP TABLE expenses');
+    final opener = await openSheet(tester, s, expenseId: id);
+    expect(find.text(loadFailedMessage), findsOneWidget);
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(opener.closed, true);
+  });
+
+  testWidgets('Settings says when its categories cannot load', (tester) async {
+    final s = await testServices();
+    await s.db.customStatement('DROP TABLE categories');
+    await pumpSettings(tester, s);
+    expect(find.text(loadFailedMessage), findsOneWidget);
   });
 }

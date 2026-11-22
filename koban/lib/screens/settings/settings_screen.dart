@@ -127,6 +127,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      if (vm.loadError case final error?) ...[
+                        WarningRow(error),
+                        const SizedBox(height: 8),
+                      ],
                       const SectionHeading('Tracking'),
                       ListenerStatusBanner(
                         isAccessGranted: vm.isAccessGranted,

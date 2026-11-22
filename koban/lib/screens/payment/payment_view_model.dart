@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show ChangeNotifier, immutable;
 import '../../app/app_services.dart';
 import '../../data/database.dart';
 import '../../data/undoable.dart';
+import '../../data/user_error.dart';
 import '../../rules/types.dart';
 import '../../ui/amount_input.dart';
 import '../../ui/category_chips.dart';
@@ -129,23 +130,23 @@ final class PaymentOpenSplit extends PaymentResult {
 }
 
 /// The state and the rules of the payment page: add a payment, or edit one.
-class PaymentViewModel extends ChangeNotifier {
+class PaymentViewModel extends ChangeNotifier with LoadErrors {
   PaymentViewModel(this._s, {String? expenseId}) : _expenseId = expenseId {
     _categorySub = _s.categories.watchAll().listen((list) {
       _categories = list;
       notifyListeners();
-    });
+    }, onError: onLoadError);
     _mostUsedSub = _s.categories.watchMostUsedIds(categoryChipCount).listen((
       ids,
     ) {
       _mostUsed = ids;
       notifyListeners();
-    });
+    }, onError: onLoadError);
     // ponytail: reads every saved payment to find 3 shops. Fine for a personal log.
     _recentSub = _s.expenses.watchAllActive().listen((list) {
       _recentShops = _recentShopsOf(list);
       notifyListeners();
-    });
+    }, onError: onLoadError);
     if (expenseId == null) {
       _setLoaded(
         PaymentForm(
@@ -217,7 +218,13 @@ class PaymentViewModel extends ChangeNotifier {
   }
 
   Future<void> _load(String id) async {
-    final e = await _s.expenses.getById(id);
+    final Expense? e;
+    try {
+      e = await _s.expenses.getById(id);
+    } catch (error, stack) {
+      if (!_disposed) onLoadError(error, stack);
+      return;
+    }
     if (_disposed) return;
     if (e == null) {
       _closeNow = const PaymentClosed(null);

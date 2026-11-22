@@ -8,6 +8,7 @@ import '../../data/activity_selection.dart';
 import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../data/summaries.dart';
+import '../../data/user_error.dart';
 import '../../rules/periods.dart';
 import '../../rules/types.dart';
 import '../../ui/category_donut.dart';
@@ -118,7 +119,7 @@ const _forever = 0x7fffffffffffffff;
 
 /// The state of the Activity tab. A port of `ActivityViewModel.kt`.
 /// The month, the week, the category filter and the All view live in [ActivitySelection].
-class ActivityViewModel extends ChangeNotifier {
+class ActivityViewModel extends ChangeNotifier with LoadErrors {
   ActivityViewModel(this._s) {
     _watched = _s.activitySelection.value;
     _s.activitySelection.addListener(_onSelection);
@@ -128,21 +129,21 @@ class ActivityViewModel extends ChangeNotifier {
       _s.categories.watchAll().listen((list) {
         _categories = list;
         notifyListeners();
-      }),
+      }, onError: onLoadError),
     );
     _subs.add(
       _s.expenses.watchMonthlySummaries().listen((list) {
         _monthly = list;
         _rebuildAll();
         notifyListeners();
-      }),
+      }, onError: onLoadError),
     );
     _subs.add(
       _s.expenses.watchAllActive().listen((list) {
         _allActive = list;
         _rebuildAll();
         notifyListeners();
-      }),
+      }, onError: onLoadError),
     );
   }
 
@@ -329,11 +330,11 @@ class ActivityViewModel extends ChangeNotifier {
       e.watchTotalForRange(listStart, listEnd).listen((v) {
         total = v;
         emit();
-      }),
+      }, onError: onLoadError),
       e.watchReceivedForRange(listStart, listEnd).listen((v) {
         received = v;
         emit();
-      }),
+      }, onError: onLoadError),
       e
           .watchInRange(spanStart, spanEnd)
           .asyncMap((list) async {
@@ -351,11 +352,11 @@ class ActivityViewModel extends ChangeNotifier {
           .listen((v) {
             span = v;
             emit();
-          }),
+          }, onError: onLoadError),
       e.watchCategoryBreakdown(listStart, listEnd).listen((v) {
         breakdown = v;
         emit();
-      }),
+      }, onError: onLoadError),
     ];
   }
 
@@ -365,11 +366,11 @@ class ActivityViewModel extends ChangeNotifier {
       e.watchTotalForRange(0, _forever).listen((v) {
         _allTimeTotal = v;
         notifyListeners();
-      }),
+      }, onError: onLoadError),
       e.watchCategoryBreakdown(0, _forever).listen((v) {
         _allTimeBreakdown = v;
         notifyListeners();
-      }),
+      }, onError: onLoadError),
     ];
   }
 

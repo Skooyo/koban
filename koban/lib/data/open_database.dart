@@ -81,9 +81,10 @@ Future<ImportResult> openAndImport({
     result = await runImport();
     try {
       await secrets.migrate(settings);
-    } catch (e, s) {
+    } catch (e) {
       // The copy comes before the removal, so no value is lost. The next open tries again.
-      debugPrint('Koban: ${describeError(e)}\n$s');
+      // The log has the error type only: no path and no value.
+      debugPrint('Koban: secrets move failed (${e.runtimeType})');
     }
   } finally {
     await host.releaseImportGate();
@@ -102,13 +103,13 @@ Future<ImportResult> openAndImport({
         '',
       );
     } catch (e) {
-      debugPrint('Koban: ${describeError(e)}');
+      debugPrint('Koban: ${e.runtimeType}');
     }
   }
   try {
     await paymentApps.syncToNative();
   } catch (e) {
-    debugPrint('Koban: ${describeError(e)}');
+    debugPrint('Koban: ${e.runtimeType}');
   }
   return result;
 }

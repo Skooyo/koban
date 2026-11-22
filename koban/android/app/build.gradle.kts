@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -33,6 +35,27 @@ if (supabaseKey.isEmpty()) {
     logger.warn("SUPABASE_KEY is missing in .env: groups and receipt reading will not work.")
 }
 
+// Release signing, the same file as 0.1.1 (docs/RELEASING.md). Never commit or print it.
+val releaseSigningFile = file("${System.getProperty("user.home")}/.koban/release-signing.properties")
+val releaseSigning = Properties().apply {
+    if (releaseSigningFile.exists()) releaseSigningFile.inputStream().use { load(it) }
+}
+// The names of the keys that have no value. Only names, never values.
+val missingSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    .filter { releaseSigning.getProperty(it).isNullOrBlank() }
+
+// A release build without the release key must stop: an APK with another key cannot update 0.1.1.
+// Debug builds and unit tests do not need the file (CI has no key).
+gradle.taskGraph.whenReady {
+    if (missingSigningKeys.isNotEmpty() && hasTask("${project.path}:preReleaseBuild")) {
+        throw GradleException(
+            "Release signing file ${releaseSigningFile.path} is missing or has no value for " +
+                "${missingSigningKeys.joinToString()}. " +
+                "A release APK must use the release key (docs/RELEASING.md, section 2).",
+        )
+    }
+}
+
 android {
     namespace = "io.github.skooyo.koban"
     compileSdk = flutter.compileSdkVersion
@@ -43,10 +66,25 @@ android {
         resValues = true
     }
     testOptions { unitTests { isIncludeAndroidResources = true } }
+    // The release lint check crashes inside lint on the image_picker_android plugin
+    // (NoSuchMethodError in JavaDocParser, AGP 9.3.1), so a release build cannot end.
+    // ponytail: release builds skip the lint vital check. Turn it on again after an AGP or plugin update.
+    lint { checkReleaseBuilds = false }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        if (missingSigningKeys.isEmpty()) {
+            create("release") {
+                storeFile = file(releaseSigning.getProperty("storeFile"))
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias")
+                keyPassword = releaseSigning.getProperty("keyPassword")
+            }
+        }
     }
 
     defaultConfig {
@@ -75,10 +113,11 @@ android {
             resValue("string", "app_name", "Koban (Debug)")
         }
         release {
-            // Milestone 6: sign with the release key from ~/.koban, never the debug key.
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // The release key from ~/.koban, never the debug key (the check above stops the build without it).
+            signingConfig = signingConfigs.findByName("release")
+            // No R8, the same as 0.1.1 (owner decision, milestone 6). The Flutter plugin turns both on.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

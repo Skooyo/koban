@@ -208,7 +208,33 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
     final scheme = theme.colorScheme;
     final text = theme.textTheme;
     final muted = scheme.onSurfaceVariant;
-    if (cards == null) return const Scaffold();
+    if (cards == null) {
+      // Empty while the cards load. A failed load shows its text and Back.
+      final error = vm.loadError;
+      if (error == null) return const Scaffold();
+      return Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  tooltip: 'Back',
+                  icon: const Icon(Icons.arrow_back),
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: WarningRow(error),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final top = cards.firstOrNull;
     final shown = cards.take(_stackDepth).toList();
     final label = vm.undoLabel;

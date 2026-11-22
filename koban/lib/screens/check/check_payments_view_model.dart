@@ -7,6 +7,7 @@ import '../../app/app_services.dart';
 import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../data/payment_checks.dart';
+import '../../data/user_error.dart';
 import '../../rules/amount_formatter.dart';
 import '../../ui/category_chips.dart';
 
@@ -26,26 +27,26 @@ class CheckCard {
 }
 
 /// The state of Check payments. A port of `CheckPaymentsViewModel.kt`.
-class CheckPaymentsViewModel extends ChangeNotifier {
+class CheckPaymentsViewModel extends ChangeNotifier with LoadErrors {
   CheckPaymentsViewModel(this._s) {
     _subs
       ..add(
         _s.categories.watchAll().listen((list) {
           _categories = list;
           _build();
-        }),
+        }, onError: onLoadError),
       )
       ..add(
         _s.categories.watchMostUsedIds(chipCount).listen((ids) {
           _mostUsed = ids;
           notifyListeners();
-        }),
+        }, onError: onLoadError),
       )
       ..add(
         _s.paymentChecks.watchVisible().listen((rows) {
           _rows = rows;
           _build();
-        }),
+        }, onError: onLoadError),
       );
   }
 
