@@ -33,6 +33,10 @@ const legacySettingKeys = <String>[
 /// The setting that is true after the rows are in the new database.
 const importDoneKey = 'legacy_import_done';
 
+/// The setting that is true while the 0.1.1 settings still need a copy: the read
+/// failed at the import. Each start tries the read again, so capture gets its payment apps.
+const settingsRetryKey = 'legacy_settings_retry';
+
 /// The Room schema version that the import accepts.
 const _legacyVersion = 11;
 
@@ -48,8 +52,8 @@ final class ImportSkipped extends ImportResult {
 
 /// The import copied all old rows. [rowCounts] is the old row count of each table.
 ///
-/// Known limit: when the settings cannot be read, the rows still copy and the
-/// done-mark is set, so a later start does not try the settings again.
+/// When the settings cannot be read, the rows still copy and the done-mark is
+/// set. [settingsRetryKey] makes each later start try the settings again.
 final class ImportDone extends ImportResult {
   const ImportDone(this.rowCounts, {this.settingsError});
 
@@ -84,6 +88,18 @@ class _Failure implements Exception {
   final ImportFailed result;
 }
 
+/// Fewer old rows are in the new table than in the old table. Its text has
+/// only the two counts, so the log keeps them (never a row value or a path).
+class _CountMismatch implements Exception {
+  _CountMismatch(this.found, this.total);
+
+  final int found;
+  final int total;
+
+  @override
+  String toString() => '$found of $total rows copied';
+}
+
 /// Copies the 0.1.1 database and settings into Koban one time.
 ///
 /// This function never throws. On failure, the old file stays where it is and
@@ -96,11 +112,13 @@ Future<ImportResult> importLegacyData({
   try {
     // Step 1: the rows were copied before. Finish the rename if a crash stopped it.
     if (await prefs.getBool(importDoneKey) ?? false) {
+      final path = await legacy.databasePath();
       try {
-        await _renameOldFiles(await legacy.databasePath());
+        await _renameOldFiles(path);
       } catch (_) {
         // The rows are safe in the new database. The next start tries the rename again.
       }
+      await _finishSettings(legacy, prefs, path);
       return const ImportSkipped();
     }
 
@@ -122,7 +140,8 @@ Future<ImportResult> importLegacyData({
     // Steps 4 and 5.
     final counts = await _copyTables(db, path);
 
-    // Step 6.
+    // Step 6. The retry mark comes first, so a stop between the two writes loses no retry.
+    if (settingsError != null) await prefs.setBool(settingsRetryKey, true);
     await prefs.setBool(importDoneKey, true);
 
     // Step 7. The old connection is closed. The rows are committed and the mark is set,
@@ -130,6 +149,13 @@ Future<ImportResult> importLegacyData({
     try {
       await _renameOldFiles(path);
     } catch (_) {}
+    if (settingsError == null) {
+      try {
+        await _deleteOldSecrets(path);
+      } catch (_) {
+        // Step 1 tries again at the next start.
+      }
+    }
     return ImportDone(counts, settingsError: settingsError);
   } catch (e) {
     return _failureOf(e);
@@ -144,24 +170,51 @@ ImportFailed _failureOf(Object e) => switch (e) {
   _ => ImportFailed(const [], describeError(e)),
 };
 
-/// The error text for the log. It never holds row values: the toString() of a
-/// SqliteException adds the statement and its bound values (a full payment
-/// row), so only the result code and the message stay.
-String describeError(Object e) {
-  switch (e) {
-    case SqliteException():
-      return 'SqliteException(${e.extendedResultCode}): ${e.message}';
-    case DriftRemoteException():
-      return describeError(e.remoteCause);
-    case DriftWrappedException(:final cause?):
-      return describeError(cause);
-    case PlatformException():
-      return 'PlatformException(${e.code}): ${e.message}';
+/// The error text for the log. It never holds a path or a value: the toString()
+/// of a SqliteException adds the statement and its bound values (a full payment
+/// row), and other texts can hold a file path or notification text. So a
+/// SqliteException keeps its result code and its message (SQLite puts only
+/// table and column names in it), a PlatformException keeps its code, a row
+/// count mismatch keeps its two counts, and every other error gives its type only.
+String describeError(Object e) => switch (e) {
+  SqliteException() => 'SqliteException(${e.extendedResultCode}): ${e.message}',
+  DriftRemoteException() => describeError(e.remoteCause),
+  DriftWrappedException(:final cause?) => describeError(cause),
+  PlatformException() => 'PlatformException(${e.code})',
+  _CountMismatch() => '$e',
+  _ => '${e.runtimeType}',
+};
+
+/// Step 1 after a done import: copies the 0.1.1 settings when the read failed
+/// before, then deletes the old secrets file. An error stops here and the next
+/// start tries again.
+Future<void> _finishSettings(
+  LegacySource legacy,
+  SharedPreferencesAsync prefs,
+  String path,
+) async {
+  try {
+    if (await prefs.getBool(settingsRetryKey) ?? false) {
+      await _copySettings(await legacy.readSettings(), prefs);
+      await prefs.remove(settingsRetryKey);
+    }
+    await _deleteOldSecrets(path);
+  } catch (_) {}
+}
+
+/// Deletes the 0.1.1 `files/datastore/secrets.preferences_pb` and its DataStore
+/// temp copy. They keep the device token, which Remove device token and Delete
+/// account do not remove. Call it only after the settings copied.
+/// Android keeps `databases/` and `files/` in the same app folder.
+Future<void> _deleteOldSecrets(String databasePath) async {
+  final dir = File(databasePath).parent.parent.path;
+  for (final name in const [
+    'secrets.preferences_pb',
+    'secrets.preferences_pb.tmp',
+  ]) {
+    final file = File('$dir/files/datastore/$name');
+    if (await file.exists()) await file.delete();
   }
-  // Other errors: the type and the first line of the text, without a statement.
-  final text = '$e'.split('\n').first;
-  final type = '${e.runtimeType}';
-  return text.startsWith(type) ? text : '$type: $text';
 }
 
 /// Writes each old setting that the new settings do not have.
@@ -259,9 +312,7 @@ Future<Map<String, int>> _copyTables(KobanDatabase db, String path) async {
               )
               .length;
           if (found != rows.length) {
-            throw StateError(
-              '$found of ${rows.length} old rows are in the new table',
-            );
+            throw _CountMismatch(found, rows.length);
           }
           counts[name] = rows.length;
         } catch (e) {

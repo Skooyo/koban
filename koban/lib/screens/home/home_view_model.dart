@@ -6,19 +6,20 @@ import 'package:flutter/foundation.dart';
 import '../../app/app_services.dart';
 import '../../data/legacy_import.dart';
 import '../../data/summaries.dart';
+import '../../data/user_error.dart';
 import '../../rules/periods.dart';
 import '../../rules/types.dart';
 import '../../ui/alerts_off_row.dart';
 
 /// The state of the Home tab: the access status, the 3 period summaries and the category names.
-class HomeViewModel extends ChangeNotifier {
+class HomeViewModel extends ChangeNotifier with LoadErrors {
   HomeViewModel(this._s) {
     _watchPeriods();
     _subs.add(
       _s.categories.watchAll().listen((list) {
         _categoryNames = {for (final c in list) c.id: c.name};
         notifyListeners();
-      }),
+      }, onError: onLoadError),
     );
     _subs.add(
       _s.paymentChecks.watchVisible().listen((v) {
@@ -30,7 +31,7 @@ class HomeViewModel extends ChangeNotifier {
               p.amount,
         ].fold(Decimal.zero, (a, b) => a + b);
         notifyListeners();
-      }),
+      }, onError: onLoadError),
     );
     // The settings notify after the payment apps picker saves.
     _s.settings.paymentAppsChosen.addListener(notifyListeners);
@@ -39,7 +40,7 @@ class HomeViewModel extends ChangeNotifier {
       _s.expenses.watchHasAnyPayment().listen((v) {
         _hasAnyPayment = v;
         notifyListeners();
-      }),
+      }, onError: onLoadError),
     );
   }
 
@@ -101,15 +102,15 @@ class HomeViewModel extends ChangeNotifier {
       _s.expenses.watchPeriodSummary(SpendingPeriod.day).listen((v) {
         _today = v;
         notifyListeners();
-      }),
+      }, onError: onLoadError),
       _s.expenses.watchPeriodSummary(SpendingPeriod.week).listen((v) {
         _week = v;
         notifyListeners();
-      }),
+      }, onError: onLoadError),
       _s.expenses.watchPeriodSummary(SpendingPeriod.month).listen((v) {
         _month = v;
         notifyListeners();
-      }),
+      }, onError: onLoadError),
     ];
   }
 
@@ -117,8 +118,16 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> refresh() async {
     // The day moves first: a failed platform call must not freeze it.
     if (_dayStamp() != _day) _watchPeriods();
-    final granted = await _s.listener.isAccessGranted();
-    final alertsOff = await alertsBlocked(_s.device);
+    final bool granted;
+    final bool alertsOff;
+    try {
+      granted = await _s.listener.isAccessGranted();
+      alertsOff = await alertsBlocked(_s.device);
+    } catch (e) {
+      // The screen calls refresh without a wait. A failed platform call keeps the last values.
+      debugPrint('Koban: Home refresh failed (${e.runtimeType})');
+      return;
+    }
     if (_disposed) return;
     _isAccessGranted = granted;
     _alertsOff = alertsOff;

@@ -39,6 +39,26 @@ class ListGroup extends StatelessWidget {
   }
 }
 
+/// One row with a warning icon and [text], for a problem the user must know about.
+class WarningRow extends StatelessWidget {
+  const WarningRow(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => ListGroup(
+    children: [
+      KobanRow(
+        title: text,
+        leading: Icon(
+          Icons.warning,
+          color: Theme.of(context).colorScheme.error,
+        ),
+      ),
+    ],
+  );
+}
+
 /// A list row with an optional subtitle, trailing content and chevron.
 /// [leading] sits centered in a 40 dp box: pass a 24 dp icon or an avatar.
 class KobanRow extends StatelessWidget {

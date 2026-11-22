@@ -1024,6 +1024,38 @@ void main() {
     expect(find.text('RM 18.80'), findsOneWidget);
   });
 
+  // Owner decision D3 (milestone 6): RM 0 takes the person out of the split.
+  testWidgets('RM 0 in Change amounts takes the person out of the split', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final id = await addPayment(s, amount: '18.80', merchant: 'Grab');
+    await openEditor(tester, s, expenseId: id);
+    await noReceiptToSummary(tester, 'Split RM 18.80 evenly, no receipt', [
+      'Ali',
+      'Bala',
+    ]);
+    await tester.tap(find.text('Change amounts'));
+    await tester.pumpAndSettle();
+    await typeInto(tester, field('Ali (RM)'), '0');
+    await typeInto(tester, field('Bala (RM)'), '9.40');
+    await typeInto(tester, field('Me (RM)'), '9.40');
+    expect(find.text('Amounts add up to RM 18.80'), findsOneWidget);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    final people = {
+      for (final p in await s.db.select(s.db.splitPeople).get()) p.name: p.id,
+    };
+    final debts = await s.db.select(s.db.splitDebts).get();
+    expect(
+      [for (final x in debts) (x.personId, x.amount)],
+      [(people['Bala'], d('9.40'))],
+    );
+    final shares = await s.db.select(s.db.splitItemShares).get();
+    expect(shares.map((x) => x.personId), isNot(contains(people['Ali'])));
+    expect((await s.expenses.getById(id))!.countedAmount, d('9.40'));
+  });
+
   testWidgets('Split evenly puts the even split back in the fields', (
     tester,
   ) async {

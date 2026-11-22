@@ -2,6 +2,8 @@
 
 This runbook tells you how to build, publish and roll out a new Koban version to friends. It is for the owner, who releases Koban alone, and for a coding agent that helps.
 
+Koban is the Flutter app in `koban/` from version 0.2.0 (`versionCode` 3). The Kotlin app in `app/` made 0.1.0 and 0.1.1. Do not release the Kotlin app again: friends with 0.2.0 or later cannot install a lower `versionCode`.
+
 The repository is public. Do not write a password, a key or a server URL in this file, in a commit or in a chat. Refer to the files in `~/.koban/` by name only.
 
 ## 1. Rules that never change
@@ -19,7 +21,7 @@ Break one of these rules and friends lose data or stop getting updates.
 Do these steps once, on the computer that makes releases.
 
 1. Keep the release key at `~/.koban/koban-release.jks` (alias `koban`, PKCS12).
-2. Keep the passwords at `~/.koban/release-signing.properties`. It has the keys `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. `app/build.gradle.kts` reads this file. If the file is missing, `assembleRelease` makes `app-release-unsigned.apk`, which you cannot install.
+2. Keep the passwords at `~/.koban/release-signing.properties`. It has the keys `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. `koban/android/app/build.gradle.kts` reads this file. If the file is missing or a key has no value, a release build stops with the error "Release signing file ... is missing or has no value for ...". It never signs a release with the debug key. Debug builds and unit tests do not need the file.
 3. Back up the two files in two places. Keep one of the two places offline. For example, use a USB drive and a password manager. Without these files, you cannot make an update for the friends who have Koban.
 4. Keep the two Android OAuth clients in Google Cloud. One client is for `io.github.skooyo.koban` with the release key SHA-1. One client is for `io.github.skooyo.koban.debug` with the debug key SHA-1. `~/.koban/oauth-sha1.txt` has the two SHA-1 values. Google sign-in fails when the SHA-1 of the APK is not in a client.
 5. Install the GitHub CLI and sign in. Run the command below. It must show the account that owns `Skooyo/koban`.
@@ -30,67 +32,77 @@ Do these steps once, on the computer that makes releases.
 
 ## 3. Release a new version
 
-Use Git Bash, from the repository folder. Set `JAVA_HOME` to your JDK 17 for each command that needs it. In the commands, `<versionCode>` and `<versionName>` are the new values. Example: `versionCode` 2, `versionName` 0.1.1.
+Use Git Bash, from the `koban/` folder (not the repository folder). Set `JAVA_HOME` to your JDK 17 for each command that needs it. In the commands, `<versionCode>` and `<versionName>` are the new values. Example: `versionCode` 3, `versionName` 0.2.0.
 
 1. Pick the new version.
    - `versionCode`: the old value + 1.
    - `versionName`: MAJOR.MINOR.PATCH. Add 1 to PATCH for fixes only. Add 1 to MINOR for new features, and set PATCH to 0.
-2. Open `app/build.gradle.kts`. Change `versionCode` and `versionName` in `defaultConfig`.
-3. Run the unit tests and build the release APK.
+2. Open `koban/pubspec.yaml`. Change the line `version: <versionName>+<versionCode>`. Example: `version: 0.2.0+3`.
+3. Run the checks. `flutter analyze` must show `No issues found!`. Every test must pass. Run the Kotlin tests as `:app:testDebugUnitTest`: the plain `testDebugUnitTest` also runs the tests of a plugin, and they fail.
 
    ```bash
-   JAVA_HOME="<your JDK 17>" ./gradlew.bat --console=plain testDebugUnitTest assembleRelease
+   flutter analyze
+   flutter test
+   (cd android && JAVA_HOME="<your JDK 17>" ./gradlew.bat --console=plain :app:testDebugUnitTest)
    ```
 
-4. Check the signature of the APK.
+4. Build the release APK. Do not add `--split-per-abi`: it adds 1000 x ABI to the `versionCode`, and then the updater does not find `koban-<versionCode>.apk`. The APK is `build/app/outputs/flutter-apk/app-release.apk`.
 
    ```bash
-   JAVA_HOME="<your JDK 17>" D:/Android/build-tools/34.0.0/apksigner.bat verify --print-certs app/build/outputs/apk/release/app-release.apk
+   JAVA_HOME="<your JDK 17>" flutter build apk --release
    ```
 
-5. Compare the line `Signer #1 certificate SHA-1 digest` with the `io.github.skooyo.koban` line in `~/.koban/oauth-sha1.txt`. `apksigner` shows lowercase hex without colons. The file shows uppercase hex with colons. The 40 hex digits must be the same. If they are not the same, stop: the APK has the wrong key.
-6. Check that the APK is not debuggable. The command must print `0`. If it prints `1`, stop: the build is debuggable. Never publish it.
+   The release build does not use R8 (no code shrink and no resource shrink), the same as 0.1.1. Do not turn R8 on without a test of the release APK on a phone: R8 can remove code that a plugin finds by name, and ML Kit then needs `-dontwarn` rules for its Chinese, Devanagari, Japanese and Korean option classes.
+5. Check the signature of the APK.
 
    ```bash
-   D:/Android/build-tools/34.0.0/aapt2.exe dump badging app/build/outputs/apk/release/app-release.apk | grep -c application-debuggable
+   JAVA_HOME="<your JDK 17>" D:/Android/build-tools/36.0.0/apksigner.bat verify --print-certs build/app/outputs/flutter-apk/app-release.apk
    ```
 
-7. Copy the APK to the name that the updater looks for. The updater reads the asset named `koban-<versionCode>.apk` and ignores other names. It also checks that the APK inside has this `versionCode`.
+6. Compare the line `Signer #1 certificate SHA-1 digest` with the `io.github.skooyo.koban` line in `~/.koban/oauth-sha1.txt`. `apksigner` shows lowercase hex without colons. The file shows uppercase hex with colons. The 40 hex digits must be the same. If they are not the same, stop: the APK has the wrong key. Do not show the file in a chat: compare in a script that prints only "match" or "mismatch".
+7. Check the version and that the APK is not debuggable. The first command must show `versionCode='<versionCode>'` and `versionName='<versionName>'`. The second command must print `0`. If it prints `1`, stop: the build is debuggable. Never publish it.
 
    ```bash
-   cp app/build/outputs/apk/release/app-release.apk koban-<versionCode>.apk
+   D:/Android/build-tools/36.0.0/aapt2.exe dump badging build/app/outputs/flutter-apk/app-release.apk | head -1
+   D:/Android/build-tools/36.0.0/aapt2.exe dump badging build/app/outputs/flutter-apk/app-release.apk | grep -c application-debuggable
    ```
 
-8. Commit the version change. Tag the commit and push the tag.
+8. Copy the APK to the name that the updater looks for. The updater reads the asset named `koban-<versionCode>.apk` and ignores other names. It also checks that the APK inside has this `versionCode`.
 
    ```bash
-   git add app/build.gradle.kts
+   cp build/app/outputs/flutter-apk/app-release.apk koban-<versionCode>.apk
+   ```
+
+9. Commit the version change. Tag the commit and push the tag.
+
+   ```bash
+   git add pubspec.yaml
    git commit -m "Release Koban <versionName>"
    git tag v<versionName>
    git push origin v<versionName>
    ```
 
-   Do this step before step 9. If the tag is not on GitHub, `gh release create` makes a new tag on the tip of `main`, which can be the wrong code.
-9. Create the GitHub release as a draft, with the APK. Friends cannot get a draft. Write the notes in Simplified Technical English. The "Update available" dialog shows the first 500 characters of the notes. The dialog shows the tag without the `v` as the version name.
+   Do this step before step 10. If the tag is not on GitHub, `gh release create` makes a new tag on the tip of `main`, which can be the wrong code.
+10. Create the GitHub release as a draft, with the APK. Friends cannot get a draft. Write the notes in Simplified Technical English. The "Update available" dialog shows the first 500 characters of the notes. The dialog shows the tag without the `v` as the version name.
 
    ```bash
    gh release create v<versionName> koban-<versionCode>.apk --verify-tag --draft --title "Koban <versionName>" --notes "<what changed, in STE>"
    ```
 
-10. Install the APK on your own phone by USB. The latest-release API that Koban reads skips drafts, so "Check for updates" cannot see a draft.
+11. Install the APK on your own phone by USB. The latest-release API that Koban reads skips drafts, so "Check for updates" cannot see a draft.
 
    ```bash
    adb install -r koban-<versionCode>.apk
    ```
 
-11. Use the new version on your phone for 1 day. Open Settings and make sure "App version" shows the new `versionName`. If you find a problem, do not publish. Fix it and start again at step 1.
-12. Publish the draft. Friends get the update at their next daily check. See section 4.
+12. Use the new version on your phone for 1 day. Open Settings and make sure "App version" shows the new `versionName`. If you find a problem, do not publish. Fix it and start again at step 1.
+13. Publish the draft. Friends get the update at their next daily check. See section 4.
 
     ```bash
     gh release edit v<versionName> --draft=false
     ```
 
-13. Delete the local copy `koban-<versionCode>.apk`. Do not commit it.
+14. Delete the local copy `koban-<versionCode>.apk`. Do not commit it.
 
 ## 4. Roll out
 
@@ -164,7 +176,7 @@ The first update after this install asks the friend to allow "Install unknown ap
 
 ## 8. Known limits
 
-- The APK is about 65 MB, because of ML Kit. Each update downloads the full APK.
+- The APK is about 101 MB (0.2.0: 101,184,525 bytes; `flutter build` shows 96.5 MB, in units of 1024 x 1024 bytes), because of ML Kit, no R8 and the Flutter engine for 3 ABIs. 0.1.1 was about 65 MB. Each update downloads the full APK.
 - Android closes Koban after a self-update and does not open it again. The friend opens Koban again.
 - Koban calls the GitHub API without a token. GitHub allows 60 requests per hour per IP address. On a shared Wi-Fi with many Koban phones, GitHub can answer 403 for one hour. Koban shows no error and tries again the next day. A manual check shows "Could not check for updates. Try again later."
 - Google developer verification applies in all countries in 2027 (ticket #26). Register before then. If you do not register, friends need `adb` or the "advanced flow" for new installs.

@@ -7,6 +7,7 @@ import '../../app/app_services.dart';
 import '../../capture/listener_control.dart';
 import '../../data/database.dart';
 import '../../data/undoable.dart';
+import '../../data/user_error.dart';
 import '../../online/receipt_cloud_client.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/payment_rules.dart';
@@ -27,7 +28,7 @@ const xiaomiChecklist = <String>[
 const _newCategoryColor = '#5C6BC0';
 
 /// The state of Settings: the listener status, the switches, the categories and the parser tool.
-class SettingsViewModel extends ChangeNotifier {
+class SettingsViewModel extends ChangeNotifier with LoadErrors {
   /// [reconnectWait] is the time between the reconnect and its result. 0.1.1 waits 65 s.
   SettingsViewModel(
     this._s, {
@@ -37,7 +38,7 @@ class SettingsViewModel extends ChangeNotifier {
       _s.categories.watchAll().listen((list) {
         _categories = list;
         notifyListeners();
-      }),
+      }, onError: onLoadError),
     );
     for (final l in _listenables) {
       l.addListener(notifyListeners);

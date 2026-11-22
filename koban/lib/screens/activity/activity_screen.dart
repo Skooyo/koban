@@ -133,6 +133,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     selectedIndex: state.showAll ? 1 : 0,
                     onPick: (i) => vm.setShowAll(i == 1),
                   ),
+                  if (vm.loadError case final error?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: WarningRow(error),
+                    ),
                   if (summary != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 12),

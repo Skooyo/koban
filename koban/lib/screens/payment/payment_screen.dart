@@ -100,7 +100,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       builder: (context, _) {
         final f = _vm.form;
         // While an edited payment loads, or when it is missing, the page is empty.
-        if (f == null) return const Scaffold();
+        if (f == null) return _loadFailedPage(context);
         return PopScope(
           canPop: !_vm.hasChanges || _vm.saving,
           onPopInvokedWithResult: (didPop, _) {
@@ -109,6 +109,31 @@ class _PaymentScreenState extends State<PaymentScreen> {
           child: Scaffold(body: SafeArea(child: _content(context, f))),
         );
       },
+    );
+  }
+
+  /// Empty while an edited payment loads. A failed load shows its text and a Close button.
+  Widget _loadFailedPage(BuildContext context) {
+    final error = _vm.loadError;
+    if (error == null) return const Scaffold();
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                tooltip: 'Close',
+                icon: const Icon(Icons.close),
+              ),
+              const SizedBox(height: 12),
+              WarningRow(error),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -145,6 +170,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 4),
+                  if (_vm.loadError case final error?) ...[
+                    WarningRow(error),
+                    const SizedBox(height: 12),
+                  ],
                   CategoryChips(
                     chips: _vm.chipCategories,
                     selectedId: f.categoryId,

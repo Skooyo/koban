@@ -118,7 +118,9 @@ void main() {
 
   // Review Focus 4.
   test('two opens at the same time import the 0.1.1 data one time', () async {
-    final oldPath = '${tmp.path}/expense_tracker.db';
+    // The Android layout: databases/ is next to files/ in the app folder.
+    final oldPath = '${tmp.path}/databases/expense_tracker.db';
+    Directory('${tmp.path}/databases').createSync();
     File('test/fixtures/room_v11.db').copySync(oldPath);
     final legacy = FakeLegacySource(oldPath);
     final a = db;

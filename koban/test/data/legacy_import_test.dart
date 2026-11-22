@@ -42,7 +42,7 @@ class FakeLegacySource implements LegacySource {
   final String path;
 
   /// When set, readSettings throws this error.
-  final Object? settingsError;
+  Object? settingsError;
 
   @override
   Future<String> databasePath() async => path;
@@ -65,6 +65,8 @@ String quotedSelect(TableInfo table) {
 
 void main() {
   late Directory tmp;
+
+  /// The `databases` folder of the app folder [tmp], as on Android.
   late String dir;
   late String oldPath;
   late KobanDatabase newDb;
@@ -115,7 +117,8 @@ void main() {
 
   setUp(() async {
     tmp = await Directory.systemTemp.createTemp('koban_import_');
-    dir = tmp.path;
+    dir = '${tmp.path}/databases';
+    Directory(dir).createSync();
     oldPath = '$dir/expense_tracker.db';
     File('test/fixtures/room_v11.db').copySync(oldPath);
     newDb = KobanDatabase(NativeDatabase(File('$dir/koban.sqlite')));
@@ -478,16 +481,117 @@ void main() {
     );
     final r = await run() as ImportDone;
     expect(r.rowCounts, fixtureCounts);
-    expect(r.settingsError, 'PlatformException(LEGACY_SETTINGS): bad file');
+    // The native message can hold a path, so only the code goes to the log.
+    expect(r.settingsError, 'PlatformException(LEGACY_SETTINGS)');
     expect(
       r.logLine,
-      'Settings import failed (PlatformException(LEGACY_SETTINGS): bad file)',
+      'Settings import failed (PlatformException(LEGACY_SETTINGS))',
     );
     expect(await rowCountsOf(newDb), fixtureCounts);
-    expect(await prefs.getKeys(), {importDoneKey});
+    expect(await prefs.getKeys(), {importDoneKey, settingsRetryKey});
     expect(await prefs.getBool(importDoneKey), true);
     expect(File(oldPath).existsSync(), false);
     expect(File('$oldPath.pre-flutter').existsSync(), true);
+  });
+
+  test('tries the settings again at each start until they copy', () async {
+    final source = FakeLegacySource(
+      oldPath,
+      settingsError: PlatformException(code: 'LEGACY_SETTINGS'),
+    );
+    legacy = source;
+    expect(await run(), isA<ImportDone>());
+
+    // The second start: the read fails again, and the retry stays.
+    expect(await run(), isA<ImportSkipped>());
+    expect(await prefs.getBool(settingsRetryKey), true);
+    expect(await prefs.getStringList('payment_app_allowlist'), isNull);
+
+    // The third start: the read works. Capture gets its payment apps back.
+    source.settingsError = null;
+    expect(await run(), isA<ImportSkipped>());
+    expect(await prefs.getStringList('payment_app_allowlist'), [
+      'com.maybank2u.life',
+      'my.com.tngdigital.ewallet',
+    ]);
+    expect(await prefs.getString('device_token'), 'test-device-token-0001');
+    expect(await prefs.getBool(settingsRetryKey), isNull);
+    expect((await rowCountsOf(newDb))['expenses'], 4);
+  });
+
+  group('the 0.1.1 secrets file', () {
+    late File secrets;
+    late File secretsTmp;
+    late File settingsFile;
+
+    setUp(() {
+      final store = Directory('${tmp.path}/files/datastore')
+        ..createSync(recursive: true);
+      secrets = File('${store.path}/secrets.preferences_pb')
+        ..writeAsStringSync('test-old-secrets');
+      secretsTmp = File('${store.path}/secrets.preferences_pb.tmp')
+        ..writeAsStringSync('test-old-secrets');
+      settingsFile = File('${store.path}/settings.preferences_pb')
+        ..writeAsStringSync('test-old-settings');
+    });
+
+    test('goes after an import that copied the settings', () async {
+      expect(await run(), isA<ImportDone>());
+      expect(await prefs.getString('device_token'), 'test-device-token-0001');
+      expect(secrets.existsSync(), false);
+      expect(secretsTmp.existsSync(), false);
+      expect(settingsFile.existsSync(), true);
+    });
+
+    test('stays until the settings copy, then goes', () async {
+      final source = FakeLegacySource(
+        oldPath,
+        settingsError: PlatformException(code: 'LEGACY_SETTINGS'),
+      );
+      legacy = source;
+      expect(await run(), isA<ImportDone>());
+      expect(secrets.existsSync(), true);
+      expect(await run(), isA<ImportSkipped>());
+      expect(secrets.existsSync(), true);
+
+      source.settingsError = null;
+      expect(await run(), isA<ImportSkipped>());
+      expect(await prefs.getString('device_token'), 'test-device-token-0001');
+      expect(secrets.existsSync(), false);
+    });
+
+    test('goes at the next start after an earlier import', () async {
+      // An import of an earlier build left the file.
+      await prefs.setBool(importDoneKey, true);
+      expect(await run(), isA<ImportSkipped>());
+      expect(secrets.existsSync(), false);
+      expect(settingsFile.existsSync(), true);
+    });
+
+    test('stays when the rows fail', () async {
+      changeOld((old) => old.execute('PRAGMA user_version = 10'));
+      expect(await run(), isA<ImportFailed>());
+      expect(secrets.existsSync(), true);
+    });
+  });
+
+  test('the log text of other errors is the error type only', () {
+    expect(
+      describeError(
+        const FileSystemException(
+          'Cannot open file',
+          '/data/user/0/io.github.skooyo.koban/databases/expense_tracker.db',
+        ),
+      ),
+      'FileSystemException',
+    );
+    expect(describeError(StateError('test-merchant RM 12.50')), 'StateError');
+    expect(
+      describeError(
+        PlatformException(code: 'LEGACY_SETTINGS', message: '/data/x'),
+      ),
+      'PlatformException(LEGACY_SETTINGS)',
+    );
   });
 
   // The app opens the database in a background isolate (drift_flutter), so
@@ -530,6 +634,34 @@ void main() {
       },
     );
   }
+
+  test(
+    'logs the table and both counts when old rows are missing in the new table',
+    () async {
+      // A loose old table (no column types): the key 12345 stays an integer,
+      // and the new TEXT key column stores '12345', so the key check misses it.
+      changeOld((old) {
+        final cols = [
+          for (final r in old.select('PRAGMA table_info(expenses)'))
+            '"${r['name']}"',
+        ];
+        old.execute('CREATE TABLE expenses_loose (${cols.join(', ')})');
+        old.execute('INSERT INTO expenses_loose SELECT * FROM expenses');
+        old.execute('DROP TABLE expenses');
+        old.execute('ALTER TABLE expenses_loose RENAME TO expenses');
+        old.execute("UPDATE expenses SET id = 12345 WHERE id = 'e1'");
+      });
+      final r = await run() as ImportFailed;
+      expect(r.tables, ['expenses']);
+      expect(
+        r.logLine,
+        'Data import failed: expenses (expenses: 3 of 4 rows copied)',
+      );
+      expect((await rowCountsOf(newDb))['expenses'], 0);
+      expect(File(oldPath).existsSync(), true);
+      expect(await prefs.getBool(importDoneKey), isNull);
+    },
+  );
 
   test('stops all tables and keeps the new rows when SQLite rolls back the transaction', () async {
     // Rows that the new database had before the import.
