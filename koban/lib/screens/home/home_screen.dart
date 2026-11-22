@@ -1,5 +1,4 @@
 import 'package:decimal/decimal.dart';
-import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
@@ -11,16 +10,19 @@ import '../../data/legacy_import.dart';
 import '../../data/summaries.dart';
 import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
+import '../../theme/tokens.dart';
 import '../../ui/alerts_off_row.dart';
 import '../../ui/kit.dart';
 import '../../ui/listener_status_banner.dart';
 import '../../ui/money.dart';
 import '../../ui/payment_row.dart';
+import '../../ui/scene_band.dart';
 import '../../ui/undo_snack_bar.dart';
 import '../payment/payment_view_model.dart';
+import 'home_mon.dart';
 import 'home_view_model.dart';
 
-/// The Home tab: today's spending, the week and the month, and the latest payments.
+/// The Home tab: Mon's band, this week, the month, and the latest payments.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -77,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final vm = _vm!;
     final s = AppScope.of(context);
     final theme = Theme.of(context);
+    const gap = SizedBox(height: 12);
     return ListenableBuilder(
       listenable: vm,
       builder: (context, _) {
@@ -84,42 +87,62 @@ class _HomeScreenState extends State<HomeScreen> {
         final week = vm.week;
         final month = vm.month;
         final recent = week?.recentExpenses ?? const <Expense>[];
+        final say = vm.monSay;
+        final saved = vm.daysSaved;
         return Stack(
           children: [
-            Column(
+            ListView(
+              padding: EdgeInsets.zero,
               children: [
-                LargeTopBar(
-                  title: 'Today',
-                  subtitle: DateFormat('EEE, d MMM', 'en_US').format(s.now()),
-                  actions: [
-                    IconButton(
-                      onPressed: () => openSettings(context),
-                      tooltip: 'Settings',
-                      icon: const Icon(Icons.settings),
-                    ),
+                SceneBand(
+                  title: greetingFor(s.now()),
+                  face: say.face,
+                  line: say.line,
+                  detail: say.detail,
+                  stats: [
+                    if (week != null) ...[
+                      '$saved ${saved == 1 ? 'day' : 'days'} with payments',
+                      '${vm.waitingCount} to check',
+                    ],
                   ],
+                  action: SceneIconButton(
+                    icon: Icons.settings,
+                    tooltip: 'Settings',
+                    onPressed: () => openSettings(context),
+                  ),
                 ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 112),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 112),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (week != null && today != null) ...[
+                        _WeekCard(
+                          week: week,
+                          today: today,
+                          days: vm.weekDays,
+                          todayIndex: vm.todayIndex,
+                          onOpen: () => _openActivity(withWeek: true),
+                        ),
+                        gap,
+                      ],
                       // The 0.1.1 data did not move and is safe.
                       if (vm.importFailed) ...[
                         const WarningRow(importFailedMessage),
-                        const SizedBox(height: 12),
+                        gap,
                       ],
                       if (vm.loadError case final error?) ...[
                         WarningRow(error),
-                        const SizedBox(height: 12),
+                        gap,
                       ],
                       ListenerStatusBanner(
                         isAccessGranted: vm.isAccessGranted,
                         onEnable: vm.openNotificationSettings,
                       ),
-                      const SizedBox(height: 12),
+                      gap,
                       if (vm.alertsOff) ...[
                         AlertsOffRow(onTurnOn: vm.askForAlerts),
-                        const SizedBox(height: 12),
+                        gap,
                       ],
                       if (vm.listensToNoApp) ...[
                         ListGroup(
@@ -131,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        gap,
                       ],
                       if (vm.waitingCount > 0) ...[
                         ListGroup(
@@ -152,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        gap,
                       ],
                       if (vm.isAccessGranted &&
                           !vm.hasAnyPayment &&
@@ -162,29 +185,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           onAdd: _add,
                           onOpenSettings: () => openSettings(context),
                         ),
-                        const SizedBox(height: 12),
+                        gap,
                       ],
-                      if (today != null) ...[
-                        _SpentTodayCard(
-                          summary: today,
-                          onOpen: () => _openActivity(withWeek: true),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      if (week != null && month != null) ...[
+                      if (month != null) ...[
                         ListGroup(
                           children: [
-                            _PeriodRow(
-                              week,
-                              () => _openActivity(withWeek: true),
-                            ),
                             _PeriodRow(
                               month,
                               () => _openActivity(withWeek: false),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        gap,
                       ],
                       if (recent.isNotEmpty) ...[
                         const Padding(
@@ -220,8 +232,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: const Icon(Icons.add),
                 label: const Text('Add payment'),
                 extendedTextStyle: weighted(theme.textTheme.titleMedium!, 700),
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
               ),
             ),
           ],
@@ -231,11 +241,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// Today's total, the money received, and the split by category. A tap opens the Activity tab.
-class _SpentTodayCard extends StatelessWidget {
-  const _SpentTodayCard({required this.summary, required this.onOpen});
+/// This week: the total, one bar for each day with today in gold, and today's total.
+/// A tap opens the Activity tab on this week.
+class _WeekCard extends StatelessWidget {
+  const _WeekCard({
+    required this.week,
+    required this.today,
+    required this.days,
+    required this.todayIndex,
+    required this.onOpen,
+  });
 
-  final PeriodSummary summary;
+  final PeriodSummary week;
+  final PeriodSummary today;
+  final List<Decimal> days;
+  final int todayIndex;
   final VoidCallback onOpen;
 
   @override
@@ -243,10 +263,11 @@ class _SpentTodayCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final muted = scheme.onSurfaceVariant;
-    final noReceived = summary.received <= Decimal.zero;
+    final nothingToday =
+        today.breakdown.isEmpty && today.received <= Decimal.zero;
     return Material(
       color: scheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(KobanRadius.r24),
       clipBehavior: Clip.antiAlias,
       child: Semantics(
         button: true,
@@ -254,7 +275,7 @@ class _SpentTodayCard extends StatelessWidget {
         child: InkWell(
           onTap: onOpen,
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -262,88 +283,134 @@ class _SpentTodayCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Spent today',
+                        'Spent this week',
                         style: text.bodyMedium!.copyWith(color: muted),
                       ),
                     ),
-                    Text(
-                      'See this week',
-                      style: text.bodySmall!.copyWith(color: muted),
+                    Flexible(
+                      child: Text(
+                        week.subtitle,
+                        textAlign: TextAlign.end,
+                        style: text.bodySmall!.copyWith(color: muted),
+                      ),
                     ),
-                    Icon(Icons.keyboard_arrow_right, color: muted, size: 20),
                   ],
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: 4),
                   child: MoneyText(
-                    rm(summary.total),
+                    rm(week.total),
                     style: text.displayLarge,
                     color: scheme.onSurface,
                   ),
                 ),
-                if (!noReceived)
+                if (week.received > Decimal.zero)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: MoneyText(
-                      '+ ${rm(summary.received)} received',
+                      '+ ${rm(week.received)} received',
                       style: text.bodyMedium,
                       color: MoneyColors.of(context).received,
                     ),
                   ),
-                if (summary.breakdown.isEmpty && noReceived)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      'No payments yet today.',
-                      style: text.bodyMedium!.copyWith(color: muted),
-                    ),
-                  ),
-                if (summary.breakdown.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: NoteStrip(breakdown: summary.breakdown, height: 8),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Column(
-                      children: [
-                        for (final item in summary.breakdown)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              children: [
-                                CategoryDot(
-                                  categoryColor(context, item.categoryId),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    child: Text(
-                                      item.name,
-                                      style: text.bodyLarge!.copyWith(
-                                        color: scheme.onSurface,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                MoneyText(
-                                  rm(item.total),
-                                  style: text.bodyLarge,
-                                  color: scheme.onSurface,
-                                ),
-                              ],
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: _DayBars(days: days, todayIndex: todayIndex),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: nothingToday
+                      ? Text(
+                          'No payments yet today.',
+                          style: text.bodyMedium!.copyWith(color: muted),
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Spent today',
+                                style: text.bodyMedium!.copyWith(color: muted),
+                              ),
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
+                            MoneyText(
+                              rm(today.total),
+                              style: weighted(text.titleMedium!, 700),
+                              color: scheme.onSurface,
+                            ),
+                          ],
+                        ),
+                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+const _dayInitials = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const _dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/// Seven bars, Monday first, each as tall as that day's spending. Today is gold.
+class _DayBars extends StatelessWidget {
+  const _DayBars({required this.days, required this.todayIndex});
+
+  final List<Decimal> days;
+  final int todayIndex;
+
+  static const _barMax = 60.0;
+  static const _barMin = 6.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    // The gold of the Add button: the primary color is a dark gold on the light theme.
+    final gold =
+        Theme.of(context).floatingActionButtonTheme.backgroundColor ??
+        scheme.primary;
+    final top = days.fold(Decimal.zero, (a, b) => b > a ? b : a);
+    double height(Decimal d) => top == Decimal.zero
+        ? _barMin
+        : _barMin + (_barMax - _barMin) * (d / top).toDouble();
+    final spoken = [
+      for (var i = 0; i < 7; i++) '${_dayNames[i]} ${rm(days[i])}',
+    ].join(', ');
+    return Semantics(
+      label: 'Spent each day: $spoken',
+      excludeSemantics: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          for (var i = 0; i < 7; i++)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      height: height(days[i]),
+                      decoration: BoxDecoration(
+                        color: i == todayIndex ? gold : scheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _dayInitials[i],
+                      style: text.labelSmall!.copyWith(
+                        color: i == todayIndex
+                            ? scheme.onSurface
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

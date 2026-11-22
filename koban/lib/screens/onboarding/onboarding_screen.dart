@@ -4,6 +4,7 @@ import '../../app/app_services.dart';
 import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
 import '../../ui/kit.dart';
+import '../../ui/scene_band.dart';
 import '../payment_apps/payment_apps_screen.dart';
 import 'onboarding_rules.dart';
 import 'onboarding_view_model.dart';
@@ -87,7 +88,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           },
           // The picker keeps its own top bar and Save button.
           child: step == OnboardingStep.apps
-              ? PaymentAppsScreen(onSaved: vm.appsSaved, onBack: vm.back)
+              ? PaymentAppsScreen(onSaved: vm.appsSaved)
               : _page(context, vm, step),
         );
       },
@@ -101,36 +102,44 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ) {
     final number = OnboardingRules.stepNumber(step);
     final s = AppScope.of(context);
+    final (face, line) = _mon(step, vm);
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 16,
-                  children: [
-                    if (number != null)
-                      StepProgress(
-                        number: number,
-                        total: 4,
-                        name: _stepNames[step]!,
-                      ),
-                    ...switch (step) {
-                      OnboardingStep.welcome => _welcome(context),
-                      OnboardingStep.access => _access(context),
-                      OnboardingStep.blocked => _blocked(context),
-                      OnboardingStep.running => _runningStep(context, vm),
-                      OnboardingStep.ready => _ready(context, vm),
-                      OnboardingStep.apps => const <Widget>[],
-                    },
-                  ],
-                ),
+      body: Column(
+        children: [
+          SceneBand(title: 'Koban', face: face, line: line),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                20,
+                SceneBand.overlap + 16,
+                20,
+                16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 16,
+                children: [
+                  if (number != null)
+                    StepProgress(
+                      number: number,
+                      total: 4,
+                      name: _stepNames[step]!,
+                    ),
+                  ...switch (step) {
+                    OnboardingStep.welcome => _welcome(context),
+                    OnboardingStep.access => _access(context),
+                    OnboardingStep.blocked => _blocked(context),
+                    OnboardingStep.running => _runningStep(context, vm),
+                    OnboardingStep.ready => _ready(context, vm),
+                    OnboardingStep.apps => const <Widget>[],
+                  },
+                ],
               ),
             ),
-            Padding(
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -186,11 +195,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+
+  (MonFace, String) _mon(OnboardingStep step, OnboardingViewModel vm) =>
+      switch (step) {
+        OnboardingStep.welcome => (MonFace.idle, 'Hello. I count the money.'),
+        OnboardingStep.access => (MonFace.idle, 'I need to see your alerts.'),
+        OnboardingStep.blocked => (MonFace.worry, 'Android said no. Fixable.'),
+        OnboardingStep.running => (
+          MonFace.idle,
+          'Keep me awake. I keep counting.',
+        ),
+        OnboardingStep.ready when vm.listensToNoApp => (
+          MonFace.worry,
+          'I have nothing to listen to.',
+        ),
+        OnboardingStep.ready => (MonFace.happy, 'Ready. Go pay for something.'),
+        OnboardingStep.apps => (MonFace.idle, ''),
+      };
 
   TextStyle _small(BuildContext context) {
     final theme = Theme.of(context);
@@ -205,34 +231,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   List<Widget> _welcome(BuildContext context) {
     final theme = Theme.of(context);
     return [
-      const Center(child: Mon(MonFace.idle, size: 140)),
       Text(
         'Koban counts your spending for you.',
         style: theme.textTheme.displaySmall,
         textAlign: TextAlign.center,
       ),
-      Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            spacing: 16,
-            children: const [
-              _InfoRow(
-                Icons.notifications_active,
-                'Reads payment alerts from the apps you pick.',
-              ),
-              _InfoRow(
-                Icons.touch_app,
-                'You check each payment before it counts.',
-              ),
-              _InfoRow(
-                Icons.lock,
-                'Nothing leaves the phone. No account needed.',
-              ),
-            ],
-          ),
-        ),
+      const _InfoRow(
+        Icons.notifications_active,
+        'Reads payment alerts from the apps you pick.',
+      ),
+      const _InfoRow(
+        Icons.touch_app,
+        'You check each payment before it counts.',
+      ),
+      const _InfoRow(
+        Icons.lock,
+        'Nothing leaves the phone. No account needed.',
       ),
     ];
   }
@@ -259,7 +273,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   List<Widget> _blocked(BuildContext context) {
     final body = _body(context);
     return [
-      const Center(child: Mon(MonFace.worry, size: 64)),
       Text(
         'Android blocked this',
         style: Theme.of(context).textTheme.headlineSmall,
@@ -328,7 +341,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   List<Widget> _ready(BuildContext context, OnboardingViewModel vm) =>
       vm.listensToNoApp
       ? [
-          const Center(child: Mon(MonFace.idle, size: 140)),
           Text(
             'Koban listens to no app yet.',
             style: Theme.of(context).textTheme.headlineMedium,
@@ -341,7 +353,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ]
       : [
-          const Center(child: Mon(MonFace.happy, size: 140)),
           Text(
             'Koban is ready',
             style: Theme.of(context).textTheme.headlineMedium,

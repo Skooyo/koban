@@ -122,7 +122,7 @@ class GroupsState {
 }
 
 /// Groups: sign-in, actions, reads and the shared totals sync. A port of the 0.1.1
-/// `GroupRepository.kt`. Spec: docs/superpowers/specs/2026-11-12-group-tracker-design.md
+/// `GroupRepository.kt`.
 /// With Online features off, no method sends a request.
 class GroupRepository {
   GroupRepository({

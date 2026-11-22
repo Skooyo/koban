@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/app/app_services.dart';
+import 'package:koban/app/home_shell.dart';
 import 'package:koban/capture/listener_control.dart';
 import 'package:koban/screens/onboarding/onboarding_screen.dart';
 import 'package:koban/theme/mon.dart';
@@ -297,7 +298,7 @@ void main() {
     expect(await SharedPreferencesAsync().getBool('onboarding_done'), true);
     expect(s.settings.onboardingDone.value, true);
     expect(find.text('Koban is ready'), findsNothing);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(KobanTabBar), findsOneWidget);
   });
 
   /// Goes to Ready with no app chosen.
@@ -359,7 +360,7 @@ void main() {
     await tester.tap(find.text('Skip for now'));
     await tester.pumpAndSettle();
     expect(s.settings.onboardingDone.value, true);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(KobanTabBar), findsOneWidget);
   });
 
   testWidgets('Back on Welcome stores onboarding as done and closes', (
@@ -376,7 +377,7 @@ void main() {
     expect(await SharedPreferencesAsync().getBool('onboarding_done'), true);
     expect(s.settings.onboardingDone.value, true);
     expect(find.text('Get started'), findsNothing);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(KobanTabBar), findsOneWidget);
   });
 
   testWidgets(
@@ -412,7 +413,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Go to Home'));
       await tester.pumpAndSettle();
-      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(KobanTabBar), findsOneWidget);
       final prefs = SharedPreferencesAsync();
       expect(await prefs.getBool('onboarding_done'), true);
       expect(await prefs.getString('flutter_onboarding_step'), isNull);

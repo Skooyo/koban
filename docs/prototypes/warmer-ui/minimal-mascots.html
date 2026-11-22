@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Koban: minimal mascots</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap">
+<style>
+body{margin:0;background:#e9e6df;font-family:'Bricolage Grotesque',sans-serif;color:#161d2b}
+main{padding:40px;display:flex;flex-direction:column;gap:24px;max-width:1300px}
+h1{font-size:40px;margin:0}
+p{margin:0;color:#3b4a5c;font-size:15px}
+.card{background:#fff;border-radius:24px;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:24px;align-items:center}
+.faces{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap}
+.face{background:#f6f7fa;border-radius:16px;width:120px;padding:12px 0;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:600}
+.sizes{display:flex;gap:18px;align-items:end;margin-top:14px;font-size:12px;color:#5a6478}
+.sizes div{display:flex;flex-direction:column;align-items:center;gap:4px}
+.band{height:230px;background:#cfe9e6;border-radius:24px;position:relative;overflow:hidden}
+.band .ground{position:absolute;left:0;right:0;bottom:0;height:56px;background:#a8d4cf}
+.band .who{position:absolute;left:44px;bottom:34px}
+.band .bubble{position:absolute;left:170px;top:70px;right:20px;background:#fff;border-radius:18px 18px 18px 4px;padding:12px 14px;font-size:15px;font-weight:600}
+.band .bubble small{display:block;font-weight:400;color:#5a6478;font-size:13px;margin-top:2px}
+.band .title{position:absolute;left:20px;top:18px;font-size:22px;font-weight:700}
+.strip{background:#fff;border-radius:24px;padding:20px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;text-align:center;font-size:14px;font-weight:600}
+.m{display:inline-block;line-height:0}
+</style>
+</head>
+<body>
+<main>
+<h1>Koban: minimal mascots</h1>
+<p>One shape, one or two colors, dot eyes. Each one reads at 24 px in a list, works as the app icon, and costs a few lines of Flutter painter code.</p>
+
+<div class="strip">
+<div><span class="m" data-kind="koban" data-face="idle" data-size="72"></span><br>Oval koban</div>
+<div><span class="m" data-kind="bean" data-face="idle" data-size="72"></span><br>Bean</div>
+<div><span class="m" data-kind="mochi" data-face="idle" data-size="72"></span><br>Mochi</div>
+<div><span class="m" data-kind="sen" data-face="idle" data-size="72"></span><br>Sen</div>
+<div><span class="m" data-kind="slot" data-face="idle" data-size="72"></span><br>Slot</div>
+<div><span class="m" data-kind="drop" data-face="idle" data-size="72"></span><br>Drop</div>
+</div>
+
+<div class="card" data-card="koban" data-title="1. Oval koban" data-idea="Mon with everything removed: a gold oval, two dots, a short mouth. The name and the shape stay." data-line="Still a coin. Now with less to polish."></div>
+<div class="card" data-card="bean" data-title="2. Bean" data-idea="The dusk bean without spikes, feet or tag. A night-blue bean with gold eyes that glow." data-line="I am small. Your spending is not."></div>
+<div class="card" data-card="mochi" data-title="3. Mochi" data-idea="A soft cream dome with pink cheeks. The friendliest of the six, and it sits flat on any surface." data-line="Soft on you. Strict on the numbers."></div>
+<div class="card" data-card="sen" data-title="4. Sen" data-idea="An old cash coin with a square hole. The hole sits above the eyes, so the face reads as a coin at once." data-line="One sen at a time. That is the plan."></div>
+<div class="card" data-card="slot" data-title="5. Slot" data-idea="A rounded teal box with a coin slot on top: the tabung idea in one shape. A coin can drop in when you save a payment." data-line="Feed me receipts. I sort them."></div>
+<div class="card" data-card="drop" data-title="6. Drop" data-idea="A gold drop, like melted coin. It can squash and bounce when a payment is saved, with one shape to animate." data-line="Every ringgit counts. I counted."></div>
+</main>
+<script>
+const K = {
+  koban: { fill: '#f2c94c', ink: '#2a2106' },
+  bean:  { fill: '#2b3452', ink: '#ffd66b' },
+  mochi: { fill: '#fff3e6', ink: '#3a2a20', edge: '#ecd9c4', cheek: '#ffb4a8' },
+  sen:   { fill: '#e0a93a', ink: '#2a2106', hole: '#cfe9e6' },
+  slot:  { fill: '#2fa39a', ink: '#0d2b29' },
+  drop:  { fill: '#f2b84c', ink: '#2a2106' }
+};
+const BODY = {
+  koban: (c) => `<ellipse cx="50" cy="52" rx="30" ry="40" fill="${c.fill}" transform="rotate(-10 50 52)"/>`,
+  bean:  (c) => `<path d="M50 14c24 0 38 16 38 40s-16 34-38 34S12 76 12 54 26 14 50 14z" fill="${c.fill}"/>`,
+  mochi: (c) => `<path d="M12 84c0-34 16-56 38-56s38 22 38 56z" fill="${c.fill}" stroke="${c.edge}" stroke-width="2.5"/>`,
+  sen:   (c) => `<circle cx="50" cy="52" r="38" fill="${c.fill}"/><rect x="42" y="22" width="16" height="16" rx="2" fill="${c.hole}"/>`,
+  slot:  (c) => `<rect x="14" y="22" width="72" height="66" rx="22" fill="${c.fill}"/><rect x="38" y="30" width="24" height="5" rx="2.5" fill="${c.ink}" opacity=".55"/>`,
+  drop:  (c) => `<path d="M50 10c14 22 34 38 34 54a34 30 0 0 1-68 0c0-16 20-32 34-54z" fill="${c.fill}"/>`
+};
+const EYE_Y = { koban: 54, bean: 52, mochi: 62, sen: 58, slot: 58, drop: 64 };
+function face(kind, f, c) {
+  const y = EYE_Y[kind], l = 39, r = 61, s = 'stroke="' + c.ink + '" stroke-width="3.4" stroke-linecap="round" fill="none"';
+  const dots = `<circle cx="${l}" cy="${y}" r="3.6" fill="${c.ink}"/><circle cx="${r}" cy="${y}" r="3.6" fill="${c.ink}"/>`;
+  const cheeks = c.cheek ? `<ellipse cx="${l - 7}" cy="${y + 8}" rx="5" ry="3" fill="${c.cheek}"/><ellipse cx="${r + 7}" cy="${y + 8}" rx="5" ry="3" fill="${c.cheek}"/>` : '';
+  const m = y + 12;
+  return cheeks + ({
+    idle: dots + `<path d="M46 ${m}h8" ${s}/>`,
+    happy: `<path d="M${l - 5} ${y + 2}q5-7 10 0M${r - 5} ${y + 2}q5-7 10 0" ${s}/><path d="M44 ${m - 2}q6 6 12 0" ${s}/>`,
+    sleep: `<path d="M${l - 5} ${y}h10M${r - 5} ${y}h10" ${s}/><path d="M47 ${m}h6" ${s}/><path d="M76 22h8l-8 9h8" ${s}/>`,
+    worry: dots + `<path d="M${l - 6} ${y - 6}l9 -4M${r + 6} ${y - 6}l-9 -4" ${s}/><path d="M43 ${m + 1}q2.3-3 4.6 0t4.6 0 4.6 0" ${s}/>`
+  })[f];
+}
+function draw(kind, f, size) {
+  const c = K[kind];
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true"><ellipse cx="50" cy="95" rx="28" ry="3.5" fill="#000" opacity=".1"/>${BODY[kind](c)}${face(kind, f, c)}</svg>`;
+}
+document.querySelectorAll('[data-card]').forEach((el) => {
+  const k = el.dataset.card;
+  const faces = ['idle', 'happy', 'sleep', 'worry'].map((f) => `<div class="face"><span class="m" data-kind="${k}" data-face="${f}" data-size="84"></span>${f}</div>`).join('');
+  const sizes = [24, 40, 96].map((s) => `<div><span class="m" data-kind="${k}" data-face="idle" data-size="${s}"></span>${s} px</div>`).join('');
+  el.innerHTML = `<div><b style="font-size:22px">${el.dataset.title}</b><p style="margin-top:6px">${el.dataset.idea}</p><div class="faces">${faces}</div><div class="sizes">${sizes}</div></div>
+<div class="band"><div class="title">Good evening</div><div class="ground"></div><div class="who"><span class="m" data-kind="${k}" data-face="happy" data-size="110"></span></div><div class="bubble">${el.dataset.line}<small>You spent less than last week.</small></div></div>`;
+});
+document.querySelectorAll('.m').forEach((el) => { el.innerHTML = draw(el.dataset.kind, el.dataset.face, Number(el.dataset.size)); });
+</script>
+</body>
+</html>

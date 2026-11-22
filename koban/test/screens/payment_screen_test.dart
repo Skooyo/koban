@@ -10,6 +10,7 @@ import 'package:koban/data/undoable.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/payment/payment_view_model.dart';
 import 'package:koban/ui/kit.dart';
+import 'package:koban/theme/tokens.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../online/group_repository_test.dart' show jsonReply;
@@ -236,7 +237,7 @@ void main() {
   ) async {
     final s = await testServices();
     var opener = await openSheet(tester, s);
-    await tester.tap(find.byTooltip('Close'));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.text('Discard changes?'), findsNothing);
     expect(opener.closed, true);
@@ -245,7 +246,7 @@ void main() {
     await tester.tap(find.text('Open sheet'));
     await tester.pumpAndSettle();
     await typeAmount(tester, '5');
-    await tester.tap(find.byTooltip('Close'));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.text('Discard changes?'), findsOneWidget);
     await tester.tap(find.text('Discard'));
@@ -366,7 +367,7 @@ void main() {
     },
   );
 
-  testWidgets('the Save payment label has the button text color', (
+  testWidgets('the Save payment label has the dark text color on gold', (
     tester,
   ) async {
     await openSheet(tester, await testServices());
@@ -380,7 +381,7 @@ void main() {
         .text
         .style!
         .color;
-    expect(color, Theme.of(tester.element(label)).colorScheme.onPrimary);
+    expect(color, Color(KobanColors.light.onGold));
   });
 
   testWidgets('an edit shows no recent shops', (tester) async {

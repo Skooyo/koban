@@ -123,6 +123,74 @@ class MoneyColors extends ThemeExtension<MoneyColors> {
   }
 }
 
+/// The colors of the Mon's desk look: the scene band and the pill tab bar.
+@immutable
+class SceneColors extends ThemeExtension<SceneColors> {
+  const SceneColors({
+    required this.band,
+    required this.ground,
+    required this.tabBar,
+    required this.onTabBar,
+  });
+
+  SceneColors.fromPalette(KobanPalette p)
+    : band = Color(p.sceneBand),
+      ground = Color(p.sceneGround),
+      tabBar = Color(p.tabBar),
+      onTabBar = Color(p.onTabBar);
+
+  /// The band behind the title, Mon and the speech bubble. Text on it uses onSurface.
+  final Color band;
+
+  /// The strip at the foot of the band that Mon and the coins stand on.
+  final Color ground;
+  final Color tabBar;
+
+  /// The icons of the inactive tabs.
+  final Color onTabBar;
+
+  static SceneColors of(BuildContext context) =>
+      Theme.of(context).extension<SceneColors>()!;
+
+  @override
+  SceneColors copyWith({
+    Color? band,
+    Color? ground,
+    Color? tabBar,
+    Color? onTabBar,
+  }) => SceneColors(
+    band: band ?? this.band,
+    ground: ground ?? this.ground,
+    tabBar: tabBar ?? this.tabBar,
+    onTabBar: onTabBar ?? this.onTabBar,
+  );
+
+  @override
+  SceneColors lerp(SceneColors? other, double t) {
+    if (other == null) return this;
+    Color l(Color a, Color b) => Color.lerp(a, b, t)!;
+    return SceneColors(
+      band: l(band, other.band),
+      ground: l(ground, other.ground),
+      tabBar: l(tabBar, other.tabBar),
+      onTabBar: l(onTabBar, other.onTabBar),
+    );
+  }
+}
+
+/// The glyph of a category id. All custom categories share one glyph, as they share one color.
+IconData categoryIcon(String? categoryId) => switch (categoryId) {
+  'food' => Icons.restaurant,
+  'transport' => Icons.directions_car,
+  'shopping' => Icons.shopping_bag,
+  'bills' => Icons.bolt,
+  'entertainment' => Icons.movie,
+  'health' => Icons.favorite,
+  'other' => Icons.more_horiz,
+  null => Icons.help_outline,
+  _ => Icons.label,
+};
+
 /// The color of a category id. All custom categories share one color.
 Color categoryColor(BuildContext context, String? categoryId) {
   final c = MoneyColors.of(context);
@@ -245,16 +313,36 @@ ThemeData kobanTheme(Brightness brightness) {
     shape: WidgetStatePropertyAll(stadium),
     minimumSize: minHeight,
   );
+  // The one gold action of a page is gold in both themes, as in the Mon's desk look.
+  final gold = Color(p.gold);
+  final onGold = Color(p.onGold);
+  final cardShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(KobanRadius.r24),
+  );
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
     colorScheme: scheme,
     scaffoldBackgroundColor: night,
     textTheme: textTheme,
-    extensions: [dark ? MoneyColors.dark : MoneyColors.light],
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: scheme.surfaceContainer,
-      indicatorColor: scheme.primaryContainer,
+    extensions: [
+      dark ? MoneyColors.dark : MoneyColors.light,
+      SceneColors.fromPalette(p),
+    ],
+    cardTheme: CardThemeData(
+      color: scheme.surfaceContainer,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: cardShape,
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: gold,
+      foregroundColor: onGold,
+      shape: const StadiumBorder(),
+      elevation: 0,
+      focusElevation: 0,
+      hoverElevation: 0,
+      highlightElevation: 0,
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: ink,
@@ -282,7 +370,12 @@ ThemeData kobanTheme(Brightness brightness) {
         ),
       ),
     ),
-    filledButtonTheme: const FilledButtonThemeData(style: buttonStyle),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: gold,
+        foregroundColor: onGold,
+      ).merge(buttonStyle),
+    ),
     outlinedButtonTheme: const OutlinedButtonThemeData(style: buttonStyle),
     textButtonTheme: const TextButtonThemeData(style: buttonStyle),
   );

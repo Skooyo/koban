@@ -107,7 +107,7 @@ void main() {
       find.text('Use this when new payments stop showing up in Koban.'),
       findsOneWidget,
     );
-    expect(find.text('App version 0.1.1'), findsOneWidget);
+    expect(find.text('Koban 0.1.1'), findsOneWidget);
     expect(find.text('Xiaomi autostart'), findsNothing);
     expect(listener.calls.map((c) => c.method), contains('ensureActive'));
     await tester.tap(
@@ -120,7 +120,7 @@ void main() {
     );
   });
 
-  testWidgets('Troubleshooting holds the log and Restart payment tracking', (
+  testWidgets('Tracking holds the log and Restart payment tracking', (
     tester,
   ) async {
     final listener = listenerChannel();
@@ -138,14 +138,16 @@ void main() {
       ),
       findsOneWidget,
     );
-    // The group sits between Tracking and Appearance.
-    expect(top('Troubleshooting'), greaterThan(top('Payment apps')));
-    expect(top('Notification log'), greaterThan(top('Troubleshooting')));
+    // The rows sit in the Tracking group, above Online.
+    expect(top('Notification log'), greaterThan(top('Payment apps')));
     expect(
       top('Restart payment tracking'),
       greaterThan(top('Notification log')),
     );
-    expect(top('Appearance'), greaterThan(top('Restart payment tracking')));
+    expect(
+      top('Online features'),
+      greaterThan(top('Restart payment tracking')),
+    );
   });
 
   testWidgets('the Payment apps row says when no app is chosen', (
@@ -239,11 +241,11 @@ void main() {
     await pumpSettings(tester, await settingsServices());
     Brightness brightness() =>
         Theme.of(tester.element(find.byType(SettingsScreen))).brightness;
-    expect(brightness(), Brightness.dark);
+    expect(brightness(), Brightness.light);
     await tester.tap(find.text('Dark mode'));
     await tester.pumpAndSettle();
-    expect(brightness(), Brightness.light);
-    expect(await SharedPreferencesAsync().getBool('dark_mode'), false);
+    expect(brightness(), Brightness.dark);
+    expect(await SharedPreferencesAsync().getBool('dark_mode'), true);
   });
 
   testWidgets('own categories can be added and removed, built-in ones cannot', (
@@ -475,10 +477,8 @@ void main() {
     );
     expect(
       tester
-          .widget<TextButton>(
-            find.widgetWithText(TextButton, 'Check for updates'),
-          )
-          .onPressed,
+          .widget<KobanRow>(find.widgetWithText(KobanRow, 'Check for updates'))
+          .onTap,
       isNull,
     );
     await tester.tap(find.text('Online features'));
@@ -545,13 +545,13 @@ void main() {
       expect(find.text('Set up later'), findsOneWidget);
       await tester.tap(find.text('Read receipts, join groups'));
       await tester.pumpAndSettle();
-      expect(find.text('Appearance'), findsOneWidget);
+      expect(find.text('Dark mode'), findsOneWidget);
       await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
-      expect(find.text('Appearance'), findsNothing);
+      expect(find.text('Dark mode'), findsNothing);
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
-      expect(find.text('Appearance'), findsOneWidget);
+      expect(find.text('Dark mode'), findsOneWidget);
     },
   );
 

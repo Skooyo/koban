@@ -8,9 +8,12 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
 import '../../rules/top_up.dart';
+import '../../rules/types.dart';
+import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
 import '../../ui/alerts_off_row.dart';
 import '../../ui/kit.dart';
+import '../../ui/scene_band.dart';
 import '../payment/category_sheet.dart';
 import 'check_payment_card.dart';
 import 'check_payments_view_model.dart';
@@ -213,25 +216,20 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
       final error = vm.loadError;
       if (error == null) return const Scaffold();
       return Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 12, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  tooltip: 'Back',
-                  icon: const Icon(Icons.arrow_back),
-                ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: WarningRow(error),
-                ),
-              ],
+        body: Column(
+          children: [
+            const SceneBand(
+              title: 'Check payments',
+              face: MonFace.worry,
+              line: 'That did not load.',
+              back: true,
+              compact: true,
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+              child: WarningRow(error),
+            ),
+          ],
         ),
       );
     }
@@ -244,74 +242,77 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
     const dropLabel = _ButtonLabel(Icons.close, 'Not a payment');
     const saveLabel = _ButtonLabel(Icons.check, 'Save payment');
     const buttonSize = Size(0, 52);
+    final total = cards.length + vm.handled;
+    final outline = OutlinedButton.styleFrom(
+      minimumSize: buttonSize,
+      foregroundColor: scheme.onSurface,
+      side: BorderSide(color: scheme.onSurface, width: 2),
+    );
     return Scaffold(
       body: SafeArea(
+        top: false,
         child: Stack(
           children: [
             Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 12, 20, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).maybePop(),
-                        tooltip: 'Back',
-                        icon: const Icon(Icons.arrow_back),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Semantics(
-                            header: true,
-                            child: Text(
-                              'Check payments',
-                              style: text.titleLarge,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (top != null)
-                        Text(
-                          '${vm.handled + 1} of ${cards.length + vm.handled}',
-                          style: text.bodyLarge!.copyWith(color: muted),
-                        ),
-                    ],
-                  ),
+                SceneBand(
+                  title: 'Check payments',
+                  face: top == null ? MonFace.happy : MonFace.idle,
+                  line: top == null
+                      ? 'That was the last one.'
+                      : 'Is this one yours?',
+                  detail: top == null ? null : _sourceLine(top),
+                  back: true,
+                  compact: true,
+                  action: top == null
+                      ? null
+                      : _CounterPill('${vm.handled + 1} of $total'),
                 ),
                 if (_alertsOff)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
                     child: AlertsOffRow(onTurnOn: _turnOnAlerts),
                   ),
-                // The card takes the height it needs (up to all of it); the hint sits right under it.
+                // The card takes the height it needs (up to a limit); the hint sits under it.
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      _alertsOff ? 12 : 8,
+                      16,
+                      0,
+                    ),
                     child: Column(
                       children: [
                         Flexible(
                           fit: top == null ? FlexFit.tight : FlexFit.loose,
-                          child: Stack(
-                            children: [
-                              if (top == null)
-                                const Center(child: _AllChecked()),
-                              // Drawn back to front, so the oldest card is on top.
-                              for (
-                                var depth = shown.length - 1;
-                                depth >= 0;
-                                depth--
-                              )
-                                _stackCard(shown[depth], depth),
-                            ],
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 560),
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  if (top == null)
+                                    const Center(child: _AllChecked()),
+                                  // Drawn back to front, so the oldest card is on top.
+                                  for (
+                                    var depth = shown.length - 1;
+                                    depth >= 0;
+                                    depth--
+                                  )
+                                    _stackCard(shown[depth], depth),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                         if (top != null)
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                             child: Text(
                               'Tap a field to fix it. Swipe right to save, left for Not a payment.',
-                              style: text.bodyMedium!.copyWith(color: muted),
+                              style: text.bodySmall!.copyWith(color: muted),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -321,9 +322,9 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                 ),
                 if (top != null)
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     child: Row(
-                      spacing: 8,
+                      spacing: 12,
                       children: [
                         Expanded(
                           child: topUp
@@ -336,9 +337,7 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                                 )
                               : OutlinedButton(
                                   onPressed: () => _decide(save: false),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: buttonSize,
-                                  ),
+                                  style: outline,
                                   child: dropLabel,
                                 ),
                         ),
@@ -346,9 +345,7 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                           child: topUp
                               ? OutlinedButton(
                                   onPressed: () => _decide(save: true),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: buttonSize,
-                                  ),
+                                  style: outline,
                                   child: saveLabel,
                                 )
                               : FilledButton(
@@ -364,7 +361,7 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                   )
                 else
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     child: FilledButton(
                       onPressed: () => Navigator.of(context).maybePop(),
                       style: FilledButton.styleFrom(
@@ -373,12 +370,18 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                       child: const Text('Back to Home'),
                     ),
                   ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: top == null
+                      ? const SizedBox(height: 20)
+                      : _Progress(done: vm.handled, total: total),
+                ),
               ],
             ),
             Positioned(
               left: 16,
               right: 16,
-              bottom: 140,
+              bottom: 120,
               child: Center(
                 child: AnimatedSwitcher(
                   duration: _reduceMotion
@@ -400,6 +403,16 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
     );
   }
 
+  /// Mon's second sentence: where the payment came from, and who decides.
+  String _sourceLine(CheckCard card) {
+    final p = card.payment;
+    if (p.directionUnclear) return '${card.appName} is not sure. You decide.';
+    final verb = p.transactionType == TransactionType.receive
+        ? 'you received money'
+        : 'you paid';
+    return '${card.appName} says $verb. You decide.';
+  }
+
   Widget _stackCard(CheckCard card, int depth) {
     final isTop = depth == 0;
     final payment = card.payment;
@@ -407,15 +420,14 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
       tween: Tween(end: depth.toDouble()),
       duration: _reduceMotion ? Duration.zero : _move,
       builder: (context, lift, child) => Transform.translate(
-        offset: Offset(0, lift * 10),
+        offset: Offset(0, lift * 8),
         child: Transform.scale(
-          scale: 1 - lift * 0.04,
-          child: isTop
-              ? child
-              : Opacity(
-                  opacity: (1 - lift * 0.25).clamp(0.0, 1.0),
-                  child: child,
-                ),
+          scale: 1 - lift * 0.03,
+          child: Transform.rotate(
+            // The card behind leans left, the one behind that leans right.
+            angle: _lean(lift) * math.pi / 180,
+            child: _Tinted(lift: lift, child: child!),
+          ),
         ),
       ),
       child: isTop
@@ -476,6 +488,115 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
   }
 }
 
+/// The lean in degrees of a card [lift] places behind the top one.
+double _lean(double lift) =>
+    lift <= 1 ? -3 * lift : -3 + 7 * (lift - 1).clamp(0.0, 1.0);
+
+/// Covers a card behind the top one with a teal, then a gold, tint.
+/// The cover is solid at a lift of 1, so only the top card shows its text.
+class _Tinted extends StatelessWidget {
+  const _Tinted({required this.lift, required this.child});
+
+  final double lift;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (lift <= 0) return child;
+    final teal = SceneColors.of(context).band;
+    final gold = Theme.of(context).colorScheme.primaryContainer;
+    final tint = Color.lerp(teal, gold, (lift - 1).clamp(0.0, 1.0))!;
+    return Stack(
+      children: [
+        child,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: ColoredBox(
+                color: tint.withValues(alpha: lift.clamp(0.0, 1.0)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "1 of 3" in a pill at the end of the band's title row.
+class _CounterPill extends StatelessWidget {
+  const _CounterPill(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: ShapeDecoration(
+        color: theme.colorScheme.surfaceContainer.withValues(alpha: 0.7),
+        shape: const StadiumBorder(),
+      ),
+      child: Text(
+        text,
+        style: tabular(
+          theme.textTheme.labelLarge!.copyWith(
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Dots for the cards checked and waiting, and how many follow the top one.
+class _Progress extends StatelessWidget {
+  const _Progress({required this.done, required this.total});
+
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final after = total - done - 1;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      spacing: 8,
+      children: [
+        if (total <= 12)
+          ExcludeSemantics(
+            child: Row(
+              spacing: 4,
+              children: [
+                for (var i = 0; i < total; i++)
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: i == done
+                          ? scheme.onSurface
+                          : scheme.outlineVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        Text(
+          after == 0 ? 'Last one' : '$after more after this',
+          style: theme.textTheme.bodyMedium!.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ButtonLabel extends StatelessWidget {
   const _ButtonLabel(this.icon, this.text);
 
@@ -504,7 +625,6 @@ class _AllChecked extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Mon(MonFace.happy, size: 120),
         Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Text('All checked', style: theme.textTheme.headlineMedium),

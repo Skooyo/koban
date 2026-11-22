@@ -72,14 +72,10 @@ void main() {
     await openPeople(tester, s);
 
     expect(find.text('People'), findsOneWidget);
-    expect(
-      find.text('Payment QRs, and what you owe each other'),
-      findsOneWidget,
-    );
     final headings = tester
         .widgetList<SectionHeading>(find.byType(SectionHeading))
         .map((h) => h.text);
-    expect(headings, ['You owe', 'Owes you', 'Everyone else']);
+    expect(headings, ['They owe you', 'You owe', 'Everyone else']);
     for (final (name, line) in [
       ('Mei', 'You owe RM 4.00'),
       ('Ali', 'Owes you RM 14.00'),
@@ -106,7 +102,7 @@ void main() {
 
     expect(find.byType(KobanRow), findsOneWidget);
     expect(rowOf('Ali'), findsOneWidget);
-    expect(find.text('Owes you'), findsOneWidget);
+    expect(find.text('They owe you'), findsOneWidget);
     expect(find.text('You owe'), findsNothing);
   });
 
@@ -141,7 +137,7 @@ void main() {
     final s = await testServices();
     await openPeople(tester, s);
 
-    await tester.tap(find.text('Add person'));
+    await tester.tap(find.byTooltip('Add person'));
     await tester.pumpAndSettle();
     expect(inDialog(find.text('Add person')), findsOneWidget);
     await tester.enterText(
@@ -169,7 +165,7 @@ void main() {
     final s = await testServices();
     await openPeople(tester, s);
 
-    await tester.tap(find.text('Add person'));
+    await tester.tap(find.byTooltip('Add person'));
     await tester.pumpAndSettle();
     await tester.tap(inDialog(find.text('Add')));
     await settle(tester);
@@ -202,6 +198,8 @@ void main() {
       findsOneWidget,
     );
     expect(rowOf('Split bill'), findsOneWidget);
+    await tester.ensureVisible(shop);
+    await tester.pumpAndSettle();
     await tester.tap(shop);
     await settle(tester);
     expect(find.text('Split done'), findsOneWidget);
@@ -210,8 +208,8 @@ void main() {
 
     await tester.tap(find.widgetWithText(FilledButton, 'Split a bill'));
     await settle(tester);
-    final steps = tester.widget<StepProgress>(find.byType(StepProgress));
-    expect(steps.number, 1);
+    expect(find.text('Who ate with you?'), findsOneWidget);
+    expect(find.text('1 of 3'), findsOneWidget);
     expect(find.text('Split done'), findsNothing);
   });
 
@@ -247,7 +245,7 @@ void main() {
         .listen((_) => writes++);
     addTearDown(sub.cancel);
 
-    await tester.tap(find.text('Add person'));
+    await tester.tap(find.byTooltip('Add person'));
     await tester.pumpAndSettle();
     await tester.enterText(
       inDialog(find.widgetWithText(TextField, 'Name')),

@@ -1,6 +1,6 @@
 // POST raw JPEG/PNG with "Authorization: Bearer <deviceToken>" -> 200 receipt JSON + readsLeftToday.
 // Checks the device and the daily limits, then forwards the photo to the receipt service on the owner's server.
-// A read counts only when Claude ran (200, 502, 504). See docs/superpowers/specs/2026-11-12-receipt-claude-fallback-design.md.
+// A read counts only when Claude ran (200, 502, 504).
 import { json, rpc, sha256Hex } from "../_shared/db.ts";
 
 const SERVICE_URL = Deno.env.get("RECEIPT_SERVICE_URL")!;

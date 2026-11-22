@@ -1,7 +1,6 @@
 """Koban receipt reader: photo in, receipt JSON out. Runs `claude -p` (Haiku, then Sonnet once if needed).
 
 Only the Supabase Edge Function calls this service (Bearer RECEIPT_TOKEN). One photo at a time; 5 waiting = 503.
-See docs/superpowers/specs/2026-11-12-receipt-claude-fallback-design.md.
 """
 import hmac, json, os, re, shutil, subprocess, tempfile, threading, time
 from decimal import Decimal, InvalidOperation

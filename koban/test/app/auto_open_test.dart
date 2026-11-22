@@ -94,7 +94,7 @@ void main() {
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(all(CheckPaymentsScreen), findsNothing);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(KobanTabBar), findsOneWidget);
   });
 
   testWidgets('an existing user with access never gets onboarding', (
@@ -107,7 +107,7 @@ void main() {
     expect(all(OnboardingScreen), findsNothing);
     expect(all(PaymentAppsScreen), findsNothing);
     expect(all(CheckPaymentsScreen), findsNothing);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(KobanTabBar), findsOneWidget);
   });
 
   testWidgets('auto-open runs again when the app comes back to the front', (
@@ -131,7 +131,7 @@ void main() {
     await start(tester, s);
     await tester.pumpAndSettle();
     pushPage<void>(
-      tester.element(find.byType(NavigationBar)),
+      tester.element(find.byType(KobanTabBar)),
       const Scaffold(body: Text('Other page')),
     );
     await tester.pumpAndSettle();

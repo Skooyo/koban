@@ -6,16 +6,16 @@ Koban is an Android expense tracker for people in Malaysia. It reads bank notifi
 
 ## The vibe
 
-Calm, exact, a little dry. One gold coin on a night-blue table. The app counts money for you and does not shout about it.
+Warm, exact, a little dry. Mon, a gold coin, sits on its desk at the top of every screen. The app counts money for you and does not shout about it. This is direction B, "Mon's desk" (`docs/prototypes/warmer-ui/b-mons-desk.html`).
 
-- **Calm:** dark night-blue grounds, few colors, no motion that nobody asked for.
+- **Warm:** a light page, a soft teal scene band on top, white cards, few colors, no motion that nobody asked for.
 - **Exact:** every amount is a real number in tabular figures. Every button says what it does.
-- **A little dry:** Mon, the coin, makes a short plain joke on an empty or a finished screen. Nowhere else.
+- **A little dry:** Mon makes one short plain remark in the scene band of each screen, about what the screen shows.
 - **One gold thing:** gold marks the one action you can take next. If two things are gold, one of them is wrong.
 
 ## Color rules
 
-The values are in the Tokens section below. Dark is the main theme; light follows the phone setting.
+The values are in the Tokens section below. Light is the main theme; dark is a setting. The scene band uses `scene-band` and `scene-ground`; the tab bar uses `tab-bar`.
 
 1. Use `night` for the page, `surface` for cards, lists and sheets, `surface-2` for fields and keys inside them.
 2. Use `ink` for main text and `muted` for second lines. Do not make a third gray.
@@ -55,11 +55,12 @@ One font: Bricolage Grotesque, a variable font. The Android code loads it from `
 
 - Side margin `space-16`. Gap between groups `space-24`.
 - Every tap target is `tap-48` or more. A list row is 56px tall or more.
-- Lists sit in one `surface` group with `radius-16` and `line` dividers. Do not put each row in its own card.
+- Every screen starts with the scene band (`SceneBand`): the title row, Mon on a small coin pile, and a white speech bubble. Top-level tabs use the full band; pushed screens use the compact band with Back. The first card overlaps the band by 24px.
+- Lists sit in one `surface` group with `radius-24` and `line` dividers. Do not put each row in its own card. A row leads with a `CategoryBadge` (a tinted circle with the category glyph).
 - Sheets have `radius-24` top corners. Dialogs have `radius-24`. Buttons are `radius-full`.
 - The add button sits bottom right above the bottom bar. Give the last list row enough bottom padding so the add button never covers it.
-- No shadows on dark. Show depth with `night`, `surface` and `surface-2`.
-- The bottom bar has 4 tabs: Home, Activity, People, Groups. The selected tab gets a `gold-soft` pill.
+- No shadows. Show depth with `night`, `surface`, `surface-2` and the scene band.
+- The tab bar is a floating dark pill (`tab-bar`, 12px margin) with 4 tabs: Home, Activity, People, Groups. The selected tab is a gold pill with its icon and label; the others show their icon only, with a tooltip.
 
 ## Icons
 
@@ -70,7 +71,7 @@ One font: Bricolage Grotesque, a variable font. The Android code loads it from `
 
 ## Words
 
-Use one word for one thing, on every screen. These are the words of the redesign mockups (`docs/prototypes/app-redesign-mockups.html`):
+Use one word for one thing, on every screen. These are the app's words:
 
 | Use | Not | Meaning |
 | --- | --- | --- |
@@ -106,14 +107,14 @@ Before Koban drops typed data (X, Back, swipe down), it asks `Discard changes?` 
 
 ## Mon, the mascot
 
-Mon is a tilted koban coin with a sleepy face, in the spirit of a small desk toy. The Mon section below shows the rules; the mockups file draws all 5 faces.
+Mon is a plain gold koban oval with dot eyes: one shape, no rim, no shine, so it reads at 24 px. The Mon section below shows the rules.
 
-- Mon appears on empty screens, finished screens (all checked, all paid), the tracking-off status, and first start. Nowhere else.
-- Never more than one Mon on a screen. Never on a list row, a button, a chart or the cover.
+- Mon sits in the scene band of every screen, and on empty and finished screens. Its face and line follow the screen's real state.
+- Never more than one Mon on a screen. Never on a list row, a button or a chart.
 - Mon has 5 faces: `idle` (usual), `sleep` (tracking is off), `happy` (all done), `worry` (an error with a fix), `look` (working: reading a receipt, syncing).
 - Mon's line is one short sentence, dry, under 60 characters. The real message stays in plain text next to it, so the screen works without the joke.
 - Mon is decoration for screen readers when the text says the same thing. Otherwise give it a label: `Mon, sleeping`.
-- Mon uses only `gold`, `coin-rim`, `coin-shade`, `coin-shine` and `on-gold`. Do not recolor it.
+- Mon uses only `gold`, `coin-shade` and `on-gold`. Do not recolor it.
 
 ## Logo
 
@@ -146,7 +147,7 @@ The Compose theme is `app/src/main/java/com/expensetracker/app/ui/theme/Theme.kt
 
 | Token | Dark | Light | Use |
 | --- | --- | --- | --- |
-| `night` | `#141b2b` | `#f6f7fa` | Page background behind every screen. Dark is the main theme. |
+| `night` | `#141b2b` | `#f6f7fa` | Page background behind every screen. Light is the main theme. |
 | `surface` | `#1c2539` | `#ffffff` | Cards, list groups, sheets and dialogs on night. |
 | `surface-2` | `#243049` | `#eef1f6` | Raised parts inside a surface: fields, the segmented control, the keypad keys, chart tracks. |
 | `line` | `#2f3b57` | `#d9dee8` | Dividers between list rows and outlines of outline buttons. Never use it for text. |
@@ -170,6 +171,10 @@ The Compose theme is `app/src/main/java/com/expensetracker/app/ui/theme/Theme.kt
 | `coin-rim` | `#d9ae35` | `#d9ae35` | Mon and the logo only: the coin rim line. |
 | `coin-shade` | `#c99a22` | `#c99a22` | Mon and the logo only: the coin edge below the face. |
 | `coin-shine` | `#fff3c4` | `#fff3c4` | Mon and the logo only: the highlight, at 55% opacity. |
+| `scene-band` | `#17302f` | `#cfe9e6` | The scene band at the top of every screen, behind the title and Mon. Ink on it is 12.3:1 or more. |
+| `scene-ground` | `#12403c` | `#a8d4cf` | The lower strip of the scene band, where Mon's coin pile stands. Ink on it is 10:1 or more. |
+| `tab-bar` | `#2b3957` | `#161d2b` | The floating tab bar pill. |
+| `on-tab-bar` | `#edf0f7` | `#edf0f7` | Icons on the tab bar. 10:1 or more. |
 
 ### Type
 
@@ -280,13 +285,13 @@ The discard dialog asks before Koban drops data the person typed.
 
 ### Mon
 
-Mon is Koban's mascot: a tilted koban coin with a sleepy face, shown on empty, finished and status screens.
+Mon is Koban's mascot: a plain gold koban oval with dot eyes, shown on empty, finished and status screens.
 
 - Faces: `idle`, `sleep`, `happy`, `worry`, `look`. Pick the face from the screen's state, not for fun.
 - Sizes: 120 to 160px on an empty or finished screen, 96px in a dialog, 44px in a status row, 22px next to a Settings row title.
-- One Mon per screen at most. Never on a list row, a button, a chart, a notification or the cover.
+- One Mon per screen at most, in the scene band. Never on a list row, a button, a chart or a notification.
 - Next to Mon goes one dry line under 60 characters, plus the real message in plain text. Examples: `Nothing left. I will just sit here and shine.` (happy), `I cannot see your payments. Wake me up.` (sleep).
 - Mon does not move by itself. It may change face when the state changes.
-- Colors are fixed: face `gold` `#F2C94C`, edge `coin-shade` `#C99A22`, rim `coin-rim` `#D9AE35`, hammer lines `#E3B93E`, shine `coin-shine` `#FFF3C4` at 55%, face lines `on-gold` `#2A2106` at 2.6 stroke. The same on dark and light.
+- Colors are fixed: body `gold` `#F2C94C`, a 2.5 px lower edge in `coin-shade` `#C99A22` (it keeps Mon visible on light grounds), eyes and lines `on-gold` `#2A2106` at 3.4 stroke. The same on dark and light.
 - Accessibility: when the text says the same as Mon's face, mark Mon as decoration (`contentDescription = null`). Otherwise label it: `Mon, sleeping`.
-- Source: the `mon(face, size)` function in `docs/prototypes/app-redesign-mockups.html` (viewBox 0 0 100 110). In Compose, draw it as one `ImageVector` per face, or as vector drawables in `res/drawable`.
+- Source: `koban/lib/theme/mon.dart` (viewBox 0 0 100 110, the oval tilted 10 degrees). The face shapes are in `docs/prototypes/warmer-ui/minimal-mascots.html`.

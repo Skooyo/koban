@@ -6,7 +6,7 @@ import '../../data/database.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/split_math.dart';
 import '../../theme/koban_theme.dart';
-import '../../theme/mon.dart';
+import '../../theme/tokens.dart';
 import '../../ui/amount_input.dart';
 import '../../ui/date_labels.dart';
 import '../../ui/kit.dart';
@@ -29,26 +29,163 @@ String? paymentNote(SplitEditorState s) {
       'Your share absorbs the difference.';
 }
 
-/// Selected: a primaryContainer fill with a check. Not selected: an outline.
-class _PersonChip extends StatelessWidget {
-  const _PersonChip(this.name, {required this.selected, this.onTap});
+/// The name of a person id: Me, or the name of a person of the split.
+String nameOf(SplitEditorState s, String id) => id == meId
+    ? 'Me'
+    : s.people.where((p) => p.id == id).firstOrNull?.name ?? id;
+
+/// A white card with radius 24 on the ground of the screen.
+class SplitCard extends StatelessWidget {
+  const SplitCard({super.key, required this.children, this.side});
+
+  final List<Widget> children;
+  final BorderSide? side;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Theme.of(context).colorScheme.surfaceContainer,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(KobanRadius.r24),
+      side: side ?? BorderSide.none,
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(KobanSpace.s16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    ),
+  );
+}
+
+/// A small heading inside a [SplitCard], with an optional widget at the end.
+class CardHeading extends StatelessWidget {
+  const CardHeading(this.text, {super.key, this.trailing});
+
+  final String text;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            header: true,
+            child: Text(
+              text,
+              style: theme.textTheme.titleMedium!.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ),
+        ?trailing,
+      ],
+    );
+  }
+}
+
+/// One face of who had an item: a 48 dp target with initials. On: a gold-soft fill.
+/// The tooltip is the name, so screen readers and tests read it.
+class PersonToggle extends StatelessWidget {
+  const PersonToggle(
+    this.name, {
+    super.key,
+    required this.on,
+    required this.onTap,
+  });
 
   final String name;
-  final bool selected;
-
-  /// Null shows the chip as fixed.
-  final VoidCallback? onTap;
+  final bool on;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      selected: on,
+      child: Tooltip(
+        message: name,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 24,
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: on ? scheme.primaryContainer : scheme.surface,
+                  border: Border.all(
+                    color: on ? scheme.primary : scheme.outlineVariant,
+                    width: on ? 2 : 1,
+                  ),
+                ),
+                child: ExcludeSemantics(
+                  child: Text(
+                    initialsOf(name),
+                    style: Theme.of(context).textTheme.labelMedium!.copyWith(
+                      color: on
+                          ? scheme.onPrimaryContainer
+                          : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Selected: a primaryContainer fill. Not selected: an outline.
+class PersonChip extends StatelessWidget {
+  const PersonChip(
+    this.name, {
+    super.key,
+    required this.selected,
+    this.onTap,
+    this.avatar = true,
+  });
+
+  final String name;
+  final bool selected;
+
+  /// Null shows the chip as fixed: always in, not a disabled chip.
+  final VoidCallback? onTap;
+  final bool avatar;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final labelStyle = Theme.of(context).textTheme.labelLarge!
+        .copyWith(color: selected ? scheme.onPrimaryContainer : null);
+    final face = avatar ? InitialsAvatar(name, size: 24) : null;
+    if (onTap == null) {
+      return Chip(
+        avatar: face,
+        label: Text(name),
+        labelStyle: labelStyle,
+        backgroundColor: scheme.primaryContainer,
+        side: BorderSide.none,
+      );
+    }
     return FilterChip(
       selected: selected,
-      onSelected: onTap == null ? null : (_) => onTap!(),
+      onSelected: (_) => onTap!(),
+      avatar: face,
+      showCheckmark: false,
       label: Text(name),
-      labelStyle: Theme.of(context).textTheme.labelLarge!
-          .copyWith(color: selected ? scheme.onPrimaryContainer : null),
-      checkmarkColor: scheme.onPrimaryContainer,
+      labelStyle: labelStyle,
       color: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
             ? scheme.primaryContainer
@@ -58,51 +195,62 @@ class _PersonChip extends StatelessWidget {
   }
 }
 
-class _StepIntro extends StatelessWidget {
-  const _StepIntro(this.text);
+/// The linked payment: shop, time and amount.
+class PaymentCard extends StatelessWidget {
+  const PaymentCard(this.payment, {super.key});
 
-  final String text;
+  final Expense payment;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Text(
-      text,
-      style: theme.textTheme.bodyMedium!.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-      ),
+    return SplitCard(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    payment.merchant ?? 'Payment',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  Text(
+                    dateTimeLabel(payment.notificationPostTime),
+                    style: theme.textTheme.bodySmall!.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            MoneyText(
+              splitRm(payment.amount),
+              style: theme.textTheme.titleLarge,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
 
-class _Heading extends StatelessWidget {
-  const _Heading(this.title, this.intro);
+const _gap = SizedBox(height: KobanSpace.s16);
 
-  final String title;
-  final String intro;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Semantics(
-        header: true,
-        child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
-      ),
-      const SizedBox(height: 8),
-      _StepIntro(intro),
-    ],
-  );
-}
-
-const _gap = SizedBox(height: 16);
-
-/// Who shares the bill: Me, the people of this bill, recent people and a new name.
+/// Who ate: Me, the people of this bill, recent people and a new name.
+/// [inSheet] lays it out for the people sheet of the items step.
 class PeopleStep extends StatefulWidget {
-  const PeopleStep({super.key, required this.state, required this.vm});
+  const PeopleStep({
+    super.key,
+    required this.state,
+    required this.vm,
+    this.inSheet = false,
+  });
 
   final SplitEditorState state;
   final SplitEditorViewModel vm;
+  final bool inSheet;
 
   @override
   State<PeopleStep> createState() => _PeopleStepState();
@@ -124,184 +272,102 @@ class _PeopleStepState extends State<PeopleStep> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final state = widget.state;
     final vm = widget.vm;
     final picked = {for (final p in state.people) p.id};
+    final payment = state.linkedPayment;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      shrinkWrap: widget.inSheet,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        const _Heading('Who is sharing?', 'Tap a name to add or remove it.'),
-        _gap,
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            const _PersonChip('Me', selected: true),
-            for (final p in state.people)
-              _PersonChip(
-                p.name,
-                selected: true,
-                onTap: () => vm.togglePerson(p),
-              ),
-            for (final p in vm.recentPeople.where(
-              (p) => !picked.contains(p.id),
-            ))
-              _PersonChip(
-                p.name,
-                selected: false,
-                onTap: () => vm.togglePerson(p),
-              ),
-          ],
-        ),
-        _gap,
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _name,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _add(),
-                decoration: const InputDecoration(
-                  labelText: 'New person',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ValueListenableBuilder(
-              valueListenable: _name,
-              builder: (context, value, _) =>
-                  TonalButton('Add', value.text.trim().isEmpty ? null : _add),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-/// Who had what: a card for each item with a chip for each person.
-class AssignStep extends StatelessWidget {
-  const AssignStep({super.key, required this.state, required this.vm});
-
-  final SplitEditorState state;
-  final SplitEditorViewModel vm;
-
-  @override
-  Widget build(BuildContext context) {
-    final missing = SplitEditorViewModel.unassigned(state);
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const _StepIntro(
-          'Tap names to share each item. A shared item splits evenly.',
-        ),
-        _gap,
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TonalButton(
-            'Split everything evenly',
-            vm.splitEverythingEvenly,
-          ),
-        ),
-        for (final row in state.items) ...[
-          _gap,
-          _AssignCard(
-            key: ValueKey(row.key),
-            row: row,
-            people: state.people,
-            unassigned: missing.contains(row.key),
-            vm: vm,
-          ),
+        if (payment != null && !widget.inSheet) ...[
+          PaymentCard(payment),
+          const SizedBox(height: KobanSpace.s12),
         ],
-      ],
-    );
-  }
-}
-
-class _AssignCard extends StatelessWidget {
-  const _AssignCard({
-    super.key,
-    required this.row,
-    required this.people,
-    required this.unassigned,
-    required this.vm,
-  });
-
-  final ItemRow row;
-  final List<SplitPeopleData> people;
-  final bool unassigned;
-  final SplitEditorViewModel vm;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final quantity = row.quantity.trim();
-    final price = AmountFormatter.parseInput(row.price);
-    return Material(
-      color: scheme.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: unassigned
-            ? BorderSide(color: MoneyColors.of(context).review, width: 2)
-            : BorderSide.none,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        SplitCard(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    quantity == '1' ? row.name : '${row.name} ×$quantity',
-                    style: theme.textTheme.titleMedium,
-                  ),
+            CardHeading(
+              widget.inSheet ? 'Who ate with you?' : 'Recent people',
+              trailing: Text(
+                'Tap to add',
+                style: theme.textTheme.bodySmall!.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-                if (price != null) ...[
-                  const SizedBox(width: 12),
-                  MoneyText(splitRm(price), style: theme.textTheme.titleMedium),
-                ],
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: KobanSpace.s12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                _PersonChip(
-                  'Everyone',
-                  selected: row.sharedBy.length == people.length + 1,
-                  onTap: () => vm.toggleEveryone(row.key),
-                ),
-                _PersonChip(
-                  'Me',
-                  selected: row.sharedBy.contains(meId),
-                  onTap: () => vm.toggleShare(row.key, meId),
-                ),
-                for (final p in people)
-                  _PersonChip(
+                const PersonChip('Me', selected: true),
+                for (final p in state.people)
+                  PersonChip(
                     p.name,
-                    selected: row.sharedBy.contains(p.id),
-                    onTap: () => vm.toggleShare(row.key, p.id),
+                    selected: true,
+                    onTap: () => vm.togglePerson(p),
+                  ),
+                for (final p in vm.recentPeople.where(
+                  (p) => !picked.contains(p.id),
+                ))
+                  PersonChip(
+                    p.name,
+                    selected: false,
+                    onTap: () => vm.togglePerson(p),
                   ),
               ],
             ),
-            if (unassigned) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Pick who had this item.',
-                style: theme.textTheme.bodySmall!.copyWith(
-                  color: MoneyColors.of(context).review,
+            _gap,
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _name,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _add(),
+                    decoration: const InputDecoration(
+                      labelText: 'New person',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ValueListenableBuilder(
+                  valueListenable: _name,
+                  builder: (context, value, _) => TonalButton(
+                    'Add',
+                    value.text.trim().isEmpty ? null : _add,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        if (!widget.inSheet) ...[
+          const SizedBox(height: KobanSpace.s12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'You mark who had each item as you add it. There is no second pass.',
+                  style: theme.textTheme.bodyMedium!.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -322,13 +388,8 @@ class LinkStep extends StatelessWidget {
     final note = paymentNote(state);
     final error = state.error;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        const _Heading(
-          'Which payment was this?',
-          'Link the card payment, so your spending counts only your share.',
-        ),
-        _gap,
         RadioGroup<String>(
           groupValue: state.selectedExpenseId ?? _none,
           onChanged: (v) =>
@@ -361,14 +422,14 @@ class LinkStep extends StatelessWidget {
             ),
           ),
         ],
-        if (note != null) ...[_gap, _ReviewNote(note)],
+        if (note != null) ...[_gap, ReviewNote(note)],
       ],
     );
   }
 }
 
-class _ReviewNote extends StatelessWidget {
-  const _ReviewNote(this.text);
+class ReviewNote extends StatelessWidget {
+  const ReviewNote(this.text, {super.key});
 
   final String text;
 
@@ -376,15 +437,10 @@ class _ReviewNote extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final review = MoneyColors.of(context).review;
-    return Material(
-      color: theme.colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: review),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
+    return SplitCard(
+      side: BorderSide(color: review),
+      children: [
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(Icons.info, color: review, size: 20),
@@ -392,27 +448,31 @@ class _ReviewNote extends StatelessWidget {
             Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
           ],
         ),
-      ),
+      ],
     );
   }
 }
 
-String _joinNames(List<String> names) => names.length <= 1
+String joinNames(List<String> names) => names.length <= 1
     ? names.join(', ')
     : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
 
+/// The people who owe the owner, for the summary line. Me is the last share line.
+List<String> owingNames(SplitEditorState s) {
+  final lines = SplitEditorViewModel.shareLines(s) ?? const [];
+  return [
+    for (final l in lines.take(lines.isEmpty ? 0 : lines.length - 1))
+      if (l.$3.sign > 0) l.$2,
+  ];
+}
+
 /// The shares, the total, and the actions of a saved or finished split.
+/// Send summary and Save split are in the bottom bar of the screen.
 class SummaryStep extends StatelessWidget {
-  const SummaryStep({
-    super.key,
-    required this.state,
-    required this.vm,
-    required this.onShare,
-  });
+  const SummaryStep({super.key, required this.state, required this.vm});
 
   final SplitEditorState state;
   final SplitEditorViewModel vm;
-  final ValueChanged<String> onShare;
 
   /// Deletes at once. The editor closes, and the page under it shows Undo.
   Future<void> _delete(BuildContext context) async {
@@ -428,6 +488,33 @@ class SummaryStep extends StatelessWidget {
     }
   }
 
+  /// "Nasi lemak, teh ais" for the items that [id] shares.
+  String _itemsOf(String id) {
+    final names = [
+      for (final r in state.items)
+        if (r.sharedBy.contains(id)) r.name.trim(),
+    ];
+    return names.join(', ');
+  }
+
+  /// The line under the total: do the shares add up to the printed total or the payment?
+  (String, bool)? _check(Decimal total) {
+    final printed = state.printedTotal;
+    if (printed != null) {
+      return printed.compareTo(total) == 0
+          ? ('Shares add up to the printed ${splitRm(printed)}.', true)
+          : (
+              'Shares add up to ${splitRm(total)}. The receipt says ${splitRm(printed)}.',
+              false,
+            );
+    }
+    final payment = state.linkedPayment;
+    if (payment != null && payment.amount.compareTo(total) == 0) {
+      return ('Shares add up to the payment of ${splitRm(total)}.', true);
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -436,55 +523,27 @@ class SummaryStep extends StatelessWidget {
     final total = SplitEditorViewModel.totalOf(state);
     final amounts = state.amounts;
     final left = SplitEditorViewModel.amountsLeft(state);
-    // The last line is always Me. Everyone before it with a share owes the owner.
-    final owing = [
-      for (final l in lines.take(lines.isEmpty ? 0 : lines.length - 1))
-        if (l.$3.sign > 0) l.$2,
-    ];
     final error = state.error;
     final note = paymentNote(state);
     final saved = state.billId != null;
+    final check = total == null ? null : _check(total);
     final edit = state.locked
         ? ('Change payment', vm.changePayment)
         : ('Edit items', vm.editItems);
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        Row(
-          children: [
-            const Mon(MonFace.happy, size: 56),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      'Split done',
-                      style: theme.textTheme.headlineMedium,
-                    ),
-                  ),
-                  if (state.locked)
-                    const _StepIntro(
-                      "Someone has paid you back, so the items can't change.",
-                    )
-                  else if (owing.isNotEmpty)
-                    _StepIntro(
-                      '${_joinNames(owing)} now ${owing.length == 1 ? 'owes' : 'owe'} you.',
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        _gap,
         ListGroup(
           children: [
             for (final (id, name, amount) in lines)
               amounts == null
                   ? KobanRow(
                       title: name,
+                      subtitle: [
+                        id == meId ? 'Your share' : 'Owes you',
+                        if (_itemsOf(id).isNotEmpty) _itemsOf(id),
+                      ].join(' · '),
+                      subtitleMaxLines: 2,
                       leading: InitialsAvatar(name),
                       trailing: MoneyText(splitRm(amount)),
                     )
@@ -523,7 +582,7 @@ class SummaryStep extends StatelessWidget {
           ),
         ],
         if (total != null) ...[
-          _gap,
+          const SizedBox(height: KobanSpace.s12),
           ListGroup(
             children: [
               KobanRow(
@@ -536,7 +595,30 @@ class SummaryStep extends StatelessWidget {
             ],
           ),
         ],
-        if (note != null) ...[_gap, _ReviewNote(note)],
+        if (check != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                check.$2 ? Icons.check : Icons.warning,
+                size: 18,
+                color: check.$2
+                    ? scheme.onSurfaceVariant
+                    : MoneyColors.of(context).review,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  check.$1,
+                  style: theme.textTheme.bodyMedium!.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (note != null) ...[_gap, ReviewNote(note)],
         if (error != null) ...[
           _gap,
           Text(
@@ -549,10 +631,6 @@ class SummaryStep extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            TonalButton('Share summary', () {
-              final text = SplitEditorViewModel.shareText(state);
-              if (text != null) onShare(text);
-            }, icon: Icons.share),
             // Change amounts replaces the items, so only a one-item split offers it.
             if (!state.locked && lines.isNotEmpty && state.items.length == 1)
               TextButton(
@@ -576,7 +654,7 @@ class SummaryStep extends StatelessWidget {
           ],
         ),
         if (saved) ...[
-          _gap,
+          const SizedBox(height: 8),
           TextButton.icon(
             onPressed: state.saving ? null : () => _delete(context),
             style: TextButton.styleFrom(
@@ -647,6 +725,7 @@ class _SplitFieldState extends State<SplitField> {
       labelText: widget.label,
       border: const OutlineInputBorder(),
       helperText: widget.isError ? null : widget.hint,
+      helperMaxLines: 2,
       errorText: widget.isError ? (widget.hint ?? '') : null,
     ),
   );

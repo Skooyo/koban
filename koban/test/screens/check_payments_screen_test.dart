@@ -5,6 +5,7 @@ import 'package:koban/app/app_services.dart';
 import 'package:koban/app/routes.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/check/check_payment_card.dart';
+import 'package:koban/theme/tokens.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
@@ -82,7 +83,7 @@ void main() {
     expect(find.text('Check payments'), findsOneWidget);
     expect(find.byTooltip('Back'), findsOneWidget);
     expect(find.text('1 of 3'), findsOneWidget);
-    expect(find.text('MAE · 12:00'), findsOneWidget);
+    expect(find.text('Today, 12:00'), findsOneWidget);
     expect(find.text('RM 15.00'), findsOneWidget);
     expect(find.text('Today, 12:00'), findsOneWidget);
     expect(find.text('“$firstText”'), findsOneWidget);
@@ -110,7 +111,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Saved RESTORAN CONTOH · Undo'), findsOneWidget);
     expect(find.text('2 of 3'), findsOneWidget);
-    expect(find.text('MAE · 12:00'), findsNothing);
+    expect(find.text('Today, 12:00'), findsNothing);
     expect(await expenseShops(s), isEmpty);
     await endHold(tester);
     expect(await expenseShops(s), ['RESTORAN CONTOH']);
@@ -135,12 +136,12 @@ void main() {
     tester,
   ) async {
     await openCheck(tester, await threeCards());
-    final start = tester.getTopLeft(find.text('MAE · 12:00'));
-    await tester.drag(find.text('MAE · 12:00'), const Offset(80, 0));
+    final start = tester.getTopLeft(find.text('Today, 12:00'));
+    await tester.drag(find.text('Today, 12:00'), const Offset(80, 0));
     await tester.pumpAndSettle();
     expect(find.text('Saved RESTORAN CONTOH · Undo'), findsNothing);
-    expect(tester.getTopLeft(find.text('MAE · 12:00')), start);
-    await tester.drag(find.text('MAE · 12:00'), const Offset(150, 0));
+    expect(tester.getTopLeft(find.text('Today, 12:00')), start);
+    await tester.drag(find.text('Today, 12:00'), const Offset(150, 0));
     await tester.pumpAndSettle();
     expect(find.text('Saved RESTORAN CONTOH · Undo'), findsOneWidget);
     expect(find.text('2 of 3'), findsOneWidget);
@@ -148,7 +149,7 @@ void main() {
 
   testWidgets('a drag to the left past 100 dp drops the card', (tester) async {
     await openCheck(tester, await threeCards());
-    await tester.drag(find.text('MAE · 12:00'), const Offset(-150, 0));
+    await tester.drag(find.text('Today, 12:00'), const Offset(-150, 0));
     await tester.pumpAndSettle();
     expect(find.text('Skipped RESTORAN CONTOH · Undo'), findsOneWidget);
   });
@@ -161,7 +162,7 @@ void main() {
     await tester.tap(find.text('Saved RESTORAN CONTOH · Undo'));
     await tester.pumpAndSettle();
     expect(find.text('1 of 3'), findsOneWidget);
-    expect(find.text('MAE · 12:00'), findsOneWidget);
+    expect(find.text('Today, 12:00'), findsOneWidget);
     expect(find.text('Saved RESTORAN CONTOH · Undo'), findsNothing);
     await endHold(tester);
     expect(await expenseShops(s), isEmpty);
@@ -180,13 +181,10 @@ void main() {
       rawText: firstText,
     );
     await openCheck(tester, s);
-    final onPrimary = Theme.of(tester.element(find.text('Save payment')))
-        .colorScheme
-        .onPrimary;
     final paragraph = tester.renderObject<RenderParagraph>(
       find.text('Save payment'),
     );
-    expect(paragraph.text.style!.color, onPrimary);
+    expect(paragraph.text.style!.color, Color(KobanColors.light.onGold));
   });
 
   testWidgets('a tap on Received switches a known direction on the card', (
@@ -294,7 +292,7 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
-    expect(find.text('MAE · 12:00'), findsNothing);
+    expect(find.text('Today, 12:00'), findsNothing);
     expect(find.text('Saved RESTORAN CONTOH · Undo'), findsNothing);
     expect(find.text('2 of 3'), findsOneWidget);
     expect(find.text('RM 8.00'), findsOneWidget);

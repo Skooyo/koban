@@ -9,13 +9,15 @@ import '../../data/database.dart';
 import '../../data/summaries.dart';
 import '../../rules/periods.dart';
 import '../../theme/koban_theme.dart';
-import '../../theme/mon.dart';
+import '../../theme/tokens.dart';
 import '../../ui/category_donut.dart';
 import '../../ui/kit.dart';
 import '../../ui/money.dart';
 import '../../ui/payment_row.dart';
+import '../../ui/scene_band.dart';
 import '../../ui/undo_snack_bar.dart';
 import '../payment/payment_view_model.dart';
+import 'activity_mon.dart';
 import 'activity_sheets.dart';
 import 'activity_view_model.dart';
 
@@ -26,7 +28,7 @@ String _weekLabel(WeekSummary w) =>
     ' – '
     '${_dayFormat.format(DateTime.fromMillisecondsSinceEpoch(w.endMs - 1))}';
 
-/// The Activity tab: a month with its ring, weeks and payments, or all payments by month.
+/// The Activity tab: a month with its category bar, weeks and payments, or all payments by month.
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
 
@@ -119,89 +121,109 @@ class _ActivityScreenState extends State<ActivityScreen> {
           now: now,
         );
 
+        final say = activityMon(
+          showAll: state.showAll,
+          searching: query.isNotEmpty,
+          filtered: filter != null,
+          monthLabel: monthLabel,
+          breakdown: state.breakdown,
+        );
+
         final slivers = <Widget>[
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _SearchField(controller: _search, onChanged: vm.setQuery),
-                  const SizedBox(height: 12),
-                  SegmentedControl(
-                    labels: const ['Month', 'All'],
-                    selectedIndex: state.showAll ? 1 : 0,
-                    onPick: (i) => vm.setShowAll(i == 1),
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SceneBand(
+                  title: 'Activity',
+                  compact: true,
+                  face: say.face,
+                  line: say.line,
+                  detail: say.detail,
+                  action: _FilterButton(
+                    onOpen: _openFilter,
+                    active: filter == null ? 0 : 1,
                   ),
-                  if (vm.loadError case final error?)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: WarningRow(error),
-                    ),
-                  if (summary != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: _SummaryRow(
-                        title: [
-                          ?filterName,
-                          if (query.isNotEmpty) '"$query"',
-                        ].join(', '),
-                        subtitle: '${_paymentsCount(summary.count)}, $scope',
-                        total: summary.total,
-                        leading: filter == null
-                            ? const Icon(Icons.search)
-                            : CategoryDot(
-                                sliceColor(
-                                  context,
-                                  filter == uncategorizedFilter ? null : filter,
-                                ),
-                                size: 12,
-                              ),
-                      ),
-                    ),
-                  if (!state.showAll) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: _MonthBar(
-                        label: monthLabel,
-                        canGoNext: state.canGoNext,
-                        onPrevious: vm.previousMonth,
-                        onNext: vm.nextMonth,
-                        onPick: _openMonths,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: _ChartCard(
-                        slices: state.slices,
-                        label: selectedLabel == null
-                            ? 'Spent'
-                            : 'Spent, $selectedLabel',
-                        total: state.monthTotal,
-                        received: state.monthReceived,
-                        onRingTap: _openFilter,
-                      ),
-                    ),
-                    if (state.breakdown.any((b) => b.total > Decimal.zero))
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: _ByCategory(
-                          breakdown: state.breakdown,
-                          onPick: vm.setCategoryFilter,
-                          onOther: _openFilter,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _MonthCard(
+                        showAll: state.showAll,
+                        onShowAll: vm.setShowAll,
+                        monthBar: _MonthBar(
+                          label: monthLabel,
+                          canGoNext: state.canGoNext,
+                          onPrevious: vm.previousMonth,
+                          onNext: vm.nextMonth,
+                          onPick: _openMonths,
+                        ),
+                        chart: _ChartBody(
+                          slices: state.slices,
+                          label: selectedLabel == null
+                              ? 'Spent'
+                              : 'Spent, $selectedLabel',
+                          total: state.monthTotal,
+                          received: state.monthReceived,
+                          onBarTap: _openFilter,
                         ),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: _WeekStrip(
-                        weeks: state.weeks,
-                        selected: state.selectedWeek,
-                        onToggle: vm.toggleWeek,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                      const SizedBox(height: 12),
+                      _SearchField(controller: _search, onChanged: vm.setQuery),
+                      if (vm.loadError case final error?)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: WarningRow(error),
+                        ),
+                      if (summary != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: _SummaryRow(
+                            title: [
+                              ?filterName,
+                              if (query.isNotEmpty) '"$query"',
+                            ].join(', '),
+                            subtitle:
+                                '${_paymentsCount(summary.count)}, $scope',
+                            total: summary.total,
+                            leading: filter == null
+                                ? const Icon(Icons.search)
+                                : CategoryDot(
+                                    sliceColor(
+                                      context,
+                                      filter == uncategorizedFilter
+                                          ? null
+                                          : filter,
+                                    ),
+                                    size: 12,
+                                  ),
+                          ),
+                        ),
+                      if (!state.showAll) ...[
+                        if (state.breakdown.any((b) => b.total > Decimal.zero))
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: _ByCategory(
+                              breakdown: state.breakdown,
+                              onPick: vm.setCategoryFilter,
+                              onOther: _openFilter,
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: _WeekStrip(
+                            weeks: state.weeks,
+                            selected: state.selectedWeek,
+                            onToggle: vm.toggleWeek,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ];
@@ -265,20 +287,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
         return Stack(
           children: [
-            Column(
-              children: [
-                LargeTopBar(
-                  title: 'Activity',
-                  actions: [
-                    _FilterButton(
-                      onOpen: _openFilter,
-                      active: filter == null ? 0 : 1,
-                    ),
-                  ],
-                ),
-                Expanded(child: CustomScrollView(slivers: slivers)),
-              ],
-            ),
+            CustomScrollView(slivers: slivers),
             Positioned(
               right: 16,
               bottom: 16,
@@ -288,8 +297,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 icon: const Icon(Icons.add),
                 label: const Text('Add payment'),
                 extendedTextStyle: weighted(theme.textTheme.titleMedium!, 700),
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
               ),
             ),
           ],
@@ -312,8 +319,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
       sliver: SliverToBoxAdapter(
         child: Column(
           children: [
-            const Mon(MonFace.idle, size: 64),
-            const SizedBox(height: 12),
             Text(
               searching ? 'No payments match "$query".' : title,
               style: theme.textTheme.titleMedium,
@@ -366,12 +371,10 @@ class _FilterButton extends StatelessWidget {
       excludeSemantics: true,
       onTap: onOpen,
       child: Material(
-        color: on ? scheme.primaryContainer : Colors.transparent,
-        shape: StadiumBorder(
-          side: BorderSide(
-            color: on ? scheme.primaryContainer : scheme.outlineVariant,
-          ),
-        ),
+        color: on
+            ? scheme.primaryContainer
+            : scheme.surfaceContainer.withValues(alpha: 0.7),
+        shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onOpen,
@@ -441,13 +444,16 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurfaceVariant;
     return TextField(
       controller: controller,
       onChanged: onChanged,
       textInputAction: TextInputAction.search,
       maxLines: 1,
       decoration: InputDecoration(
+        filled: true,
+        fillColor: scheme.surfaceContainer,
         hintText: 'Search shop or note',
         prefixIcon: Icon(Icons.search, color: muted),
         suffixIcon: ListenableBuilder(
@@ -463,74 +469,110 @@ class _SearchField extends StatelessWidget {
                   icon: const Icon(Icons.close),
                 ),
         ),
-        border: const OutlineInputBorder(),
+        border: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(KobanRadius.full)),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }
 }
 
-/// The ring, "Spent" with the big total, and the money received, in one card.
-class _ChartCard extends StatelessWidget {
-  const _ChartCard({
+/// The card under the band: the Month | All switch and, for one month, the month bar and chart.
+class _MonthCard extends StatelessWidget {
+  const _MonthCard({
+    required this.showAll,
+    required this.onShowAll,
+    required this.monthBar,
+    required this.chart,
+  });
+
+  final bool showAll;
+  final ValueChanged<bool> onShowAll;
+  final Widget monthBar;
+  final Widget chart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(KobanRadius.r24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: 200,
+              child: SegmentedControl(
+                labels: const ['Month', 'All'],
+                selectedIndex: showAll ? 1 : 0,
+                onPick: (i) => onShowAll(i == 1),
+              ),
+            ),
+          ),
+          if (!showAll) ...[monthBar, chart],
+        ],
+      ),
+    );
+  }
+}
+
+/// "Spent" with the big total, the money received, and the category bar.
+class _ChartBody extends StatelessWidget {
+  const _ChartBody({
     required this.slices,
     required this.label,
     required this.total,
     required this.received,
-    required this.onRingTap,
+    required this.onBarTap,
   });
 
   final List<DonutSlice> slices;
   final String label;
   final Decimal total;
   final Decimal received;
-  final VoidCallback onRingTap;
+  final VoidCallback onBarTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          CategoryDonut(slices: slices, onTap: onRingTap),
-          if (slices.isNotEmpty) const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: theme.textTheme.bodyMedium!.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: MoneyText(
-                    rm(total),
-                    style: theme.textTheme.displayMedium,
-                    color: scheme.onSurface,
-                  ),
-                ),
-                if (received > Decimal.zero)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: MoneyText(
-                      '+ ${rm(received)} received',
-                      style: theme.textTheme.bodyMedium,
-                      color: MoneyColors.of(context).received,
-                    ),
-                  ),
-              ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodyMedium!.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: MoneyText(
+            rm(total),
+            style: theme.textTheme.displayMedium,
+            color: scheme.onSurface,
+          ),
+        ),
+        if (received > Decimal.zero)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: MoneyText(
+              '+ ${rm(received)} received',
+              style: theme.textTheme.bodyMedium,
+              color: MoneyColors.of(context).received,
             ),
           ),
-        ],
-      ),
+        if (slices.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: CategoryBar(slices: slices, onTap: onBarTap),
+          ),
+      ],
     );
   }
 }

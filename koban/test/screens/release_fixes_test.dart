@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:koban/app/home_shell.dart';
 import 'package:koban/app/koban_app.dart';
 import 'package:koban/app/routes.dart';
 import 'package:koban/data/user_error.dart';
@@ -24,11 +25,11 @@ void main() {
     tester,
   ) async {
     final dark = systemBarStyle(kobanTheme(Brightness.dark));
-    expect(dark.systemNavigationBarColor, const Color(0xFF1C2539));
+    expect(dark.systemNavigationBarColor, const Color(0xFF141B2B));
     expect(dark.systemNavigationBarIconBrightness, Brightness.light);
     expect(dark.statusBarIconBrightness, Brightness.light);
     final light = systemBarStyle(kobanTheme(Brightness.light));
-    expect(light.systemNavigationBarColor, const Color(0xFFFFFFFF));
+    expect(light.systemNavigationBarColor, const Color(0xFFF6F7FA));
     expect(light.systemNavigationBarIconBrightness, Brightness.dark);
     expect(light.statusBarIconBrightness, Brightness.dark);
 
@@ -38,7 +39,7 @@ void main() {
     );
     expect(
       regions.map((r) => r.value.systemNavigationBarColor),
-      contains(const Color(0xFF1C2539)),
+      contains(const Color(0xFFF6F7FA)),
     );
   });
 
@@ -129,7 +130,7 @@ void main() {
 
   testWidgets('the Activity month label has the primary color', (tester) async {
     await pumpHome(tester, await testServices());
-    await tester.tap(find.text('Activity'));
+    await tester.tap(find.byTooltip('Activity'));
     await settle(tester);
     final button = find.ancestor(
       of: find.byIcon(Icons.arrow_drop_down),
@@ -140,7 +141,7 @@ void main() {
     );
     expect(
       label.text.style!.color,
-      kobanTheme(Brightness.dark).colorScheme.primary,
+      kobanTheme(Brightness.light).colorScheme.primary,
     );
   });
 
@@ -149,7 +150,7 @@ void main() {
   ) async {
     await pumpHome(tester, await testServices());
     final messenger = ScaffoldMessenger.of(
-      tester.element(find.byType(NavigationBar)),
+      tester.element(find.byType(KobanTabBar)),
     );
     showUndoSnackBar(messenger, 'Payment saved');
     await tester.pump();
@@ -199,7 +200,7 @@ void main() {
     expect(find.text('All checked'), findsNothing);
   });
 
-  testWidgets('an edited payment that cannot load shows the text and Close', (
+  testWidgets('an edited payment that cannot load shows the text and Back', (
     tester,
   ) async {
     final s = await testServices();
@@ -207,7 +208,7 @@ void main() {
     await s.db.customStatement('DROP TABLE expenses');
     final opener = await openSheet(tester, s, expenseId: id);
     expect(find.text(loadFailedMessage), findsOneWidget);
-    await tester.tap(find.byTooltip('Close'));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(opener.closed, true);
   });

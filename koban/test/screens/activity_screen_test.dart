@@ -40,7 +40,7 @@ Future<void> pumpActivity(
   addTearDown(tester.view.reset);
   await pumpKoban(tester, s, textScale: textScale);
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Activity'));
+  await tester.tap(find.byTooltip('Activity'));
   await tester.pumpAndSettle();
 }
 
@@ -100,7 +100,7 @@ void main() {
     await pay(s, '5.00', DateTime(2026, 11, 13, 9));
     await pumpKoban(tester, s);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('This week'));
+    await tester.tap(find.text('Spent this week'));
     await tester.pumpAndSettle();
     expect(
       tester.state<HomeShellState>(find.byType(HomeShell)).tab,

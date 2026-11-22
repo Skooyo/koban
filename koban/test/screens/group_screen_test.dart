@@ -222,19 +222,20 @@ void main() {
       routes();
       backend.on('POST', '/rest/v1/rpc/remove_member', (r) => jsonReply('ok'));
       await openGroup(tester, s);
-      expect(onPageText('Transport'), findsNothing);
+      // The category chip is the only Transport until a row opens.
+      expect(onPageText('Transport'), findsOneWidget);
       expect(onPageText('Remove'), findsNothing);
 
       await tester.tap(onPageText('Mei'));
       await tester.pumpAndSettle();
-      expect(onPageText('Transport'), findsOneWidget);
+      expect(onPageText('Transport'), findsNWidgets(2));
       expect(onPageText('Make owner'), findsOneWidget);
 
       // Abu has no totals. One row is open at a time.
       await tester.tap(onPageText('Abu'));
       await tester.pumpAndSettle();
       expect(onPageText('No spending in this period.'), findsOneWidget);
-      expect(onPageText('Transport'), findsNothing);
+      expect(onPageText('Transport'), findsOneWidget);
 
       await tester.tap(onPageText('Mei'));
       await tester.pumpAndSettle();

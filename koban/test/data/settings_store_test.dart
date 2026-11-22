@@ -24,12 +24,12 @@ void main() {
     );
   }
 
-  test('settings have the 0.1.1 defaults', () async {
+  test('settings have the 0.1.1 defaults, with dark mode off', () async {
     store({});
 
     final s = await load();
 
-    expect(s.darkMode.value, isTrue);
+    expect(s.darkMode.value, isFalse);
     expect(s.onboardingDone.value, isFalse);
     expect(s.paymentAppsChosen.value, isFalse);
     expect(s.paymentApps.value, <String>{});
@@ -61,10 +61,10 @@ void main() {
     store({});
     final s = await load();
 
-    await s.setDarkMode(false);
+    await s.setDarkMode(true);
 
-    expect(await prefs.getBool('dark_mode'), isFalse);
-    expect(s.darkMode.value, isFalse);
+    expect(await prefs.getBool('dark_mode'), isTrue);
+    expect(s.darkMode.value, isTrue);
   });
 
   test('onboarding and online features are stored under their keys', () async {
@@ -86,11 +86,11 @@ void main() {
     await prefs.setStringList('payment_app_allowlist', [
       'my.com.tngdigital.ewallet',
     ]);
-    await prefs.setBool('dark_mode', false);
+    await prefs.setBool('dark_mode', true);
     await s.reload();
 
     expect(s.paymentApps.value, {'my.com.tngdigital.ewallet'});
     expect(s.paymentAppsChosen.value, isTrue);
-    expect(s.darkMode.value, isFalse);
+    expect(s.darkMode.value, isTrue);
   });
 }

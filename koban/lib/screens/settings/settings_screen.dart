@@ -4,8 +4,10 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/app_services.dart';
 import '../../app/routes.dart';
 import '../../theme/koban_theme.dart';
+import '../../theme/mon.dart';
+import '../../theme/tokens.dart';
 import '../../ui/kit.dart';
-import '../../ui/listener_status_banner.dart';
+import '../../ui/scene_band.dart';
 import '../../ui/undo_snack_bar.dart';
 import 'settings_view_model.dart';
 
@@ -98,380 +100,375 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context, _) {
         final online = vm.onlineFeatures;
         final reconnect = vm.reconnectMessage;
+        final granted = vm.isAccessGranted;
         return Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 12, 20, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        tooltip: 'Back',
-                        icon: const Icon(Icons.arrow_back),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Semantics(
-                            header: true,
-                            child: Text('Settings', style: text.titleLarge),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      if (vm.loadError case final error?) ...[
-                        WarningRow(error),
-                        const SizedBox(height: 8),
-                      ],
-                      const SectionHeading('Tracking'),
-                      ListenerStatusBanner(
-                        isAccessGranted: vm.isAccessGranted,
-                        onEnable: vm.openNotificationSettings,
-                      ),
+          body: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              SceneBand(
+                title: 'Settings',
+                back: true,
+                compact: true,
+                face: granted ? MonFace.happy : MonFace.worry,
+                line: granted ? 'I am awake.' : 'I cannot read your alerts.',
+                detail: granted
+                    ? 'Tracking on'
+                    : 'Turn on notification access to fix it.',
+              ),
+              Padding(
+                // The first child is a heading, not a card, so it starts below the band.
+                padding: const EdgeInsets.fromLTRB(16, SceneBand.overlap + 8, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (vm.loadError case final error?) ...[
+                      WarningRow(error),
                       const SizedBox(height: 8),
-                      ListGroup(
-                        children: [
+                    ],
+                    const SectionHeading('Tracking'),
+                    ListGroup(
+                      children: [
+                        if (!granted)
                           KobanRow(
-                            title: 'Payment apps',
-                            subtitle: switch (vm.paymentAppCount) {
-                              0 => 'None chosen. Koban listens to no app.',
-                              1 => '1 app chosen',
-                              final n => '$n apps chosen',
-                            },
-                            leading: const Icon(Icons.list_alt),
+                            title: 'Tracking is off',
+                            subtitle: 'Koban cannot read notifications.',
+                            leading: const _RowIcon(Icons.notifications_off),
+                            trailing: TextButton(
+                              onPressed: vm.openNotificationSettings,
+                              child: const Text('Turn on'),
+                            ),
+                          ),
+                        KobanRow(
+                          title: 'Payment apps',
+                          subtitle: switch (vm.paymentAppCount) {
+                            0 => 'None chosen. Koban listens to no app.',
+                            1 => '1 app chosen',
+                            final n => '$n apps chosen',
+                          },
+                          leading: const _RowIcon(Icons.list_alt),
+                          showChevron: true,
+                          onTap: () => openPaymentApps(context),
+                        ),
+                        KobanRow(
+                          title: 'Notification log',
+                          subtitle: vm.capturedCount > 0
+                              ? '${vm.capturedCount} ${vm.capturedCount == 1 ? 'notification' : 'notifications'} captured'
+                              : 'Every notification the listener receives, with save and skip reasons',
+                          leading: const _RowIcon(Icons.list),
+                          showChevron: true,
+                          onTap: () => openNotificationLog(context),
+                        ),
+                        KobanRow(
+                          title: 'Restart payment tracking',
+                          subtitle: reconnect == null
+                              ? 'Use this when new payments stop showing up in Koban.'
+                              : '$reconnect If an alert appears, tap it or open notification access settings.',
+                          subtitleColor: reconnect == null
+                              ? null
+                              : scheme.primary,
+                          leading: const _RowIcon(Icons.sync),
+                          showChevron: true,
+                          onTap: vm.reconnect,
+                        ),
+                        if (vm.isBatteryOptimizationIgnored)
+                          KobanRow(
+                            title: 'Battery optimization',
+                            subtitle: 'Off. Good for background tracking.',
+                            leading: const _RowIcon(Icons.battery_alert),
+                            trailing: Icon(
+                              Icons.check,
+                              semanticLabel: 'Done',
+                              color: scheme.primary,
+                            ),
+                          )
+                        else
+                          KobanRow(
+                            title: 'Battery optimization',
+                            subtitle: 'On. Tracking may stop in the background. Tap to turn it off.',
+                            subtitleColor: scheme.error,
+                            leading: const _RowIcon(Icons.battery_alert),
                             showChevron: true,
-                            onTap: () => openPaymentApps(context),
+                            onTap: vm.openBatterySettings,
+                            onTapLabel: 'Disable battery optimization',
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const SectionHeading('Troubleshooting'),
-                      ListGroup(
-                        children: [
+                        if (vm.isXiaomi) ...[
                           KobanRow(
-                            title: 'Notification log',
-                            subtitle: vm.capturedCount > 0
-                                ? '${vm.capturedCount} ${vm.capturedCount == 1 ? 'notification' : 'notifications'} captured'
-                                : 'Every notification the listener receives, with save and skip reasons',
-                            leading: const Icon(Icons.list),
+                            title: 'Xiaomi autostart',
+                            subtitle:
+                                'Autostart and Background autostart are required. '
+                                'Do not use “Clear all” in recents: it can revoke notification access.',
+                            subtitleColor: scheme.error,
+                            leading: const _RowIcon(Icons.settings),
                             showChevron: true,
-                            onTap: () => openNotificationLog(context),
-                          ),
-                          KobanRow(
-                            title: 'Restart payment tracking',
-                            subtitle: reconnect == null
-                                ? 'Use this when new payments stop showing up in Koban.'
-                                : '$reconnect If an alert appears, tap it or open notification access settings.',
-                            subtitleColor: reconnect == null
-                                ? null
-                                : scheme.primary,
-                            leading: const Icon(Icons.sync),
-                            showChevron: true,
-                            onTap: vm.reconnect,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const SectionHeading('Appearance'),
-                      ListGroup(
-                        children: [
-                          _SwitchRow(
-                            title: 'Dark mode',
-                            subtitle: 'Use the dark theme across the app',
-                            icon: Icons.palette,
-                            value: vm.darkMode,
-                            onChanged: vm.setDarkMode,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const SectionHeading('Categories'),
-                      if (vm.categories.isNotEmpty)
-                        ListGroup(
-                          children: [
-                            if (vm.categories.any((c) => c.isDefault))
-                              KobanRow(
-                                title:
-                                    '${vm.categories.where((c) => c.isDefault).length} built-in categories',
-                                subtitle: [
-                                  for (final c in vm.categories)
-                                    if (c.isDefault) c.name,
-                                ].join(', '),
-                              ),
-                            for (final c in vm.categories.where(
-                              (c) => !c.isDefault,
-                            ))
-                              KobanRow(
-                                key: ValueKey(c.id),
-                                title: c.name,
-                                subtitle: 'Your own',
-                                leading: CategoryDot(
-                                  categoryColor(context, c.id),
-                                ),
-                                trailing: IconButton(
-                                  onPressed: () =>
-                                      _deleteCategory(vm, c.id, c.name),
-                                  tooltip: 'Remove category ${c.name}',
-                                  icon: const Icon(Icons.delete),
-                                ),
-                              ),
-                          ],
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _newCategory,
-                                onChanged: (_) => setState(() {}),
-                                maxLines: 1,
-                                decoration: const InputDecoration(
-                                  labelText: 'New category',
-                                  border: OutlineInputBorder(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            TonalButton(
-                              'Add',
-                              _newCategory.text.trim().isEmpty
-                                  ? null
-                                  : _addCategory,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'Categories and notes are saved on this phone only.',
-                          style: text.bodySmall!.copyWith(color: muted),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const SectionHeading('Online'),
-                      ListGroup(
-                        children: [
-                          _SwitchRow(
-                            title: 'Online features',
-                            subtitle: online
-                                ? 'On: groups and reading receipts with Claude can use the internet.'
-                                : 'Off: Koban makes no network calls. Groups and reading receipts with Claude stop.',
-                            icon: Icons.cloud,
-                            value: online,
-                            onChanged: vm.setOnlineFeatures,
-                          ),
-                          if (vm.hasDeviceToken)
-                            KobanRow(
-                              title: 'Invite code',
-                              subtitle: "Accepted. Receipts are read by Claude on Koban's server.",
-                              leading: const Icon(Icons.lock),
-                              trailing: TextButton(
-                                onPressed: vm.removeDeviceToken,
-                                child: const Text('Remove'),
-                              ),
-                            )
-                          else
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Invite code', style: text.titleMedium),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    "Enter an invite code from Koban's owner to read receipts with Claude. "
-                                    'Everything else works without one.',
-                                    style: text.bodyMedium!.copyWith(
-                                      color: muted,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  TextField(
-                                    controller: _code,
-                                    onChanged: (_) => setState(() {}),
-                                    maxLines: 1,
-                                    autocorrect: false,
-                                    textCapitalization:
-                                        TextCapitalization.characters,
-                                    inputFormatters: const [_UpperCase()],
-                                    decoration: InputDecoration(
-                                      labelText: 'XXXX-XXXX',
-                                      errorText: vm.inviteMessage,
-                                      border: const OutlineInputBorder(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: TonalButton(
-                                      vm.inviteBusy ? 'Checking…' : 'Use code',
-                                      _code.text.trim().isEmpty || vm.inviteBusy
-                                          ? null
-                                          : () =>
-                                                vm.enterInviteCode(_code.text),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const SectionHeading('Background'),
-                      ListGroup(
-                        children: [
-                          if (vm.isBatteryOptimizationIgnored)
-                            KobanRow(
-                              title: 'Battery optimization',
-                              subtitle: 'Off. Good for background tracking.',
-                              leading: const Icon(Icons.battery_alert),
-                              trailing: Icon(
-                                Icons.check,
-                                semanticLabel: 'Done',
-                                color: scheme.primary,
-                              ),
-                            )
-                          else
-                            KobanRow(
-                              title: 'Battery optimization',
-                              subtitle: 'On. Tracking may stop in the background. Tap to turn it off.',
-                              subtitleColor: scheme.error,
-                              leading: const Icon(Icons.battery_alert),
-                              showChevron: true,
-                              onTap: vm.openBatterySettings,
-                              onTapLabel: 'Disable battery optimization',
-                            ),
-                          if (vm.isXiaomi) ...[
-                            KobanRow(
-                              title: 'Xiaomi autostart',
-                              subtitle:
-                                  'Autostart and Background autostart are required. '
-                                  'Do not use “Clear all” in recents: it can revoke notification access.',
-                              subtitleColor: scheme.error,
-                              leading: const Icon(Icons.settings),
-                              showChevron: true,
-                              onTap: vm.openBackgroundSettings,
-                              onTapLabel:
-                                  'Open Xiaomi autostart and battery settings',
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  for (final step in xiaomiChecklist)
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 4),
-                                      child: Text(
-                                        '• $step',
-                                        style: text.bodyMedium!.copyWith(
-                                          color: muted,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'You do not need to keep the app open. After you grant notification access, a small '
-                          'persistent notification keeps Android from stopping the listener. '
-                          'Checklist: enable Notification access, allow that notification, then make a payment. '
-                          'Check the notification log if nothing is saved.',
-                          style: text.bodySmall!.copyWith(color: muted),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const SectionHeading('About'),
-                      ListGroup(
-                        children: [
-                          KobanRow(
-                            title: 'App version ${vm.versionName}',
-                            subtitle: !online
-                                ? 'Turn on Online features to check for updates.'
-                                : vm.upToDate
-                                ? 'Koban is up to date.'
-                                : null,
-                            leading: const Icon(Icons.info),
-                          ),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                              child: TextButton(
-                                onPressed: online ? vm.checkForUpdates : null,
-                                child: const Text('Check for updates'),
-                              ),
-                            ),
+                            onTap: vm.openBackgroundSettings,
+                            onTapLabel:
+                                'Open Xiaomi autostart and battery settings',
                           ),
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Parser test tool',
-                                  style: text.titleMedium,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Paste a sample notification to check amount and shop extraction.',
-                                  style: text.bodyMedium!.copyWith(
-                                    color: muted,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: _parserInput,
-                                  minLines: 3,
-                                  maxLines: null,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Notification text',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TonalButton(
-                                  'Test parse',
-                                  () => vm.runParserTest(_parserInput.text),
-                                ),
-                                if (vm.parserResult != null)
+                                for (final step in xiaomiChecklist)
                                   Padding(
-                                    padding: const EdgeInsets.only(top: 8),
+                                    padding: const EdgeInsets.only(bottom: 4),
                                     child: Text(
-                                      vm.parserResult!,
-                                      style: text.bodyMedium,
+                                      '• $step',
+                                      style: text.bodyMedium!.copyWith(
+                                        color: muted,
+                                      ),
                                     ),
                                   ),
                               ],
                             ),
                           ),
                         ],
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'You do not need to keep the app open. After you grant notification access, a small '
+                        'persistent notification keeps Android from stopping the listener. '
+                        'Checklist: enable Notification access, allow that notification, then make a payment. '
+                        'Check the notification log if nothing is saved.',
+                        style: text.bodySmall!.copyWith(color: muted),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 24),
+                    const SectionHeading('Online'),
+                    ListGroup(
+                      children: [
+                        _SwitchRow(
+                          title: 'Online features',
+                          subtitle: online
+                              ? 'On: groups and reading receipts with Claude can use the internet.'
+                              : 'Off: Koban makes no network calls. Groups and reading receipts with Claude stop.',
+                          icon: Icons.cloud,
+                          value: online,
+                          onChanged: vm.setOnlineFeatures,
+                        ),
+                        if (vm.hasDeviceToken)
+                          KobanRow(
+                            title: 'Invite code',
+                            subtitle: "Accepted. Receipts are read by Claude on Koban's server.",
+                            leading: const _RowIcon(Icons.lock),
+                            trailing: TextButton(
+                              onPressed: vm.removeDeviceToken,
+                              child: const Text('Remove'),
+                            ),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Invite code', style: text.titleMedium),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "Enter an invite code from Koban's owner to read receipts with Claude. "
+                                  'Everything else works without one.',
+                                  style: text.bodyMedium!.copyWith(
+                                    color: muted,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: _code,
+                                  onChanged: (_) => setState(() {}),
+                                  maxLines: 1,
+                                  autocorrect: false,
+                                  textCapitalization:
+                                      TextCapitalization.characters,
+                                  inputFormatters: const [_UpperCase()],
+                                  decoration: InputDecoration(
+                                    labelText: 'XXXX-XXXX',
+                                    errorText: vm.inviteMessage,
+                                    border: const OutlineInputBorder(),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TonalButton(
+                                    vm.inviteBusy ? 'Checking…' : 'Use code',
+                                    _code.text.trim().isEmpty || vm.inviteBusy
+                                        ? null
+                                        : () => vm.enterInviteCode(_code.text),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const SectionHeading('App'),
+                    ListGroup(
+                      children: [
+                        KobanRow(
+                          title: 'Check for updates',
+                          subtitle: !online
+                              ? 'Turn on Online features to check for updates.'
+                              : vm.upToDate
+                              ? 'Koban is up to date.'
+                              : null,
+                          leading: const _RowIcon(Icons.system_update),
+                          showChevron: online,
+                          onTap: online ? vm.checkForUpdates : null,
+                        ),
+                        _SwitchRow(
+                          title: 'Dark mode',
+                          subtitle: 'Use the dark theme across the app',
+                          icon: Icons.palette,
+                          value: vm.darkMode,
+                          onChanged: vm.setDarkMode,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const SectionHeading('Categories'),
+                    if (vm.categories.isNotEmpty)
+                      ListGroup(
+                        children: [
+                          if (vm.categories.any((c) => c.isDefault))
+                            KobanRow(
+                              title:
+                                  '${vm.categories.where((c) => c.isDefault).length} built-in categories',
+                              subtitle: [
+                                for (final c in vm.categories)
+                                  if (c.isDefault) c.name,
+                              ].join(', '),
+                            ),
+                          for (final c in vm.categories.where(
+                            (c) => !c.isDefault,
+                          ))
+                            KobanRow(
+                              key: ValueKey(c.id),
+                              title: c.name,
+                              subtitle: 'Your own',
+                              leading: CategoryDot(
+                                categoryColor(context, c.id),
+                              ),
+                              trailing: IconButton(
+                                onPressed: () =>
+                                    _deleteCategory(vm, c.id, c.name),
+                                tooltip: 'Remove category ${c.name}',
+                                icon: const Icon(Icons.delete),
+                              ),
+                            ),
+                        ],
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _newCategory,
+                              onChanged: (_) => setState(() {}),
+                              maxLines: 1,
+                              decoration: const InputDecoration(
+                                labelText: 'New category',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TonalButton(
+                            'Add',
+                            _newCategory.text.trim().isEmpty
+                                ? null
+                                : _addCategory,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Categories and notes are saved on this phone only.',
+                        style: text.bodySmall!.copyWith(color: muted),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ListGroup(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Parser test tool', style: text.titleMedium),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Paste a sample notification to check amount and shop extraction.',
+                                style: text.bodyMedium!.copyWith(color: muted),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _parserInput,
+                                minLines: 3,
+                                maxLines: null,
+                                decoration: const InputDecoration(
+                                  labelText: 'Notification text',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TonalButton(
+                                'Test parse',
+                                () => vm.runParserTest(_parserInput.text),
+                              ),
+                              if (vm.parserResult != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    vm.parserResult!,
+                                    style: text.bodyMedium,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Koban ${vm.versionName}',
+                      textAlign: TextAlign.center,
+                      style: tabular(text.bodySmall!.copyWith(color: muted)),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+/// The rounded icon tile at the start of a Settings row.
+class _RowIcon extends StatelessWidget {
+  const _RowIcon(this.icon);
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(KobanRadius.r12),
+      ),
+      child: SizedBox.square(
+        dimension: 40,
+        child: Icon(icon, size: 22, color: scheme.onSurface),
+      ),
     );
   }
 }
@@ -499,7 +496,7 @@ class _SwitchRow extends StatelessWidget {
       child: KobanRow(
         title: title,
         subtitle: subtitle,
-        leading: Icon(icon),
+        leading: _RowIcon(icon),
         trailing: ExcludeSemantics(
           child: IgnorePointer(
             child: Switch(value: value, onChanged: (_) {}),

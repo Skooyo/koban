@@ -7,13 +7,16 @@ import '../../data/user_error.dart';
 import '../../rules/people_math.dart';
 import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
+import '../../theme/tokens.dart';
 import '../../ui/kit.dart';
+import '../../ui/money.dart';
+import '../../ui/scene_band.dart';
 import '../person/person_dialogs.dart' show personDate;
 import 'people_view_model.dart';
 
 String _groupTitle(PeopleGroup group) => switch (group) {
   PeopleGroup.youOwe => 'You owe',
-  PeopleGroup.owesYou => 'Owes you',
+  PeopleGroup.owesYou => 'They owe you',
   PeopleGroup.others => 'Everyone else',
 };
 
@@ -79,155 +82,233 @@ class _PeopleScreenState extends State<PeopleScreen> {
     return ListenableBuilder(
       listenable: vm,
       builder: (context, _) {
-        final sections = vm.sections;
+        final sections = [...vm.sections]
+          ..sort((a, b) => _groupOrder(a.$1).compareTo(_groupOrder(b.$1)));
         final bills = vm.bills;
+        final totals = vm.totals;
         final noPeople = sections.isEmpty && vm.query.trim().isEmpty;
-        return Stack(
+        final say = _monSay(totals, noPeople: noPeople);
+        return ListView(
+          padding: EdgeInsets.zero,
           children: [
-            ListView(
-              padding: const EdgeInsets.only(bottom: 112),
-              children: [
-                const LargeTopBar(
-                  title: 'People',
-                  subtitle: 'Payment QRs, and what you owe each other',
-                ),
-                if (!noPeople)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: TextField(
+            SceneBand(
+              title: 'People',
+              face: say.face,
+              line: say.line,
+              detail: say.detail,
+              stats: [
+                if (totals.owedCount > 0)
+                  '${totals.owedCount} ${totals.owedCount == 1 ? 'owes' : 'owe'} you',
+                if (totals.oweCount > 0) 'You owe ${totals.oweCount}',
+              ],
+              action: SceneIconButton(
+                icon: Icons.person_add,
+                tooltip: 'Add person',
+                onPressed: _add,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 12,
+                children: [
+                  _BalanceCard(
+                    totals: totals,
+                    onSplit: () => openSplitNew(context),
+                  ),
+                  if (!noPeople)
+                    TextField(
                       onChanged: vm.setQuery,
                       textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
                         hintText: 'Search people',
                         prefixIcon: const Icon(Icons.search),
                         filled: true,
-                        fillColor: scheme.surfaceContainerHigh,
+                        fillColor: scheme.surfaceContainer,
                         border: field,
                         enabledBorder: field,
                         focusedBorder: field,
                       ),
                     ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 12),
-                  child: TonalButton(
-                    'Split a bill',
-                    () => openSplitNew(context),
-                    icon: Icons.receipt,
-                  ),
-                ),
-                if (noPeople)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                    child: Column(
-                      children: [
-                        const Mon(MonFace.idle, size: 64),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No people yet.',
-                          style: theme.textTheme.titleMedium,
+                  if (!noPeople && sections.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        'Nobody matches that search.',
+                        style: theme.textTheme.bodyLarge!.copyWith(
+                          color: scheme.onSurfaceVariant,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Add someone, or split a bill to start.',
-                          style: theme.textTheme.bodyMedium!.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  )
-                else if (sections.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      top: 16,
-                    ),
-                    child: Text(
-                      'Nobody matches that search.',
-                      style: theme.textTheme.bodyLarge!.copyWith(
-                        color: scheme.onSurfaceVariant,
                       ),
                     ),
-                  ),
-                for (final (group, people) in sections)
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      top: 20,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SectionHeading(_groupTitle(group)),
-                        ListGroup(
-                          children: [
-                            for (final summary in people)
-                              _PersonRow(
-                                key: ValueKey(summary.person.id),
-                                summary: summary,
-                                avatarColor:
-                                    avatarColors[jvmHash(summary.person.id) %
-                                        avatarColors.length],
-                              ),
-                          ],
-                        ),
+                  for (final (group, people) in sections)
+                    _Card(
+                      heading: _groupTitle(group),
+                      rows: [
+                        for (final summary in people)
+                          _PersonRow(
+                            key: ValueKey(summary.person.id),
+                            summary: summary,
+                            avatarColor:
+                                avatarColors[jvmHash(summary.person.id) %
+                                    avatarColors.length],
+                          ),
                       ],
                     ),
-                  ),
-                if (bills.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      top: 24,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SectionHeading('Past splits'),
-                        ListGroup(
-                          children: [
-                            for (final bill in bills)
-                              KobanRow(
-                                key: ValueKey(bill.id),
-                                title: bill.merchant ?? 'Split bill',
-                                trailing: Text(
-                                  personDate(bill.billTime),
-                                  style: theme.textTheme.bodyMedium!.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                showChevron: true,
-                                onTap: () => openSplitEdit(context, bill.id),
-                                onTapLabel: 'Open',
+                  if (bills.isNotEmpty)
+                    _Card(
+                      heading: 'Past splits',
+                      rows: [
+                        for (final bill in bills)
+                          KobanRow(
+                            key: ValueKey(bill.id),
+                            title: bill.merchant ?? 'Split bill',
+                            trailing: Text(
+                              personDate(bill.billTime),
+                              style: theme.textTheme.bodyMedium!.copyWith(
+                                color: scheme.onSurfaceVariant,
                               ),
-                          ],
-                        ),
+                            ),
+                            showChevron: true,
+                            onTap: () => openSplitEdit(context, bill.id),
+                            onTapLabel: 'Open',
+                          ),
                       ],
                     ),
-                  ),
-              ],
-            ),
-            Positioned(
-              right: 16,
-              bottom: 16,
-              child: FloatingActionButton.extended(
-                heroTag: null,
-                onPressed: _add,
-                icon: const Icon(Icons.person_add),
-                label: const Text('Add person'),
-                extendedTextStyle: weighted(theme.textTheme.titleMedium!, 700),
-                backgroundColor: scheme.primary,
-                foregroundColor: scheme.onPrimary,
+                ],
               ),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+/// They owe you first, as in the Mon's desk look.
+int _groupOrder(PeopleGroup group) => switch (group) {
+  PeopleGroup.owesYou => 0,
+  PeopleGroup.youOwe => 1,
+  PeopleGroup.others => 2,
+};
+
+({MonFace face, String line, String? detail}) _monSay(
+  PeopleTotals totals, {
+  required bool noPeople,
+}) {
+  if (noPeople) {
+    return (
+      face: MonFace.idle,
+      line: 'No people yet.',
+      detail: 'Add someone, or split a bill to start.',
+    );
+  }
+  if (totals.owedCount > 0) {
+    return (
+      face: MonFace.happy,
+      line: 'I will hold this.',
+      detail: 'Until they pay.',
+    );
+  }
+  if (totals.oweCount > 0) {
+    return (
+      face: MonFace.worry,
+      line: 'You owe. I kept count.',
+      detail: 'Pay it when you can.',
+    );
+  }
+  return (
+    face: MonFace.idle,
+    line: 'Everyone is even.',
+    detail: 'Nothing to chase.',
+  );
+}
+
+/// The balance under the band, and the one gold action of the tab.
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({required this.totals, required this.onSplit});
+
+  final PeopleTotals totals;
+  final VoidCallback onSplit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = theme.textTheme.bodyMedium!.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    final owed = totals.owedCount > 0;
+    final owe = totals.oweCount > 0;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(KobanRadius.r24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 4,
+        children: [
+          if (owed || owe) ...[
+            MergeSemantics(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  MoneyText(
+                    owed ? '+ ${rm(totals.owed)}' : rm(totals.owe),
+                    style: theme.textTheme.displayMedium,
+                    color: owed
+                        ? MoneyColors.of(context).received
+                        : scheme.onSurface,
+                  ),
+                  Text(owed ? 'owed to you' : 'you owe', style: muted),
+                ],
+              ),
+            ),
+            if (owed && owe)
+              Text('You owe ${rm(totals.owe)} in return.', style: muted),
+            const SizedBox(height: 8),
+          ],
+          FilledButton.icon(
+            onPressed: onSplit,
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+            icon: const Icon(Icons.receipt, size: 18),
+            label: const Text('Split a bill'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A white card with a heading and rows with a divider between them.
+class _Card extends StatelessWidget {
+  const _Card({required this.heading, required this.rows});
+
+  final String heading;
+  final List<Widget> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainer,
+      borderRadius: BorderRadius.circular(KobanRadius.r24),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: SectionHeading(heading),
+          ),
+          for (final row in rows) ...[
+            Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
+            row,
+          ],
+        ],
+      ),
     );
   }
 }

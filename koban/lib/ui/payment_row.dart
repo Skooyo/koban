@@ -67,7 +67,7 @@ class ExpenseListCard extends StatelessWidget {
     return KobanRow(
       title: merchant,
       subtitle: subtitle,
-      leading: CategoryDot(categoryColor(context, e.categoryId)),
+      leading: CategoryBadge(e.categoryId),
       trailing: MoneyAmount(
         amount: signed,
         currency: e.currency,

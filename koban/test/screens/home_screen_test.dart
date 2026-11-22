@@ -57,24 +57,22 @@ void main() {
     await pay(s, '12.50', DateTime(2026, 11, 13, 9));
     await pumpHome(tester, s);
     for (final t in [
-      'Today',
-      'Fri, 13 Nov',
+      'Good afternoon',
       'Spent today',
       'RM 12.50',
-      'This week',
+      'Spent this week',
       'Mon 9 Nov – Sun 15 Nov',
       'This month',
       'November 2026',
     ]) {
       expect(find.text(t), findsWidgets, reason: t);
     }
-    expect(find.text('Fri, 13 Nov'), findsOneWidget);
   });
 
   testWidgets('with no payment today Home says so', (tester) async {
     await pumpHome(tester, await testServices());
     expect(find.text('No payments yet today.'), findsOneWidget);
-    expect(find.text('RM 0.00'), findsNWidgets(3));
+    expect(find.text('RM 0.00'), findsNWidgets(2));
   });
 
   testWidgets('money received today shows under the total', (tester) async {
@@ -88,8 +86,8 @@ void main() {
     await pumpHome(tester, s);
     expect(find.text('+ RM 50.00 received'), findsOneWidget);
     expect(find.text('No payments yet today.'), findsNothing);
-    // The week row, the month row and the payment row.
-    expect(find.text('+ RM 50.00'), findsNWidgets(3));
+    // The month row and the payment row.
+    expect(find.text('+ RM 50.00'), findsNWidgets(2));
   });
 
   testWidgets(
@@ -163,7 +161,7 @@ void main() {
     (tester) async {
       final s = await testServices();
       await pumpHome(tester, s);
-      await tester.tap(find.text('This week'));
+      await tester.tap(find.text('Spent this week'));
       await tester.pump();
       expect(
         s.activitySelection.value.weekStart,
@@ -209,13 +207,13 @@ void main() {
     expect(find.text('Found by Koban, not saved yet'), findsOneWidget);
   });
 
-  testWidgets('Spent today says See this week and opens the week', (
+  testWidgets('a tap on Spent today opens the week', (
     tester,
   ) async {
     final s = await testServices();
     await pay(s, '12.50', DateTime(2026, 11, 13, 9));
     await pumpHome(tester, s);
-    await tester.tap(find.text('See this week'));
+    await tester.tap(find.text('Spent today'));
     await tester.pump();
     expect(
       s.activitySelection.value.weekStart,
@@ -280,6 +278,9 @@ void main() {
         .text
         .style!
         .color;
-    expect(color, Theme.of(tester.element(label)).colorScheme.onPrimary);
+    expect(
+      color,
+      Theme.of(tester.element(label)).floatingActionButtonTheme.foregroundColor,
+    );
   });
 }

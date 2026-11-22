@@ -14,7 +14,10 @@ import '../../rules/people_math.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/date_labels.dart';
 import '../../ui/kit.dart';
+import '../../theme/mon.dart';
+import '../../theme/tokens.dart';
 import '../../ui/money.dart';
+import '../../ui/scene_band.dart';
 import '../../ui/sheets.dart';
 import '../../ui/undo_snack_bar.dart';
 import 'person_dialogs.dart';
@@ -193,66 +196,58 @@ class PersonScreenState extends State<PersonScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = _vm!;
-    final theme = Theme.of(context);
     return ListenableBuilder(
       listenable: vm,
       builder: (context, _) {
         final detail = vm.detail;
         final name = detail?.person.name ?? '';
         final hasQr = detail?.person.qrPath != null;
-        return Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).maybePop(),
-                        tooltip: 'Back',
-                        icon: const Icon(Icons.arrow_back),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Semantics(
-                            header: true,
-                            child: Text(
-                              name,
-                              style: theme.textTheme.headlineSmall,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (detail != null)
-                        PopupMenuButton<VoidCallback>(
-                          tooltip: 'More options',
-                          icon: const Icon(Icons.more_vert),
-                          onSelected: (action) => action(),
-                          itemBuilder: (_) => [
-                            PopupMenuItem(
-                              value: () => _rename(name),
-                              child: const Text('Rename'),
-                            ),
-                            if (hasQr)
-                              PopupMenuItem(
-                                value: vm.pickQr,
-                                child: const Text('Replace QR'),
-                              ),
-                            PopupMenuItem(
-                              value: () => _delete(name),
-                              child: const Text('Delete person'),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
+        final menu = detail == null
+            ? null
+            : PopupMenuButton<VoidCallback>(
+                tooltip: 'More options',
+                icon: const Icon(Icons.more_vert),
+                style: IconButton.styleFrom(
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainer
+                      .withValues(alpha: 0.7),
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
+                  minimumSize: const Size(48, 48),
                 ),
-                if (detail != null)
-                  Expanded(child: _content(context, vm, detail)),
-              ],
-            ),
+                onSelected: (action) => action(),
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: () => _rename(name),
+                    child: const Text('Rename'),
+                  ),
+                  if (hasQr)
+                    PopupMenuItem(
+                      value: vm.pickQr,
+                      child: const Text('Replace QR'),
+                    ),
+                  PopupMenuItem(
+                    value: () => _delete(name),
+                    child: const Text('Delete person'),
+                  ),
+                ],
+              );
+        final say = _monSay(detail?.balance);
+        return Scaffold(
+          body: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              SceneBand(
+                title: name,
+                back: true,
+                compact: true,
+                face: say.face,
+                line: say.line,
+                detail: say.detail,
+                action: menu,
+              ),
+              if (detail != null) _content(context, vm, detail),
+            ],
           ),
         );
       },
@@ -262,78 +257,83 @@ class PersonScreenState extends State<PersonScreen> {
   Widget _content(BuildContext context, PersonViewModel vm, PersonDetail d) {
     final name = d.person.name;
     final qrPath = d.person.qrPath;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-      children: [
-        _BalanceCard(
-          name: name,
-          balance: d.balance,
-          bills: d.balance is YouPay ? d.iOwe.length : d.owedToMe.length,
-          oldest: _oldest(d),
-          onRemind: () => _remind(d),
-          onSettleUp: () => _settleUp(d),
-        ),
-        if (d.settleSuggestion case final receive?) ...[
-          const SizedBox(height: 16),
-          _RepaymentCard(
-            title: 'Possible settle up',
-            text: receiveText(receive),
-            onConfirm: vm.confirmSettle,
-            onDismiss: vm.dismissSettle,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _BalanceCard(
+            name: name,
+            balance: d.balance,
+            bills: d.balance is YouPay ? d.iOwe.length : d.owedToMe.length,
+            oldest: _oldest(d),
+            onRemind: () => _remind(d),
+            onSettleUp: () => _settleUp(d),
           ),
-        ],
-        const SizedBox(height: 24),
-        SectionHeading('$name owes you'),
-        if (d.owedToMe.isEmpty)
-          const _Nothing()
-        else
-          ListGroup(
-            children: [
-              for (final view in d.owedToMe)
-                _DebtRow(
-                  key: ValueKey(view.debt.id),
-                  view: view,
-                  onOpen: () => _openDebt(view, name),
-                  onMarkPaid: () => vm.startPaying(view),
-                  onConfirm: () => vm.confirmDebtSuggestion(view.debt.id),
-                  onDismiss: () => vm.dismissDebtSuggestion(view.debt.id),
-                ),
-            ],
-          ),
-        _AddButton('Add what $name owes me', () => _addOwedToMe(name)),
-        const SizedBox(height: 16),
-        SectionHeading('You owe $name'),
-        if (d.iOwe.isEmpty)
-          const _Nothing()
-        else
-          ListGroup(
-            children: [
-              for (final item in d.iOwe)
-                _ItemRow(
-                  key: ValueKey(item.id),
-                  item: item,
-                  onEdit: () => _editItem(item),
-                  onMarkPaid: () => vm.markItemPaid(item.id),
-                ),
-            ],
-          ),
-        _AddButton('Add what I owe', _addItem),
-        const SizedBox(height: 16),
-        ListGroup(
-          children: [
-            KobanRow(
-              title: "$name's payment QR",
-              subtitle: qrPath == null ? 'Not added yet. Tap to add it.' : null,
-              leading: const Icon(Icons.qr_code_2),
-              showChevron: true,
-              onTap: qrPath == null
-                  ? vm.pickQr
-                  : () => _showQr(vm, name, qrPath),
-              onTapLabel: qrPath == null ? 'Add QR' : 'Open QR',
+          if (d.settleSuggestion case final receive?) ...[
+            const SizedBox(height: 16),
+            _RepaymentCard(
+              title: 'Possible settle up',
+              text: receiveText(receive),
+              onConfirm: vm.confirmSettle,
+              onDismiss: vm.dismissSettle,
             ),
           ],
-        ),
-      ],
+          const SizedBox(height: 24),
+          SectionHeading('$name owes you'),
+          if (d.owedToMe.isEmpty)
+            const _Nothing()
+          else
+            ListGroup(
+              children: [
+                for (final view in d.owedToMe)
+                  _DebtRow(
+                    key: ValueKey(view.debt.id),
+                    view: view,
+                    onOpen: () => _openDebt(view, name),
+                    onMarkPaid: () => vm.startPaying(view),
+                    onConfirm: () => vm.confirmDebtSuggestion(view.debt.id),
+                    onDismiss: () => vm.dismissDebtSuggestion(view.debt.id),
+                  ),
+              ],
+            ),
+          _AddButton('Add what $name owes me', () => _addOwedToMe(name)),
+          const SizedBox(height: 16),
+          SectionHeading('You owe $name'),
+          if (d.iOwe.isEmpty)
+            const _Nothing()
+          else
+            ListGroup(
+              children: [
+                for (final item in d.iOwe)
+                  _ItemRow(
+                    key: ValueKey(item.id),
+                    item: item,
+                    onEdit: () => _editItem(item),
+                    onMarkPaid: () => vm.markItemPaid(item.id),
+                  ),
+              ],
+            ),
+          _AddButton('Add what I owe', _addItem),
+          const SizedBox(height: 16),
+          ListGroup(
+            children: [
+              KobanRow(
+                title: "$name's payment QR",
+                subtitle: qrPath == null
+                    ? 'Not added yet. Tap to add it.'
+                    : null,
+                leading: const Icon(Icons.qr_code_2),
+                showChevron: true,
+                onTap: qrPath == null
+                    ? vm.pickQr
+                    : () => _showQr(vm, name, qrPath),
+                onTapLabel: qrPath == null ? 'Add QR' : 'Open QR',
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -407,6 +407,21 @@ class PersonScreenState extends State<PersonScreen> {
         ),
       );
 }
+
+({MonFace face, String line, String? detail}) _monSay(Balance? balance) =>
+    switch (balance) {
+      PaysYou() => (
+        face: MonFace.idle,
+        line: 'I am holding this for you.',
+        detail: 'Until they pay.',
+      ),
+      YouPay() => (
+        face: MonFace.worry,
+        line: 'You owe. I kept count.',
+        detail: 'Pay it when you can.',
+      ),
+      _ => (face: MonFace.happy, line: 'All square.', detail: null),
+    };
 
 /// The QR on a white box with a gold frame. A tap adds or replaces it.
 /// White stays white in the dark theme, so the QR scans.
@@ -523,7 +538,7 @@ class _BalanceCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: scheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(KobanRadius.r24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -624,32 +639,50 @@ class _RepaymentCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.primary),
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: 8,
         children: [
-          Row(
-            spacing: 8,
-            children: [
-              Icon(Icons.info, color: scheme.primary, size: 20),
-              Expanded(
+          Align(
+            alignment: Alignment.centerLeft,
+            child: DecoratedBox(
+              decoration: ShapeDecoration(
+                shape: const StadiumBorder(),
+                color: scheme.primary,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 child: Text(
-                  title,
-                  style: weighted(theme.textTheme.titleMedium!, 700),
+                  'Suggested match',
+                  style: theme.textTheme.labelMedium!.copyWith(
+                    color: scheme.onPrimary,
+                  ),
                 ),
               ),
-            ],
+            ),
+          ),
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: weighted(
+                theme.textTheme.titleMedium!,
+                700,
+              ).copyWith(color: scheme.onPrimaryContainer),
+            ),
           ),
           Text(
             text,
             style: theme.textTheme.bodyMedium!.copyWith(
-              color: scheme.onSurfaceVariant,
+              color: scheme.onPrimaryContainer,
             ),
           ),
           Wrap(
@@ -658,10 +691,22 @@ class _RepaymentCard extends StatelessWidget {
             children: [
               TextButton(
                 onPressed: onDismiss,
-                style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  foregroundColor: scheme.onPrimaryContainer,
+                ),
                 child: const Text('Not this'),
               ),
-              TonalButton('Confirm', onConfirm),
+              FilledButton(
+                onPressed: onConfirm,
+                style: FilledButton.styleFrom(
+                  elevation: 0,
+                  minimumSize: const Size(0, 48),
+                  backgroundColor: scheme.onSurface,
+                  foregroundColor: scheme.surface,
+                ),
+                child: const Text('Confirm'),
+              ),
             ],
           ),
         ],
