@@ -12,6 +12,7 @@ import 'package:koban/rules/receipt_rules.dart';
 import 'package:koban/rules/split_math.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/split/split_editor_view_model.dart';
+import 'package:koban/screens/split/split_entry.dart';
 import 'package:path/path.dart' as p;
 
 import '../support/fake_backend.dart';
@@ -99,22 +100,20 @@ Future<SplitEditorViewModel> open(
   return vm;
 }
 
-/// Types the draft of the brief into [vm] and moves to the summary.
+/// Types the draft of the brief into [vm], people first, and moves to the summary.
 void typeDraft(SplitEditorViewModel vm) {
-  vm.typeItemsInstead();
-  vm.setMerchant('Kedai Contoh');
-  final first = vm.state.items.single.key;
-  vm.updateItem(first, (r) => r.copyWith(name: 'Nasi lemak', price: '20.00'));
-  vm.addItem();
-  final second = vm.state.items.last.key;
-  vm.updateItem(second, (r) => r.copyWith(name: 'Teh ais', price: '4.00'));
-  vm.next();
   vm.addPerson('Ali');
   vm.next();
+  vm.typeItemsInstead();
+  vm.setMerchant('Kedai Contoh');
   final aliId = vm.state.people.single.id;
-  vm.toggleShare(first, meId);
-  vm.toggleShare(first, aliId);
-  vm.toggleShare(second, aliId);
+  vm.addItem(
+    name: 'Nasi lemak',
+    quantity: 1,
+    price: d('20.00'),
+    sharedBy: {meId, aliId},
+  );
+  vm.addItem(name: 'Teh ais', quantity: 1, price: d('4.00'), sharedBy: {aliId});
   vm.next();
   vm.next();
 }
@@ -269,6 +268,63 @@ void main() {
     expect(SplitEditorViewModel.totalOf(vm.state), d('24.50'));
   });
 
+  test('rounding fills a gap of 5 sen to the printed total, and a typed rounding wins', () {
+    final auto = draft(printedTotal: d('24.03'));
+    expect(SplitEditorViewModel.chargesOf(auto)!.rounding, d('0.03'));
+    expect(SplitEditorViewModel.totalOf(auto), d('24.03'));
+    expect(SplitEditorViewModel.difference(auto), null);
+    final typed = draft(printedTotal: d('24.03'), rounding: '0');
+    expect(SplitEditorViewModel.difference(typed), d('0.03'));
+    final far = draft(printedTotal: d('24.06'));
+    expect(SplitEditorViewModel.difference(far), d('0.06'));
+  });
+
+  test(
+    'rate charges and Split the rest fill a payment and save the charges in RM',
+    () async {
+      final s = await testServices();
+      final id = await addPayment(s, amount: '86.40');
+      final vm = await open(s, expenseId: id);
+      vm.addPerson('Ali');
+      vm.next();
+      vm.typeItemsInstead();
+      final aliId = vm.state.people.single.id;
+      vm.addItem(
+        name: 'Nasi kandar',
+        quantity: 2,
+        price: d('25.00'),
+        sharedBy: {meId, aliId},
+      );
+      vm.addItem(
+        name: 'Teh tarik',
+        quantity: 3,
+        price: d('8.10'),
+        sharedBy: {aliId},
+      );
+      vm.setService(const RateCharge(10));
+      vm.setTax(const RateCharge(6));
+      // 86.40 over 1.16 is a subtotal of 74.48. The items have 33.10 of it.
+      expect(SplitEditorViewModel.missingItemsOf(vm.state), d('41.38'));
+
+      vm.splitTheRest();
+
+      final rest = vm.state.items.last;
+      expect((rest.name, rest.price), ('The rest', '41.38'));
+      expect(rest.sharedBy, {meId, aliId});
+      expect(SplitEditorViewModel.missingItemsOf(vm.state), d('0.00'));
+      expect(SplitEditorViewModel.totalOf(vm.state), d('86.40'));
+      vm.next();
+      expect(vm.state.step, SplitStep.summary);
+      await vm.done();
+      final bill = (await s.db.select(s.db.splitBills).get()).single;
+      expect(
+        (bill.serviceCharge, bill.tax, bill.rounding),
+        (d('7.45'), d('4.47'), d('0.00')),
+      );
+      expect((await s.expenses.getById(id))!.countedAmount, d('38.50'));
+    },
+  );
+
   test('the summary lines list the others first and Me last', () {
     expect(SplitEditorViewModel.summaryLines(draft()), [
       ('Ali', d('14.00')),
@@ -326,7 +382,7 @@ void main() {
       final id = await addPayment(s);
       final vm = await open(s, expenseId: id);
       expect(vm.state.loading, false);
-      expect(vm.state.step, SplitStep.photo);
+      expect(vm.state.step, SplitStep.people);
       expect(vm.state.selectedExpenseId, id);
       expect(vm.state.billTime, paidAt);
       expect(vm.state.billId, null);
@@ -388,10 +444,13 @@ void main() {
       expect(vm.state.confirmDiscard, false);
 
       final fresh = await open(s);
+      fresh.next();
       fresh.typeItemsInstead();
       expect(fresh.back(), true);
-      expect(fresh.state.step, SplitStep.photo);
+      expect(fresh.state.step, SplitStep.start);
       expect(fresh.state.confirmDiscard, false);
+      expect(fresh.back(), true);
+      expect(fresh.state.step, SplitStep.people);
       expect(fresh.back(), false);
     },
   );
@@ -541,11 +600,11 @@ void main() {
       final reading = vm.readReceipt(r.path);
       expect(vm.state.step, SplitStep.reading);
       expect(vm.back(), true);
-      expect(vm.state.step, SplitStep.photo);
+      expect(vm.state.step, SplitStep.start);
       wait.complete(ocrLines);
       await reading;
 
-      expect(vm.state.step, SplitStep.photo);
+      expect(vm.state.step, SplitStep.start);
       expect(vm.state.items, isEmpty);
       await photoGone(r.path);
       expect(File(r.path).existsSync(), false);
@@ -661,7 +720,7 @@ void main() {
       expect(File(r.path).existsSync(), true);
       vm.next();
 
-      expect(vm.state.step, SplitStep.people);
+      expect(vm.state.step, SplitStep.link);
       await photoGone(r.path);
       expect(File(r.path).existsSync(), false);
     });

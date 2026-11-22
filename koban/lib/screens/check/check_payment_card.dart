@@ -67,131 +67,192 @@ class CheckPaymentCard extends StatelessWidget {
     final stamp = this.stamp;
     final topUp = looksLikeTopUp(payment.rawNotificationText);
     final guessed = payment.format == CaptureFormat.unknown && !topUp;
+    final dateText =
+        '${dateLabel(payment.notificationPostTime, now)}, $timeText';
+    final category = card.categoryId;
+    final tint = categoryColor(context, category);
+
+    // The tap targets for fixing a field. Null on the cards under the top one.
+    Widget editable(Widget child, {double radius = 12}) => onEdit == null
+        ? child
+        : MergeSemantics(
+            child: Semantics(
+              button: true,
+              onTapHint: 'Change payment',
+              child: InkWell(
+                onTap: onEdit,
+                borderRadius: BorderRadius.circular(radius),
+                child: child,
+              ),
+            ),
+          );
+
+    final top = Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: ShapeDecoration(
+            color: scheme.surfaceContainerHigh,
+            shape: const StadiumBorder(),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 6,
+            children: [
+              Icon(Icons.notifications_none, size: 14, color: muted),
+              Text(card.appName, style: text.labelMedium),
+            ],
+          ),
+        ),
+        Expanded(
+          child: editable(
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Align(
+                alignment: Alignment.centerRight,
+                widthFactor: 1,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    dateText,
+                    style: tabular(text.bodySmall!.copyWith(color: muted)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final middle = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 4,
+      children: [
+        Center(child: CategoryBadge(category, size: 56)),
+        editable(
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Center(
+              child: Text(
+                payment.merchant ?? 'Not set',
+                style: weighted(text.titleLarge!, 700),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+        if (guessed)
+          Text(
+            'Shop · guessed',
+            style: text.bodySmall!.copyWith(color: money.review),
+            textAlign: TextAlign.center,
+          ),
+        // Outside the amount, so each choice is its own button for screen readers.
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280),
+            child: DirectionSegments(
+              selected: payment.directionUnclear
+                  ? null
+                  : payment.transactionType,
+              // A tap switches Spent or Received on the card, also when the
+              // direction is known (owner decision; 0.1.1 opened the sheet).
+              onPick: onChooseDirection,
+            ),
+          ),
+        ),
+        if (payment.directionUnclear)
+          Text(
+            'Spent or Received?',
+            style: text.bodyMedium!.copyWith(color: money.review),
+            textAlign: TextAlign.center,
+          ),
+        editable(Center(child: amount)),
+        Center(
+          child: Semantics(
+            button: onPickCategory != null,
+            onTapHint: 'Change category',
+            child: Material(
+              color: tint.withValues(alpha: 0.16),
+              shape: const StadiumBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onPickCategory,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 8,
+                      children: [
+                        CategoryDot(tint, size: 10),
+                        Flexible(
+                          child: Text(
+                            category == null
+                                ? 'Pick a category'
+                                : card.categoryName,
+                            style: weighted(text.labelLarge!, 700),
+                          ),
+                        ),
+                        if (onPickCategory != null)
+                          const Icon(Icons.expand_more, size: 18),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (topUp)
+          _Note(
+            icon: Icons.swap_horiz,
+            color: scheme.primary,
+            text: 'Looks like a wallet top-up, so usually not a payment.',
+          )
+        else if (guessed)
+          _Note(
+            icon: Icons.help_outline,
+            color: money.review,
+            text:
+                'Koban did not know this message, so it guessed the shop '
+                'and Spent or Received. Check them before you save.',
+          ),
+      ],
+    );
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: ColoredBox(
         color: scheme.surfaceContainer,
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 12,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      spacing: 8,
-                      children: [
-                        InitialsAvatar(card.appName, size: 32),
-                        Flexible(
-                          child: Text(
-                            '${card.appName} · $timeText',
-                            style: text.bodyMedium!.copyWith(color: muted),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
+            LayoutBuilder(
+              builder: (context, box) => SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: box.maxHeight.isFinite ? box.maxHeight - 32 : 0,
                   ),
-                  if (topUp)
-                    _Note(
-                      icon: Icons.swap_horiz,
-                      color: scheme.primary,
-                      text: 'Looks like a wallet top-up, so usually not a payment.',
-                    )
-                  else if (guessed)
-                    _Note(
-                      icon: Icons.help_outline,
-                      color: money.review,
-                      text:
-                          'Koban did not know this message, so it guessed the shop '
-                          'and Spent or Received. Check them before you save.',
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: onEdit == null
-                        ? amount
-                        : MergeSemantics(
-                            child: Semantics(
-                              button: true,
-                              onTapHint: 'Change payment',
-                              child: InkWell(
-                                onTap: onEdit,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: amount,
-                                ),
-                              ),
-                            ),
-                          ),
-                  ),
-                  // Outside the amount, so each choice is its own button for screen readers.
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: DirectionSegments(
-                      selected: payment.directionUnclear
-                          ? null
-                          : payment.transactionType,
-                      // A tap switches Spent or Received on the card, also when the
-                      // direction is known (owner decision; 0.1.1 opened the sheet).
-                      onPick: onChooseDirection,
-                    ),
-                  ),
-                  if (payment.directionUnclear)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Spent or Received?',
-                        style: text.bodyMedium!.copyWith(color: money.review),
-                      ),
-                    ),
-                  ListGroup(
+                  // The quote sits at the foot of the card when there is room.
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 12,
                     children: [
-                      KobanRow(
-                        title: payment.merchant ?? 'Not set',
-                        subtitle: guessed ? 'Shop · guessed' : 'Shop',
-                        subtitleColor: guessed ? money.review : null,
-                        showChevron: true,
-                        onTap: onEdit,
-                        onTapLabel: 'Change payment',
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        spacing: 4,
+                        children: [top, middle],
                       ),
-                      KobanRow(
-                        title:
-                            '${dateLabel(payment.notificationPostTime, now)}, $timeText',
-                        subtitle: 'Date',
-                        showChevron: true,
-                        onTap: onEdit,
-                        onTapLabel: 'Change payment',
-                      ),
-                      KobanRow(
-                        title: card.categoryId == null
-                            ? 'Not set'
-                            : card.categoryName,
-                        subtitle: card.categoryId == null
-                            ? 'Category · tap to pick'
-                            : 'Category',
-                        subtitleColor: card.categoryId == null
-                            ? money.review
-                            : null,
-                        leading: CategoryDot(
-                          categoryColor(context, card.categoryId),
-                          size: 12,
-                        ),
-                        showChevron: true,
-                        onTap: onPickCategory,
-                        onTapLabel: 'Change category',
-                      ),
+                      _RawText('“${payment.rawNotificationText}”'),
                     ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _RawText('“${payment.rawNotificationText}”'),
-                  ),
-                ],
+                ),
               ),
             ),
             // The stamps only echo the drag. Screen readers get the card actions instead.

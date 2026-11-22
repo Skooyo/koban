@@ -2,161 +2,229 @@
 
 Android app that tracks spending by reading bank and wallet payment notifications on your phone.
 
-[Overview](#overview) • [Demo](#demo) • [Features](#features) • [Getting started](#getting-started) • [Build](#build) • [Privacy](#privacy--security) • [Troubleshooting](#troubleshooting)
+[Overview](#overview) • [Demo](#demo) • [Features](#features) • [Getting started](#getting-started) • [Build](#build) • [Architecture](#architecture) • [Privacy](#privacy) • [Troubleshooting](#troubleshooting) • [FAQ](#faq)
 
-![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?style=flat-square&logo=kotlin&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.47%2B-02569B?style=flat-square&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.14-0175C2?style=flat-square&logo=dart&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-API%2026%2B-3DDC84?style=flat-square&logo=android&logoColor=white)
-![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white)
 
 ## Overview
 
-Koban listens to payment alerts from the banking and e-wallet apps you pick. Regex rules read the amount, merchant and direction, and the payment waits on a swipe screen: swipe right to save it, swipe left to drop it. Nothing counts in your totals until you say yes. You get day / week / month spending with categories, bill splits from a receipt photo, and a list of who owes you — without typing every purchase by hand.
+Koban reads payment alerts from the bank and e-wallet apps that you pick. Regex rules find the amount, the shop and the type (Spent or Received). Each payment then waits in **Check payments**. Swipe right to save it, or swipe left for **Not a payment**. A payment counts in your totals only after you save it.
 
-It is built for Malaysian Ringgit notifications (`RM` / `MYR`). Maybank and Touch 'n Go have exact rules; other apps use a generic rule. The default build makes no network call to read a notification. Receipt photos are read on the phone with ML Kit, offline.
+Koban also splits bills from a receipt photo, keeps a list of who owes you, and lets you compare category totals with friends in groups.
+
+Koban is built for Malaysian Ringgit notifications (`RM` and `MYR`). Maybank and Touch 'n Go have exact rules. Other apps use a generic rule. Koban reads the notification text on the phone and never sends it to a server.
+
+The app is written in Flutter, in [`koban/`](koban/). Version 0.2.0 is the first Flutter release. Versions 0.1.0 and 0.1.1 came from the Kotlin app in [`app/`](app/), which is now legacy code.
 
 ```text
-Bank / wallet notification (apps you picked)
+Bank or wallet notification (only the apps you picked)
         │
         ▼
-NotificationListenerService
+ExpenseNotificationListener (Kotlin NotificationListenerService)
+skips other apps, summary notifications and empty text
         │
         ▼
-Regex rules: exact per-app rule ──► generic RM/MYR rule ──► no amount: skip
+CaptureQueue (SQLite queue on the phone, kept until Dart handles each row)
+        │  CaptureEngine wakes a Flutter engine with no screen
+        ▼
+captureMain → CaptureWorker (background Dart)
         │
         ▼
-Waiting payment (on device, not in any total)
+PaymentRules: exact rule for the app ──► generic RM/MYR rule ──► no amount: skip
+        │
         ▼
-Swipe screen: right = save, left = drop, 4 s Undo
+Duplicate check, then a waiting payment in the drift database (not in any total)
+        │
         ▼
-Room database (on device)
+Check payments: swipe right = Save payment, swipe left = Not a payment, 4 s Undo
+        │
         ▼
-Home · Activity · People · Settings
+Home · Activity · People · Groups
 ```
 
 ## Demo
 
-A 37-second demo with sound: regex reads a payment notification, you swipe right to save it and left to drop a promotion, then spending by month or week, a cash payment on a number pad, a bill split from a receipt photo that the phone reads and checks against the printed total, and who owes you. Click the image to play it. The swipe screen is redrawn from the app's Compose code; the other screens are real app recordings. All data is made up.
+The demo video and its cover image come from the Kotlin app, version 0.1. The Flutter app has the same capture, check and split flow with a new look. New screenshots follow the next UI pass.
 
-[![Koban demo video](docs/demo/koban-demo.jpg)](docs/demo/koban-demo.mp4)
+The 37-second video has sound. It shows a payment notification that Koban reads, a swipe to save it and a swipe to drop a promotion, spending by month and week, a cash payment on a number pad, a bill split from a receipt photo, and who owes you. All data is made up.
 
-Home, Expenses and History in dark mode (the default) and light mode, from before the three-tab layout and the swipe screen. All merchants and amounts are sample data.
-
-![Home, Expenses and History screens in dark mode](docs/screenshots/screens-dark.png)
-
-<details>
-<summary>Light mode</summary>
-
-![Home, Expenses and History screens in light mode](docs/screenshots/screens-light.png)
-
-</details>
-
-Each spending category takes the color of a ringgit note (RM10 red, RM1 blue, RM100 purple, RM20 orange, RM50 teal, gold foil). Uncategorized spending shows as stripes.
+[![Koban 0.1 demo video, recorded from the Kotlin app](docs/demo/koban-demo.jpg)](docs/demo/koban-demo.mp4)
 
 ## Features
 
-- **Automatic capture** — reads payment notifications via Android’s `NotificationListenerService`, from the payment apps you pick
-- **Regex rules** — exact rules for Maybank and Touch 'n Go; any other text with an `RM` / `MYR` amount becomes a card marked **Unknown format**. Works offline, no API key
-- **Swipe to confirm** — every captured payment waits on a card. Swipe right (or ✓) to save, left (or ✕) to drop, with a 4-second **Undo**. Edit amount, merchant, category, date or direction on the card first
-- **Duplicate protection** — skips the same payment when it arrives from multiple apps or twice within a short window; a dropped payment does not come back
-- **Spending views** — day / week / month totals with a category donut, money received, and an All view
-- **Bill splits** — read a receipt photo on the phone (ML Kit Document Scanner and on-device text recognition, offline, no key), tap who had what; only your share counts as spending
-- **People** — track who owes you and whom you owe, store a friend's payment QR, and get a suggested match when a repayment arrives
-- **Background reliability** — keep-alive service, boot restart, and reconnect helpers (including Xiaomi/HyperOS guidance)
-- **Debug log** — inspect every notification the listener saw and why it was captured or skipped
+### Capture and check
+
+- **Automatic capture.** Koban reads notifications only from the apps that you tick in **Payment apps**. Maybank and Touch 'n Go start ticked when they are installed. An empty list means that Koban reads no app.
+- **Regex rules.** Exact rules read Maybank and Touch 'n Go alerts. Any other text with an `RM` or `MYR` amount becomes a card with a guessed shop. The rules run on the phone and need no API key.
+- **Check payments.** Each found payment waits on a card. Tap a field to fix the amount, shop, category, date or type. Swipe right or tap **Save payment** to keep it. Swipe left or tap **Not a payment** to drop it. Both actions have a 4-second **Undo**.
+- **Duplicate protection.** Koban skips a payment that it already has: the same notification, the same app and amount in one 30-minute bucket, or the same amount and type within 5 minutes. A payment that you drop does not come back for 30 days.
+- **Background tracking.** A small persistent notification keeps Android from stopping the listener. Tracking starts again after a phone restart and after an app update. **Settings** has battery and Xiaomi autostart shortcuts.
+- **Notification log.** **Settings → Notification log** shows each notification that Koban saw and what Koban did with it. **Test parse** in Settings reads a sample text without a real payment.
+
+### Money views
+
+- **Home** shows what you spent today, the payments that wait in Check payments, and the latest payments of this week.
+- **Activity** shows one month at a time, with a category donut, a search by shop or note, and a category filter.
+- **Add payment** adds a cash payment by hand.
+- **Categories.** The built-in categories take the colors of ringgit notes: Food is red (RM10), Transport is blue (RM1), Shopping is purple (RM100), Bills is orange (RM20), Health is teal (RM50) and Entertainment is green (RM5). You can add your own categories in **Settings**.
+
+### Splits and people
+
+- **Bill splits.** Take a photo of a receipt or pick one from the gallery. Koban reads the items on the phone with ML Kit. Then you pick who had each item. Only your share counts as your spending. You can also type the items, or split one amount with no receipt.
+- **Read with Claude (optional).** With an invite code from the owner, Koban also sends the receipt photo to Claude and uses the read that matches the printed total. Each phone has 10 Claude reads a day. See [Privacy](#privacy).
+- **People.** See who owes you and whom you owe. Store a friend's payment QR, save it to the gallery, and pay from your bank app. Send a reminder through the share menu. When a Received payment matches an open debt, Koban suggests the match.
+
+### Groups
+
+- **Groups** compare spending with friends. Sign in with Google, make a group and share its code, or ask to join a friend's group. The group owner approves each request.
+- Members see each other's totals per category, for each week and month. Single payments, shops, times, notes and money in are never shared. To keep one payment out of the group totals, turn off **Count in group totals** on that payment.
+- You can be in up to 5 groups. Each group has up to 10 members.
+- **Delete account** removes you from all groups and deletes your shared totals from the server. The payments on your phone stay.
+- Groups use the invite code from **Settings**.
+
+### App
+
+- **Onboarding** on first start: notification access, payment apps, and the battery settings that your phone needs.
+- **Self-updater.** Once a day, Koban checks the latest GitHub release and shows **Update available**. The update is optional. Koban installs only an APK with the Koban app ID and the expected version code. **Settings → Check for updates** checks at once.
+- **Online features** switch in **Settings**. It is on by default. When it is off, Koban makes no network calls: groups, Claude reads and update checks stop.
+- **Import of 0.1.1 data.** When 0.2.0 installs over the Kotlin 0.1.1 app, the first start copies the old database rows and settings into the new database. Koban keeps the old database file under a `.pre-flutter` name.
+- **Look.** Night blue with one gold action color, and the Bricolage Grotesque font. Dark mode is on by default. Turn it off in **Settings**. Mon, a gold koban coin, shows on empty and finished screens. [docs/DESIGN.md](docs/DESIGN.md) has the full design rules and the app's word list.
 
 ## Getting started
 
-### Prerequisites
+### Install the app
 
-- [Android Studio](https://developer.android.com/studio) (or JDK 17 + Android SDK)
-- A physical Android device (API 26+). Emulators rarely receive real bank notifications.
-- Notification access permission for the app
+Koban is for the owner and invited friends. The owner installs the first APK by USB, as section 7 of [docs/RELEASING.md](docs/RELEASING.md) tells. Later updates come through the app. Android Play Protect can block an APK that asks for notification access when it comes from a browser or a chat app.
 
-### Run the app
+### Set up the phone
 
-1. Clone the repository and open it in Android Studio.
-2. Sync Gradle, then run on your device (`Run` or `./gradlew.bat installDebug`).
-3. Grant **Notification access**:
-   - Android Settings → Apps → Special app access → **Notification access** → enable **Koban**
-4. Tick your payment apps in the list Koban shows. Maybank and Touch 'n Go start ticked when installed. Change the list later in **Settings → Payment apps**. An empty list means Koban listens to no app.
-5. On Xiaomi/HyperOS, follow the in-app battery/autostart checklist in **Settings** so the listener is not killed.
+1. Open Koban. Onboarding opens by itself.
+2. Turn on **Notification access** for Koban.
+3. Tick your payment apps. Change the list later in **Settings → Payment apps**.
+4. Follow the battery steps that Koban shows. On Xiaomi and HyperOS, turn on Autostart and set battery to **No restrictions**.
+5. To read receipts with Claude or to use groups, enter your invite code in **Settings → Invite code**.
 
 > [!TIP]
-> After a real transfer or Scan & Pay, open Koban. The swipe screen opens by itself, and Home shows "1 payment to check". **Settings → Notification log** shows the notification as **Waiting for check**. Use **Settings → Test parse** to try a notification text without a payment.
+> After a real transfer or Scan & Pay, open Koban. **Check payments** opens by itself, and Home shows the waiting payment. **Settings → Notification log** shows the notification as **Waiting in Check payments**.
+
+### Prerequisites for development
+
+- [Flutter](https://docs.flutter.dev/get-started/install) 3.47 or later (Dart 3.14)
+- JDK 17 and the Android SDK
+- A physical Android phone, API 26 or later. Emulators rarely receive real bank notifications.
+- For groups and Claude reads, a root `.env` file with `SUPABASE_KEY`. Copy [`.env.example`](.env.example) and ask the owner for the key. Without the key, the build shows a warning, and groups and Claude reads do not work.
 
 ## Build
 
-Windows (PowerShell):
+Run all commands from `koban/`. Set `JAVA_HOME` to your JDK 17.
 
-```powershell
-.\gradlew.bat test assembleDebug
-```
-
-macOS / Linux:
+Get the packages and run the checks:
 
 ```bash
-./gradlew test assembleDebug
+flutter pub get
+flutter analyze
+flutter test
+(cd android && ./gradlew :app:testDebugUnitTest)
 ```
 
-Debug APK output:
+Flutter makes `android/gradlew` at the first `flutter run` or `flutter build`. On Windows, use `gradlew.bat`. Run `:app:testDebugUnitTest`, not the plain `testDebugUnitTest`: the plain task also runs the tests of a plugin, and they fail.
 
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-Install over USB:
+Run a debug build on a phone that is connected by USB:
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+flutter run
 ```
 
-To release a new version, follow [docs/RELEASING.md](docs/RELEASING.md).
+A debug build has the app ID `io.github.skooyo.koban.debug`, so it installs next to the release app. Google sign-in works only in builds whose key SHA-1 is in the owner's Google Cloud OAuth clients.
+
+After a change to a `.drift` file or to `lib/data/database.dart`, make `lib/data/database.g.dart` again:
+
+```bash
+dart run build_runner build
+```
+
+The release build is `flutter build apk --release`. Its output is `build/app/outputs/flutter-apk/app-release.apk`. A release build needs the owner's release key. To release a new version, follow [docs/RELEASING.md](docs/RELEASING.md).
+
+GitHub Actions runs `flutter analyze` and `flutter test` on each push and pull request that changes `koban/`.
 
 ## Architecture
 
 | Area | Stack |
 |------|--------|
-| UI | Jetpack Compose, Material 3, Navigation |
-| DI | Hilt |
-| Storage | Room (expenses, categories), DataStore (settings) |
-| Listener | `NotificationListenerService` + foreground keep-alive |
-| Parsing | Regex rules (`PaymentRules`, `NotificationParser`); ML Kit Document Scanner and text recognition plus a rule engine (`ReceiptRules`) for receipts |
-| Min SDK | 26 · Target / Compile SDK 35 |
+| UI | Flutter, Material 3, Bricolage Grotesque font |
+| Storage | drift on SQLite (payments, categories, people, splits), `shared_preferences` (settings) |
+| Capture | Kotlin `NotificationListenerService`, a foreground keep-alive service, a SQLite queue, and a background Dart engine |
+| Rules | Pure Dart regex rules (`PaymentRules`, `NotificationParser`) and the receipt rule engine (`ReceiptRules`) |
+| Receipts | `google_mlkit_document_scanner` and `google_mlkit_text_recognition` on the phone, `image_picker` for the gallery and the camera |
+| Online | `supabase` (auth, tables, Edge Functions), `google_sign_in`, `http` |
+| Updates | GitHub latest-release API, Android package installer |
+| Min SDK | 26 |
 
-Key packages under `app/src/main/java/com/expensetracker/app/`:
+Key folders:
 
-- `listener/` — notification capture, reconnect, OEM battery helpers
-- `parser/` — regex rules, receipt reader, amount formatting, dedup keys
-- `data/` — Room entities, DAOs, repositories
-- `ui/` — screens, view models, components
+- `koban/lib/capture/` has the background Dart entry point (`captureMain`) and the worker that reads the native queue.
+- `koban/lib/rules/` has the pure Dart rules: payments, receipts, splits, dedup keys and repayment matches.
+- `koban/lib/data/` has the drift database, the repositories, and the one-time import of 0.1.1 data.
+- `koban/lib/screens/` has one folder per screen, each with a screen and a view model.
+- `koban/lib/online/` has groups, Google sign-in, the Supabase client and the Claude receipt client.
+- `koban/lib/update/` has the self-updater.
+- `koban/android/app/src/main/kotlin/` has the native listener, the capture queue, the keep-alive service and the APK installer.
+- `supabase/` has the database migrations and the Edge Functions `register`, `read-receipt` and `delete-account`.
+- `server/receipt-service/` has the receipt service that runs Claude on the owner's server.
+- `app/` has the legacy Kotlin and Jetpack Compose app (0.1.0 and 0.1.1). Do not release it again.
 
-## Privacy & security
+## Privacy
 
-- Expense data stays **on device** in a local Room database.
-- Notification text is read on device by regex. The default build sends nothing to a server.
-- Receipt photos never leave the phone: ML Kit reads them on the device.
-- `.env` is gitignored. Do not publish APKs that contain a personal API key.
+Koban keeps your data on the phone. Some features use the internet, and only when **Online features** is on. The switch is on by default.
+
+These stay on the phone at all times:
+
+- The notification text, and the regex rules that read it.
+- Your payments, shops, notes, categories, people, debts, splits and payment QRs, in the local drift database.
+- Receipt photos that ML Kit reads.
+
+These go online, and only when **Online features** is on:
+
+- **Update check.** Once a day, Koban asks the GitHub API for the latest release. The request has no token, no app version and no account ID. A new APK downloads only when you tap **Update**.
+- **Invite code.** Koban sends the code to Koban's Supabase server and gets a device token back. The server keeps a hash of the token.
+- **Claude reads.** With an invite code, Koban makes the receipt photo smaller and sends it to the `read-receipt` Edge Function. The function sends the photo to the receipt service on the owner's server. The service runs Claude and deletes the photo after the read. The server counts the reads per phone for the daily limit.
+- **Groups.** When you sign in with Google, the server keeps your Google account and a name for groups (your Google first name, which you can change). It also keeps your groups and your Spent totals per category, for each week and month since you joined your first group. Single payments, shops, times, notes and money in never leave the phone. Payments with **Count in group totals** off are not in the totals.
+
+When you turn off **Online features**, Koban makes no network calls.
+
+The repository is public. `.env` is in `.gitignore`. Do not commit a key, a password or a server URL.
 
 ## Troubleshooting
 
 | Issue | What to try |
-|-------|-------------|
-| Nothing is tracked | Confirm notification access is enabled; check that **Settings → Payment apps** is not empty; check **Notification log** |
-| Listener dies when app is closed | Disable battery restrictions; enable autostart (Xiaomi); keep the persistent tracking notification |
-| Duplicate expenses | Update to the latest build; dismiss old duplicates manually — new ones should be blocked within ±5 minutes for the same amount |
-| Promos show on the swipe screen | Swipe them left |
-| Xiaomi reconnect fails | Prefer soft reconnect / checklist in Settings; avoid repeatedly toggling notification access |
+|-------|--------|
+| Nothing is tracked | Make sure that notification access is on. Make sure that **Settings → Payment apps** is not empty. Look in **Settings → Notification log**. |
+| The listener stops when the app is closed | Set battery to **No restrictions**. Turn on Autostart on Xiaomi. Keep the persistent tracking notification. Tap **Restart payment tracking** in Settings. |
+| The same payment shows twice | Delete the extra payment. Koban blocks a second payment with the same amount and type within 5 minutes. |
+| A promotion shows in Check payments | Swipe it left for **Not a payment**. |
+| Claude does not read receipts | Turn on **Online features**. Enter an invite code in **Settings**. Each phone has 10 Claude reads a day. The limit resets at midnight, Malaysia time. |
+| Google sign-in fails | Add a Google account to the phone. Enter your invite code in **Settings** first. |
+| "Could not check for updates" | GitHub allows 60 checks per hour from one IP address. Try again later. |
+| Koban closes after an update | Android closes the app after a self-update. Open Koban again. |
 
 > [!NOTE]
-> On aggressive OEMs (especially HyperOS), locking the app in Recents and setting battery to **No restrictions** makes tracking far more reliable.
+> On Xiaomi and HyperOS, lock Koban in Recents and set battery to **No restrictions**. Do not use "Clear all" in Recents: it can turn off notification access.
 
 ## FAQ
 
-**Does the app need to stay open?**  
-It should keep listening in the background via the notification listener and keep-alive service, but OEM battery policies can still stop it. Use the Settings checklist on Xiaomi devices.
+**Does the app need to stay open?**
+No. After you turn on notification access, a small persistent notification keeps Android from stopping the listener. Some phones still stop it. Use the battery steps in Settings.
 
-**Why confirm every payment?**  
-Automatic saving let promotions through and put dates into merchant names. A swipe takes a second, and nothing wrong reaches your totals.
+**Why check every payment?**
+Automatic saving let promotions through and put dates into shop names. A swipe takes a second, and no wrong payment reaches your totals.
 
-**Can two real purchases of the same amount be merged?**  
-Possibly, if they happen within about five minutes with the same amount and direction. That tradeoff avoids double-counting one payment that both the bank and the wallet report.
+**Can Koban merge two real payments of the same amount?**
+Yes, if both are Spent payments of the same amount within about 5 minutes. Koban accepts this risk so that it does not count one payment twice when the bank and the wallet both report it. Received payments from different senders are not merged.
+
+**Does Koban work without the internet?**
+Yes. Capture, Check payments, People, and splits that ML Kit reads work offline. Groups, Claude reads and update checks need the internet.
+
+**Does Koban work on iPhone?**
+No. Koban 0.2.0 ships only as an Android APK.

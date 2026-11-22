@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../theme/mon.dart';
 import 'release_parser.dart';
 import 'update_repository.dart';
 
@@ -40,6 +41,7 @@ class UpdateDialogContent extends StatelessWidget {
       UpdateAvailable(:final update) => AlertDialog(
         backgroundColor: color,
         shape: _shape,
+        icon: const Mon(MonFace.happy, size: 48),
         title: Text('Update available', style: text.headlineSmall),
         content: SingleChildScrollView(
           child: Column(
@@ -64,7 +66,7 @@ class UpdateDialogContent extends StatelessWidget {
         ),
         actions: [
           TextButton(onPressed: onDismiss, child: const Text('Later')),
-          TextButton(onPressed: onUpdate, child: const Text('Update')),
+          FilledButton(onPressed: onUpdate, child: const Text('Update')),
         ],
       ),
       UpdateDownloading() => AlertDialog(
@@ -89,6 +91,7 @@ class UpdateDialogContent extends StatelessWidget {
       UpdateFailed(:final message) => AlertDialog(
         backgroundColor: color,
         shape: _shape,
+        icon: const Mon(MonFace.worry, size: 48),
         content: Text(message),
         actions: [TextButton(onPressed: onDismiss, child: const Text('OK'))],
       ),

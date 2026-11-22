@@ -6,28 +6,25 @@ import 'package:decimal/decimal.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
+import '../../data/split_repository.dart' show RecentItem;
 import '../../receipts/receipt_photos.dart';
 import '../../rules/amount_formatter.dart';
+import '../../rules/split_math.dart';
 import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
+import '../../theme/tokens.dart';
 import '../../ui/amount_input.dart';
 import '../../ui/dialogs.dart';
 import '../../ui/kit.dart';
+import '../../ui/scene_band.dart';
 import '../../ui/sheets.dart';
 import 'split_editor_steps.dart';
 import 'split_editor_view_model.dart';
-
-const _stepNames = [
-  'Receipt',
-  'Items',
-  'People',
-  'Who had what',
-  'Payment',
-  'Summary',
-];
+import 'split_entry.dart';
+import 'split_item_sheet.dart';
 
 /// The split editor: a new split, a split of a payment, or a saved split.
-/// A port of `SplitEditorScreen.kt`.
+/// A port of `SplitEditorScreen.kt`, in the Mon's desk look.
 class SplitEditorScreen extends StatefulWidget {
   const SplitEditorScreen({super.key, this.billId, this.expenseId});
 
@@ -92,102 +89,47 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
     }
   }
 
+  /// Goes to the items and opens the quick-add sheet, filled with [prefill] when given.
+  void _typeItems([RecentItem? prefill]) {
+    final vm = _vm!;
+    vm.typeItemsInstead();
+    showItemSheet(context, vm, prefill: prefill);
+  }
+
+  Future<void> _share() async {
+    final text = SplitEditorViewModel.shareText(_vm!.state);
+    if (text == null) return;
+    try {
+      await AppScope.of(context).device.shareText(text);
+    } catch (e, s) {
+      developer.log(
+        'Share summary failed',
+        name: 'SplitEditorScreen',
+        error: e,
+        stackTrace: s,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = _vm!;
-    final theme = Theme.of(context);
     return ListenableBuilder(
       listenable: vm,
       builder: (context, _) {
         final state = vm.state;
-        final action = _bottomAction(state, vm);
-        // The step bar shows the reading step as the photo step.
-        final barStep = state.step == SplitStep.reading
-            ? 0
-            : state.step.index - (state.step.index > 1 ? 1 : 0);
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) _goBack();
           },
           child: Scaffold(
-            body: SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 12, 20, 0),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: _goBack,
-                          tooltip: 'Back',
-                          icon: const Icon(Icons.arrow_back),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: Semantics(
-                              header: true,
-                              child: Text(
-                                'Split a bill',
-                                style: theme.textTheme.titleLarge,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (!state.loading)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: StepProgress(
-                        number: barStep + 1,
-                        total: _stepNames.length,
-                        name: _stepNames[barStep],
-                      ),
-                    ),
-                  Expanded(child: _content(state, vm)),
-                  if (action != null)
-                    Material(
-                      color: theme.colorScheme.surfaceContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton(
-                                onPressed: action.enabled && !state.saving
-                                    ? action.onPressed
-                                    : null,
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size(0, 48),
-                                ),
-                                child: Text(action.label),
-                              ),
-                            ),
-                            if (action.hint != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  action.hint!,
-                                  style: theme.textTheme.bodySmall!.copyWith(
-                                    color: MoneyColors.of(context).review,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+            body: Column(
+              children: [
+                _band(context, state),
+                Expanded(child: _content(state, vm)),
+                ?_bottomBar(context, state, vm),
+              ],
             ),
           ),
         );
@@ -195,12 +137,105 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
     );
   }
 
+  Widget _band(BuildContext context, SplitEditorState s) {
+    final (face, line, detail) = _monSays(s);
+    final shop = SplitEditorViewModel.shopOf(s);
+    final (title, number) = switch (s.step) {
+      _ when s.loading => ('Split a bill', null),
+      SplitStep.people => ('Split a bill', 1),
+      SplitStep.start || SplitStep.reading => (shop ?? 'Split a bill', 2),
+      SplitStep.items => (shop ?? 'Items', 2),
+      SplitStep.link => ('Payment', 3),
+      SplitStep.summary => ('Split done', 3),
+    };
+    return SceneBand(
+      title: title,
+      face: face,
+      line: line,
+      detail: detail,
+      back: true,
+      compact: true,
+      action: number == null || s.billId != null ? null : _StepPill(number),
+    );
+  }
+
+  /// Mon's face, line and plain detail for the step.
+  (MonFace, String, String?) _monSays(SplitEditorState s) {
+    if (s.loading) return (MonFace.idle, 'Opening the bill.', null);
+    switch (s.step) {
+      case SplitStep.people:
+        if (s.error != null) return (MonFace.worry, 'That did not open.', null);
+        return (MonFace.idle, 'Who ate with you?', 'Tap names. No typing.');
+      case SplitStep.start:
+        return (MonFace.idle, 'Got the receipt?', 'I can read it for you.');
+      case SplitStep.reading:
+        return (
+          MonFace.idle,
+          'Reading every line.',
+          'This takes a few seconds.',
+        );
+      case SplitStep.items:
+        final missing = SplitEditorViewModel.unassigned(s).length;
+        final rest = SplitEditorViewModel.missingItemsOf(s);
+        if (s.items.isEmpty) {
+          return (
+            MonFace.idle,
+            'What did you have?',
+            'Add the items. I do the sums.',
+          );
+        }
+        if (rest != null && rest.sign > 0) {
+          return (
+            MonFace.idle,
+            '${splitRm(rest)} is on no one yet.',
+            'Shared food? Split it evenly.',
+          );
+        }
+        if (missing > 0) {
+          return (
+            MonFace.worry,
+            missing == 1 ? '1 item has no one.' : '$missing items have no one.',
+            'Tap the faces on each item.',
+          );
+        }
+        if (SplitEditorViewModel.difference(s) != null) {
+          return (
+            MonFace.worry,
+            'This does not match the receipt.',
+            'Fix it below.',
+          );
+        }
+        return (
+          MonFace.happy,
+          'Every item has someone.',
+          'Check the charges, then Next.',
+        );
+      case SplitStep.link:
+        return (
+          MonFace.idle,
+          'Which payment was this?',
+          'Link the card payment, so your spending counts only your share.',
+        );
+      case SplitStep.summary:
+        final owing = owingNames(s);
+        return (
+          MonFace.happy,
+          'Every sen is on someone.',
+          s.locked
+              ? "Someone has paid you back, so the items can't change."
+              : owing.isEmpty
+              ? null
+              : '${joinNames(owing)} now ${owing.length == 1 ? 'owes' : 'owe'} you.',
+        );
+    }
+  }
+
   Widget _content(SplitEditorState state, SplitEditorViewModel vm) {
     if (state.loading) {
       return const Center(child: CircularProgressIndicator());
     }
     final loadError = state.error;
-    if (state.step == SplitStep.photo && loadError != null) {
+    if (state.step == SplitStep.people && loadError != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -214,7 +249,12 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
       );
     }
     return switch (state.step) {
-      SplitStep.photo => _PhotoStep(state: state, vm: vm),
+      SplitStep.people => PeopleStep(state: state, vm: vm),
+      SplitStep.start => _StartStep(
+        state: state,
+        vm: vm,
+        onTypeItems: _typeItems,
+      ),
       SplitStep.reading => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -229,102 +269,190 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
         ),
       ),
       SplitStep.items => _ItemsStep(state: state, vm: vm),
-      SplitStep.people => PeopleStep(state: state, vm: vm),
-      SplitStep.assign => AssignStep(state: state, vm: vm),
       SplitStep.link => LinkStep(state: state, vm: vm),
-      SplitStep.summary => SummaryStep(state: state, vm: vm, onShare: _share),
+      SplitStep.summary => SummaryStep(state: state, vm: vm),
     };
   }
 
-  Future<void> _share(String text) async {
-    try {
-      await AppScope.of(context).device.shareText(text);
-    } catch (e, s) {
-      developer.log(
-        'Share summary failed',
-        name: 'SplitEditorScreen',
-        error: e,
-        stackTrace: s,
-      );
+  Widget? _bottomBar(
+    BuildContext context,
+    SplitEditorState s,
+    SplitEditorViewModel vm,
+  ) {
+    if (s.loading) return null;
+    final theme = Theme.of(context);
+    String? caption;
+    String? value;
+    String? hint;
+    Widget? second;
+    final ({String label, bool enabled, VoidCallback onPressed})? main;
+    switch (s.step) {
+      case SplitStep.start || SplitStep.reading:
+        return null;
+      case SplitStep.people:
+        if (s.error != null) return null;
+        final count = s.people.length + 1;
+        caption = count == 1 ? '1 person' : '$count people';
+        value = ['Me', for (final p in s.people) p.name].join(', ');
+        main = (label: 'Next', enabled: true, onPressed: vm.next);
+      case SplitStep.items:
+        final total = SplitEditorViewModel.totalOf(s);
+        final missing = SplitEditorViewModel.unassigned(s).length;
+        caption = 'Total';
+        value = total == null ? 'Check the amounts' : splitRm(total);
+        hint = switch (missing) {
+          0 => null,
+          1 => '1 item has no one yet. Pick someone to go on.',
+          final n => '$n items have no one yet. Pick someone to go on.',
+        };
+        main = (
+          label: 'Next',
+          enabled: s.items.isNotEmpty && total != null && missing == 0,
+          onPressed: vm.next,
+        );
+      case SplitStep.link:
+        main = s.locked
+            ? (
+                label: 'Save payment',
+                enabled: true,
+                onPressed: vm.saveLockedPayment,
+              )
+            : (label: 'Next', enabled: true, onPressed: vm.next);
+      case SplitStep.summary:
+        final viewed = s.billId != null && !s.editing && s.amounts == null;
+        second = OutlinedButton.icon(
+          onPressed: SplitEditorViewModel.shareText(s) == null ? null : _share,
+          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 56)),
+          icon: const Icon(Icons.share, size: 18),
+          label: const Text('Send summary'),
+        );
+        main = s.locked
+            ? null
+            : (
+                label: viewed ? 'Done' : 'Save split',
+                enabled:
+                    s.amounts == null ||
+                    SplitEditorViewModel.amountsLeft(s)?.sign == 0,
+                onPressed: vm.done,
+              );
     }
+    final mainButton = main == null
+        ? null
+        : FilledButton(
+            onPressed: main.enabled && !s.saving ? main.onPressed : null,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 56),
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+            ),
+            child: Text(main.label),
+          );
+    return Material(
+      color: theme.colorScheme.surfaceContainer,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  if (second != null) ...[
+                    Expanded(child: second),
+                    if (mainButton != null) const SizedBox(width: 12),
+                  ] else
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (caption != null)
+                            Text(
+                              caption,
+                              style: theme.textTheme.bodySmall!.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          if (value != null)
+                            Text(
+                              value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tabular(theme.textTheme.titleMedium!),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (mainButton != null)
+                    second != null ? Expanded(child: mainButton) : mainButton,
+                ],
+              ),
+              if (hint != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    hint,
+                    style: theme.textTheme.bodySmall!.copyWith(
+                      color: MoneyColors.of(context).review,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
-typedef _BottomAction = ({
-  String label,
-  bool enabled,
-  VoidCallback onPressed,
-  String? hint,
-});
+/// "2 of 3" in the title row of the band.
+class _StepPill extends StatelessWidget {
+  const _StepPill(this.number);
 
-_BottomAction? _bottomAction(SplitEditorState s, SplitEditorViewModel vm) {
-  if (s.loading) return null;
-  return switch (s.step) {
-    SplitStep.photo || SplitStep.reading => null,
-    SplitStep.items => (
-      label: 'Next',
-      enabled:
-          s.items.isNotEmpty &&
-          SplitEditorViewModel.parseItems(s) != null &&
-          SplitEditorViewModel.chargesOf(s) != null,
-      onPressed: vm.next,
-      hint: null,
-    ),
-    SplitStep.people => (
-      label:
-          'Next · ${s.people.length + 1} ${s.people.isEmpty ? 'person' : 'people'}',
-      enabled: true,
-      onPressed: vm.next,
-      hint: null,
-    ),
-    SplitStep.assign => (
-      label: 'Next',
-      enabled: SplitEditorViewModel.unassigned(s).isEmpty,
-      onPressed: vm.next,
-      hint: switch (SplitEditorViewModel.unassigned(s).length) {
-        0 => null,
-        1 => '1 item has no one yet. Pick someone to go on.',
-        final n => '$n items have no one yet. Pick someone to go on.',
-      },
-    ),
-    SplitStep.link =>
-      s.locked
-          ? (
-              label: 'Save payment',
-              enabled: true,
-              onPressed: vm.saveLockedPayment,
-              hint: null,
-            )
-          : (label: 'Next', enabled: true, onPressed: vm.next, hint: null),
-    SplitStep.summary =>
-      s.locked
-          ? null
-          : (
-              label: 'Done',
-              enabled:
-                  s.amounts == null ||
-                  SplitEditorViewModel.amountsLeft(s)?.sign == 0,
-              onPressed: vm.done,
-              hint: null,
-            ),
-  };
+  final int number;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      label: 'Step $number of 3',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: ShapeDecoration(
+          color: theme.colorScheme.surfaceContainer,
+          shape: const StadiumBorder(),
+        ),
+        child: Text(
+          '$number of 3',
+          style: tabular(theme.textTheme.labelLarge!),
+        ),
+      ),
+    );
+  }
 }
 
-class _PhotoStep extends StatefulWidget {
-  const _PhotoStep({required this.state, required this.vm});
+class _StartStep extends StatefulWidget {
+  const _StartStep({
+    required this.state,
+    required this.vm,
+    required this.onTypeItems,
+  });
 
   final SplitEditorState state;
   final SplitEditorViewModel vm;
+  final void Function([RecentItem? prefill]) onTypeItems;
 
   @override
-  State<_PhotoStep> createState() => _PhotoStepState();
+  State<_StartStep> createState() => _StartStepState();
 }
 
-class _PhotoStepState extends State<_PhotoStep> {
+class _StartStepState extends State<_StartStep> {
   bool _picking = false;
 
   /// Opens a photo source and reads the photo it gives. A cancel gives null and changes nothing.
-  /// As in 0.1.1, a failed photo shows nothing: the editor stays on the receipt step.
+  /// As in 0.1.1, a failed photo shows nothing: the editor stays on the start step.
   Future<void> _pick(Future<String?> Function() source) async {
     if (_picking) return;
     // Read before the await: a closed editor has no context.
@@ -363,7 +491,7 @@ class _PhotoStepState extends State<_PhotoStep> {
   }
 
   /// One amount, shared by everyone. A split of a payment uses its amount and shop.
-  Future<void> _splitWithoutReceipt() async {
+  Future<void> _splitEvenly() async {
     final payment = widget.state.linkedPayment;
     if (payment != null) {
       final shop = payment.merchant?.trim() ?? '';
@@ -384,78 +512,101 @@ class _PhotoStepState extends State<_PhotoStep> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final muted = theme.textTheme.bodyMedium!.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     final payment = widget.state.linkedPayment;
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  const SizedBox(height: 16),
-                  const Mon(MonFace.idle, size: 96),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Start with the receipt',
-                    style: theme.textTheme.headlineMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      widget.state.onlineAccess
-                          ? "Koban reads the items on your phone and with Claude. The photo goes to Koban's server, which deletes it after reading."
-                          : 'Koban reads the items on your phone. The photo is not sent anywhere.',
-                      style: theme.textTheme.bodyMedium!.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _WideButton(
+    final shop = payment?.merchant?.trim() ?? '';
+    final recent = shop.isEmpty
+        ? const <RecentItem>[]
+        : widget.vm.recentItems
+              .where(
+                (i) => i.merchant?.trim().toLowerCase() == shop.toLowerCase(),
+              )
+              .take(8)
+              .toList();
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      children: [
+        if (payment != null) ...[
+          PaymentCard(payment),
+          const SizedBox(height: KobanSpace.s12),
+        ],
+        SplitCard(
+          children: [
             FilledButton.icon(
               onPressed: _picking
                   ? null
                   : () => _pick(AppScope.of(context).receiptPhotos.scan),
-              icon: const Icon(Icons.camera_alt, size: 18),
-              label: const Text('Take photo'),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 56)),
+              icon: const Icon(Icons.camera_alt, size: 20),
+              label: const Text('Scan receipt'),
             ),
-          ),
-          const SizedBox(height: 8),
-          _WideButton(
+            const SizedBox(height: KobanSpace.s8),
             OutlinedButton.icon(
               onPressed: _picking
                   ? null
                   : () => _pick(AppScope.of(context).pickImage),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
               icon: const Icon(Icons.image, size: 18),
               label: const Text('Choose from gallery'),
             ),
-          ),
-          const SizedBox(height: 8),
-          _WideButton(
-            TonalButton(
-              payment == null
-                  ? 'Split one amount, no receipt'
-                  : 'Split ${splitRm(payment.amount)} evenly, no receipt',
-              _picking ? null : _splitWithoutReceipt,
+            const SizedBox(height: KobanSpace.s12),
+            Text(
+              widget.state.onlineAccess
+                  ? "Koban reads the items on your phone and with Claude. The photo goes to Koban's server, which deletes it after reading."
+                  : 'Koban reads the items on your phone. The photo is not sent anywhere.',
+              style: muted,
             ),
-          ),
-          const SizedBox(height: 8),
-          _WideButton(
-            TextButton(
-              onPressed: widget.vm.typeItemsInstead,
-              child: const Text('Type items instead'),
+          ],
+        ),
+        const SizedBox(height: KobanSpace.s12),
+        ListGroup(
+          children: [
+            KobanRow(
+              title: payment == null
+                  ? 'Type the total and split evenly'
+                  : 'Split ${splitRm(payment.amount)} evenly',
+              subtitle: 'No items. Everyone pays the same.',
+              leading: const Icon(Icons.call_split),
+              showChevron: true,
+              onTap: _picking ? null : _splitEvenly,
             ),
+            KobanRow(
+              title: 'Type items',
+              subtitle: 'A keypad, recent items, and who had what.',
+              leading: const Icon(Icons.dialpad),
+              showChevron: true,
+              onTap: _picking ? null : widget.onTypeItems,
+            ),
+          ],
+        ),
+        if (recent.isNotEmpty) ...[
+          const SizedBox(height: KobanSpace.s12),
+          SplitCard(
+            children: [
+              CardHeading('Recent at $shop'),
+              const SizedBox(height: 4),
+              Text(
+                'Tap one to start typing items with it. Name and price fill in.',
+                style: muted,
+              ),
+              const SizedBox(height: KobanSpace.s8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final i in recent)
+                    ActionChip(
+                      onPressed: () => widget.onTypeItems(i),
+                      label: Text('${i.name} · ${splitRm(i.unitPrice)}'),
+                    ),
+                ],
+              ),
+            ],
           ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -537,18 +688,6 @@ class _OneAmountDialogState extends State<_OneAmountDialog> {
   }
 }
 
-class _WideButton extends StatelessWidget {
-  const _WideButton(this.child);
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => ConstrainedBox(
-    constraints: const BoxConstraints(minHeight: 48, minWidth: double.infinity),
-    child: child,
-  );
-}
-
 /// Items and the receipt total differ: a card with the `review` outline and a Fix button.
 class MismatchCard extends StatelessWidget {
   const MismatchCard({
@@ -570,46 +709,36 @@ class MismatchCard extends StatelessWidget {
     final review = MoneyColors.of(context).review;
     final total = this.total;
     final printed = this.printed;
-    return Material(
-      color: theme.colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: review),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return SplitCard(
+      side: BorderSide(color: review),
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Icon(Icons.warning, color: review, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Differs from the receipt total by RM ${AmountFormatter.formatDisplay(diff.abs())}.',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-            if (total != null && printed != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Items add up to ${splitRm(total)}. The receipt says ${splitRm(printed)}.',
-                style: theme.textTheme.bodyMedium!.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+            Icon(Icons.warning, color: review, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Differs from the receipt total by RM ${AmountFormatter.formatDisplay(diff.abs())}.',
+                style: theme.textTheme.titleMedium,
               ),
-            ],
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TonalButton('Fix', onFix),
             ),
           ],
         ),
-      ),
+        if (total != null && printed != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Items add up to ${splitRm(total)}. The receipt says ${splitRm(printed)}.',
+            style: theme.textTheme.bodyMedium!.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TonalButton('Fix', onFix),
+        ),
+      ],
     );
   }
 }
@@ -689,7 +818,7 @@ class _FixSheetState extends State<_FixSheet> {
         final readsLeft = state.readsLeft;
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -744,6 +873,21 @@ class _FixSheetState extends State<_FixSheet> {
   }
 }
 
+/// Opens the people of the split over the items, to add or remove someone.
+Future<void> _showPeopleSheet(BuildContext context, SplitEditorViewModel vm) =>
+    showKobanSheet<void>(
+      context: context,
+      builder: (_) => ListenableBuilder(
+        listenable: vm,
+        builder: (_, _) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: PeopleStep(state: vm.state, vm: vm, inSheet: true),
+        ),
+      ),
+    );
+
 class _ItemsStep extends StatelessWidget {
   const _ItemsStep({required this.state, required this.vm});
 
@@ -754,235 +898,354 @@ class _ItemsStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final muted = theme.textTheme.bodyMedium!.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
     final total = SplitEditorViewModel.totalOf(state);
     final diff = SplitEditorViewModel.difference(state);
     final printed = state.printedTotal;
     final message = state.message;
-    const gap = SizedBox(height: 16);
+    final missing = SplitEditorViewModel.unassigned(state);
+    const gap = SizedBox(height: KobanSpace.s12);
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        if (state.readSource != null ||
-            diff != null ||
-            message != null ||
-            (state.readNote != null && diff == null)) ...[
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (state.readSource != null) ...[
-                Row(
-                  children: [
-                    Icon(Icons.check, size: 18, color: scheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        state.readSource!,
-                        style: theme.textTheme.bodyMedium!.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-              ],
-              if (diff != null) ...[
-                MismatchCard(
-                  diff: diff,
-                  total: total,
-                  printed: printed,
-                  onFix: () => showFixSheet(context, vm),
-                ),
-                const SizedBox(height: 12),
-              ],
-              if (message != null) ...[
-                Text(
-                  message,
-                  style: theme.textTheme.bodyMedium!.copyWith(
-                    color: scheme.error,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              if (state.readNote != null && diff == null)
-                Text(
-                  state.readNote!,
-                  style: theme.textTheme.bodyMedium!.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-            ],
-          ),
-          gap,
-        ],
-        SplitField(
-          label: 'Shop',
-          value: state.merchant,
-          onChanged: vm.setMerchant,
-        ),
-        gap,
-        const SectionHeading('Items'),
-        if (state.items.isNotEmpty)
-          ListGroup(
-            children: [
-              for (final row in state.items)
-                _ItemEditor(key: ValueKey(row.key), row: row, vm: vm),
-            ],
-          ),
-        ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: TextButton.icon(
-            onPressed: vm.addItem,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Add item'),
-          ),
-        ),
-        gap,
-        const SectionHeading('Charges'),
-        ListGroup(
+        SplitCard(
           children: [
-            _MoneyField(
-              'Service charge',
-              state.serviceCharge,
-              vm.setServiceCharge,
-            ),
-            _MoneyField('SST', state.tax, vm.setTax),
-            _MoneyField('Discount', state.discount, vm.setDiscount),
-            _MoneyField(
-              'Rounding',
-              state.rounding,
-              vm.setRounding,
-              keyboard: TextInputType.text,
-              hint: 'Use - for a negative amount',
-            ),
-          ],
-        ),
-        gap,
-        ListGroup(
-          children: [
-            KobanRow(
-              title: 'Total',
-              trailing: total != null
-                  ? MoneyText(splitRm(total), style: theme.textTheme.titleLarge)
-                  : Text(
-                      'Check the amounts',
-                      style: theme.textTheme.bodyLarge!.copyWith(
-                        color: scheme.error,
-                      ),
-                    ),
-            ),
-            if (printed != null)
-              KobanRow(
-                title: 'Receipt total',
-                trailing: MoneyText(
-                  splitRm(printed),
-                  style: theme.textTheme.bodyLarge,
-                  color: scheme.onSurfaceVariant,
+            if (state.readSource != null) ...[
+              Row(
+                children: [
+                  Icon(Icons.check, size: 18, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(state.readSource!, style: muted)),
+                ],
+              ),
+              gap,
+            ],
+            if (message != null) ...[
+              Text(
+                message,
+                style: theme.textTheme.bodyMedium!.copyWith(
+                  color: scheme.error,
                 ),
               ),
+              gap,
+            ],
+            if (state.readNote != null && diff == null) ...[
+              Text(state.readNote!, style: muted),
+              gap,
+            ],
+            SplitField(
+              label: 'Shop',
+              value: state.merchant,
+              onChanged: vm.setMerchant,
+            ),
           ],
         ),
+        if (diff != null) ...[
+          gap,
+          MismatchCard(
+            diff: diff,
+            total: total,
+            printed: printed,
+            onFix: () => showFixSheet(context, vm),
+          ),
+        ],
+        if (SplitEditorViewModel.targetTotal(state) != null) ...[
+          gap,
+          _Meter(state: state, vm: vm),
+        ],
+        gap,
+        SplitCard(
+          children: [
+            CardHeading(
+              'Items',
+              trailing: TextButton.icon(
+                onPressed: () => showItemSheet(context, vm),
+                style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add item'),
+              ),
+            ),
+            if (state.items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text('No items yet.', style: muted),
+              ),
+            for (final row in state.items)
+              _ItemLine(
+                key: ValueKey(row.key),
+                row: row,
+                state: state,
+                unassigned: missing.contains(row.key),
+                vm: vm,
+              ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (state.items.isNotEmpty)
+                  TextButton(
+                    onPressed: vm.splitEverythingEvenly,
+                    style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                    child: const Text('Split everything evenly'),
+                  ),
+                TextButton.icon(
+                  onPressed: () => _showPeopleSheet(context, vm),
+                  style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                  icon: const Icon(Icons.group, size: 18),
+                  label: const Text('Edit people'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        gap,
+        _Charges(state: state, vm: vm),
       ],
     );
   }
 }
 
-class _ItemEditor extends StatelessWidget {
-  const _ItemEditor({super.key, required this.row, required this.vm});
+/// How much of the receipt or payment the items cover, and one tap for the rest.
+class _Meter extends StatelessWidget {
+  const _Meter({required this.state, required this.vm});
 
-  final ItemRow row;
+  final SplitEditorState state;
   final SplitEditorViewModel vm;
 
   @override
   Widget build(BuildContext context) {
-    final price = AmountFormatter.parseInput(row.price);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        children: [
-          Row(
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final sum = SplitEditorViewModel.itemsSum(state);
+    final rest = SplitEditorViewModel.missingItemsOf(state);
+    if (sum == null || rest == null) return const SizedBox.shrink();
+    final target = sum + rest;
+    final parts = SplitEditorViewModel.everyone(state).length;
+    final fill = target.sign <= 0
+        ? 1.0
+        : (sum.toDouble() / target.toDouble()).clamp(0.0, 1.0);
+    final muted = theme.textTheme.bodyMedium!.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    return SplitCard(
+      children: [
+        Text('Items typed', style: muted),
+        const SizedBox(height: 4),
+        Text.rich(
+          TextSpan(
             children: [
-              Expanded(
-                child: SplitField(
-                  label: 'Item',
-                  value: row.name,
-                  onChanged: (v) =>
-                      vm.updateItem(row.key, (r) => r.copyWith(name: v)),
-                ),
+              TextSpan(
+                text: splitRm(sum),
+                style: tabular(theme.textTheme.titleLarge!),
               ),
-              IconButton(
-                onPressed: () => vm.removeItem(row.key),
-                tooltip:
-                    'Remove ${row.name.trim().isEmpty ? 'item' : row.name}',
-                icon: Icon(
-                  Icons.delete,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
+              TextSpan(text: ' of ${splitRm(target)}', style: muted),
             ],
           ),
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(KobanRadius.full),
+          child: LinearProgressIndicator(
+            value: fill,
+            minHeight: 8,
+            backgroundColor: scheme.surfaceContainerHigh,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (rest.sign > 0) ...[
+          Text('${splitRm(rest)} left, on no one yet', style: muted),
           const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 88,
-                child: SplitField(
-                  label: 'Qty',
-                  value: row.quantity,
-                  keyboard: TextInputType.number,
-                  onChanged: (v) =>
-                      vm.updateItem(row.key, (r) => r.copyWith(quantity: v)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: SplitField(
-                  label: 'Line price (RM)',
-                  value: row.price,
-                  keyboard: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  isError:
-                      row.price.trim().isNotEmpty && (price?.sign ?? 0) <= 0,
-                  onChanged: (v) =>
-                      vm.updateItem(row.key, (r) => r.copyWith(price: v)),
-                ),
-              ),
-            ],
+          TonalButton(
+            'Split the rest evenly · ${splitRm(eachOf(rest, parts))} each',
+            vm.splitTheRest,
           ),
-        ],
-      ),
+        ] else if (rest.sign < 0)
+          Text(
+            '${splitRm(-rest)} more than the ${state.printedTotal == null ? 'payment' : 'receipt'}',
+            style: theme.textTheme.bodyMedium!.copyWith(
+              color: MoneyColors.of(context).review,
+            ),
+          )
+        else
+          Text('Every sen of the bill is in the items.', style: muted),
+      ],
     );
   }
 }
 
-class _MoneyField extends StatelessWidget {
-  const _MoneyField(
-    this.label,
-    this.value,
-    this.onChanged, {
-    this.keyboard = const TextInputType.numberWithOptions(decimal: true),
-    this.hint,
+/// One item: name, quantity and line price, and a face for each person. A tap edits it.
+class _ItemLine extends StatelessWidget {
+  const _ItemLine({
+    super.key,
+    required this.row,
+    required this.state,
+    required this.unassigned,
+    required this.vm,
   });
 
-  final String label;
-  final String value;
-  final ValueChanged<String> onChanged;
-  final TextInputType keyboard;
-  final String? hint;
+  final ItemRow row;
+  final SplitEditorState state;
+  final bool unassigned;
+  final SplitEditorViewModel vm;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    child: SplitField(
-      label: '$label (RM)',
-      value: value,
-      onChanged: onChanged,
-      keyboard: keyboard,
-      hint: hint,
-      isError:
-          value.trim().isNotEmpty && AmountFormatter.parseInput(value) == null,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final quantity = row.quantity.trim();
+    final price = AmountFormatter.parseInput(row.price);
+    final name = quantity == '1' ? row.name : '${row.name} ×$quantity';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Divider(height: 1, color: theme.colorScheme.outlineVariant),
+        InkWell(
+          onTap: () => showItemSheet(context, vm, row: row),
+          child: Semantics(
+            button: true,
+            label: 'Edit ${row.name}',
+            excludeSemantics: true,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(name, style: theme.textTheme.titleMedium),
+                  ),
+                  if (price != null)
+                    MoneyText(
+                      splitRm(price),
+                      style: theme.textTheme.titleMedium,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Wrap(
+          children: [
+            PersonToggle(
+              'Me',
+              on: row.sharedBy.contains(meId),
+              onTap: () => vm.toggleShare(row.key, meId),
+            ),
+            for (final p in state.people)
+              PersonToggle(
+                p.name,
+                on: row.sharedBy.contains(p.id),
+                onTap: () => vm.toggleShare(row.key, p.id),
+              ),
+          ],
+        ),
+        if (unassigned)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Pick who had this item.',
+              style: theme.textTheme.bodySmall!.copyWith(
+                color: MoneyColors.of(context).review,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Service charge and SST as rate chips with the RM shown, then discount and rounding.
+class _Charges extends StatelessWidget {
+  const _Charges({required this.state, required this.vm});
+
+  final SplitEditorState state;
+  final SplitEditorViewModel vm;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final subtotal = SplitEditorViewModel.itemsSum(state) ?? Decimal.zero;
+    final printed = state.printedTotal;
+    final rounding = state.rounding;
+    final auto = rounding.trim().isEmpty
+        ? SplitEditorViewModel.roundingOf(state)
+        : null;
+    Widget rateChip(
+      String label,
+      Charge current,
+      int percent,
+      ValueChanged<Charge> set,
+    ) {
+      final on = current == RateCharge(percent);
+      return FilterChip(
+        selected: on,
+        onSelected: (_) => set(on ? const NoCharge() : RateCharge(percent)),
+        label: Text(
+          on
+              ? '$label $percent% · ${splitRm(rateOf(subtotal, percent))}'
+              : '$label $percent%',
+        ),
+      );
+    }
+
+    Widget? fixedChip(String label, Charge current, ValueChanged<Charge> set) =>
+        current is FixedCharge
+        ? FilterChip(
+            selected: true,
+            onSelected: (_) => set(const NoCharge()),
+            label: Text('$label · ${splitRm(current.amount)}'),
+          )
+        : null;
+
+    return SplitCard(
+      children: [
+        CardHeading(
+          'Charges',
+          trailing: printed == null
+              ? null
+              : Text(
+                  'Receipt total ${splitRm(printed)}',
+                  style: theme.textTheme.bodySmall!.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+        ),
+        const SizedBox(height: KobanSpace.s8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final r in serviceRates)
+              rateChip('Service charge', state.service, r, vm.setService),
+            ?fixedChip('Service charge', state.service, vm.setService),
+            for (final r in sstRates) rateChip('SST', state.tax, r, vm.setTax),
+            ?fixedChip('SST', state.tax, vm.setTax),
+          ],
+        ),
+        const SizedBox(height: KobanSpace.s16),
+        SplitField(
+          label: 'Discount (RM)',
+          value: state.discount,
+          onChanged: vm.setDiscount,
+          keyboard: const TextInputType.numberWithOptions(decimal: true),
+          isError:
+              state.discount.trim().isNotEmpty &&
+              AmountFormatter.parseInput(state.discount) == null,
+        ),
+        const SizedBox(height: KobanSpace.s12),
+        SplitField(
+          label: 'Rounding (RM)',
+          value: rounding,
+          onChanged: vm.setRounding,
+          keyboard: TextInputType.text,
+          hint: auto != null && auto.sign != 0 && printed != null
+              ? 'Set to ${AmountFormatter.formatDisplay(auto)} to match ${splitRm(printed)}'
+              : 'Use - for a negative amount',
+          isError:
+              rounding.trim().isNotEmpty &&
+              AmountFormatter.parseInput(rounding) == null,
+        ),
+      ],
+    );
+  }
 }

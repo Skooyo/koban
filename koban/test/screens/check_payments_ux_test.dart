@@ -71,7 +71,7 @@ void main() {
     await addOne(s);
     await openCheck(tester, s);
     expect(find.textContaining('Koban did not know'), findsNothing);
-    expect(find.text('Shop'), findsOneWidget);
+    expect(find.text('Shop · guessed'), findsNothing);
   });
 
   testWidgets('a top-up says so and Not a payment is the gold button', (
@@ -117,9 +117,9 @@ void main() {
       await addOne(s);
       await openCheck(tester, s);
       expect(find.byType(ChoiceChip), findsNothing);
-      expect(find.text('Category · tap to pick'), findsOneWidget);
+      expect(find.text('Pick a category'), findsOneWidget);
 
-      await tester.tap(find.text('Category · tap to pick'));
+      await tester.tap(find.text('Pick a category'));
       await tester.pumpAndSettle();
       expect(find.text('Most used'), findsOneWidget);
       expect(find.text('All categories'), findsOneWidget);
@@ -139,8 +139,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Most used'), findsNothing);
       expect(find.text('Shopping'), findsOneWidget);
-      expect(find.text('Category'), findsOneWidget);
-      expect(find.text('Category · tap to pick'), findsNothing);
+      expect(find.text('Pick a category'), findsNothing);
       await tester.tap(saveButton);
       await tester.pumpAndSettle();
       await endHold(tester);

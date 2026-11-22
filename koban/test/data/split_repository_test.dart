@@ -119,6 +119,52 @@ void main() {
   Future<SplitPeopleData> person(String id) =>
       (db.select(db.splitPeople)..where((p) => p.id.equals(id))).getSingle();
 
+  test('recent items rank the shop first, give the last unit price and skip made lines', () async {
+    DraftItem item(String name, int qty, String price) =>
+        DraftItem(name: name, quantity: qty, price: d(price), sharedBy: {meId});
+    SplitDraft bill(String shop, int time, List<DraftItem> items) => SplitDraft(
+      billId: null,
+      merchant: shop,
+      billTime: time,
+      currency: 'MYR',
+      printedTotal: null,
+      items: items,
+      charges: SplitCharges(),
+      people: const [],
+      linkedExpenseId: null,
+    );
+    await repo.saveSplit(
+      bill('Pelita', T - day, [
+        item('Teh tarik', 3, '8.10'),
+        item('Roti canai', 2, '3.20'),
+      ]),
+    );
+    await repo.saveSplit(
+      bill('Kedai Lain', T, [
+        item('Teh tarik', 1, '3.00'),
+        item('Kopi', 1, '2.50'),
+        item(restItemName, 1, '9.00'),
+        item('Kedai Lain', 1, '4.00'),
+        item('Kedai Lain · Ali', 1, '1.00'),
+      ]),
+    );
+    final recent = await repo.recentItems();
+    List<(String, Decimal)> names(List<RecentItem> l) => [
+      for (final i in l) (i.name, i.unitPrice),
+    ];
+
+    expect(names(rankRecentItems(recent, ' pelita ')), [
+      ('Teh tarik', d('2.70')),
+      ('Roti canai', d('1.60')),
+      ('Kopi', d('2.50')),
+    ]);
+    expect(names(rankRecentItems(recent, null)), [
+      ('Teh tarik', d('3.00')),
+      ('Kopi', d('2.50')),
+      ('Roti canai', d('1.60')),
+    ]);
+  });
+
   test('a saved split makes one open debt for each other person', () async {
     final billId = await repo.saveSplit(draftA());
 

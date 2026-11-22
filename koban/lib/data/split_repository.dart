@@ -1,6 +1,7 @@
 import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
 
+import '../rules/amount_formatter.dart';
 import '../rules/people_math.dart';
 import '../rules/repayment_matcher.dart';
 import '../rules/split_math.dart';
@@ -52,6 +53,45 @@ class SplitDraft {
   final SplitCharges charges;
   final List<SplitPeopleData> people;
   final String? linkedExpenseId;
+}
+
+/// An item of an earlier bill: what one of it cost, at which shop.
+class RecentItem {
+  const RecentItem({
+    required this.name,
+    required this.unitPrice,
+    required this.merchant,
+  });
+
+  final String name;
+  final Decimal unitPrice;
+  final String? merchant;
+}
+
+/// Names that the editor makes itself. They are not things people order.
+const restItemName = 'The rest';
+const _madeNames = {'the rest', 'shared cost'};
+
+/// One chip per name: the items of [shop] first, then the others, each with its last
+/// unit price. [newestFirst] is the order of [SplitRepository.recentItems].
+List<RecentItem> rankRecentItems(
+  List<RecentItem> newestFirst,
+  String? shop, {
+  int limit = 12,
+}) {
+  final key = shop?.trim().toLowerCase() ?? '';
+  bool atShop(RecentItem i) =>
+      key.isNotEmpty && i.merchant?.trim().toLowerCase() == key;
+  final seen = <String>{};
+  final out = <RecentItem>[];
+  for (final item in [
+    ...newestFirst.where(atShop),
+    ...newestFirst.where((i) => !atShop(i)),
+  ]) {
+    if (out.length == limit) break;
+    if (seen.add(item.name.trim().toLowerCase())) out.add(item);
+  }
+  return out;
 }
 
 /// An open debt with the names that the debts screen shows.
@@ -125,6 +165,25 @@ class SplitRepository {
 
   Future<bool> isLocked(String billId) async =>
       (await _db.debts(billId).get()).any((d) => d.status == DebtStatus.paid);
+
+  /// The items of earlier bills, newest bill first. Lines that the editor made, such as a
+  /// one-amount split or typed amounts, are left out.
+  Future<List<RecentItem>> recentItems() async => [
+    for (final r in await _db.recentItemRows().get())
+      if (!_madeNames.contains(r.name.trim().toLowerCase()) &&
+          !r.name.contains(' · ') &&
+          r.name.trim().toLowerCase() != r.merchant?.trim().toLowerCase() &&
+          r.quantity > 0)
+        RecentItem(
+          name: r.name.trim(),
+          unitPrice: AmountFormatter.toMoney(
+            (r.price / Decimal.fromInt(r.quantity)).toDecimal(
+              scaleOnInfinitePrecision: 10,
+            ),
+          ),
+          merchant: r.merchant,
+        ),
+  ];
 
   Future<SplitDraft?> loadDraft(String billId) async {
     final bill = await _db.bill(billId).getSingleOrNull();

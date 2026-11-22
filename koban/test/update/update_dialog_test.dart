@@ -111,7 +111,14 @@ void main() {
     expect(tester.takeException(), isNull);
     for (final label in ['Update', 'Later']) {
       expect(
-        tester.getSize(find.widgetWithText(TextButton, label)).height,
+        tester
+            .getSize(
+              find.ancestor(
+                of: find.text(label),
+                matching: find.bySubtype<ButtonStyleButton>(),
+              ),
+            )
+            .height,
         greaterThanOrEqualTo(48),
       );
     }

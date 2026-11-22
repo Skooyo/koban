@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../rules/types.dart';
 import '../theme/koban_theme.dart';
+import '../theme/tokens.dart';
 
 /// The style for a token weight. Every text uses the 0.1.1 release look (see
 /// [kobanFontVariations]), so [weight] does not change the drawn weight.
@@ -22,7 +23,7 @@ class ListGroup extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Material(
       color: scheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(KobanRadius.r24),
       clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -247,6 +248,32 @@ class CategoryDot extends StatelessWidget {
     height: size,
     decoration: BoxDecoration(shape: BoxShape.circle, color: color),
   );
+}
+
+/// The category glyph in the category color on a tinted circle, at the start of a list row.
+/// Decoration only: the row text names the category.
+class CategoryBadge extends StatelessWidget {
+  const CategoryBadge(this.categoryId, {super.key, this.size = 40});
+
+  /// A category id as [categoryColor] takes it. Null is uncategorized.
+  final String? categoryId;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = categoryColor(context, categoryId);
+    return ExcludeSemantics(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color.withValues(alpha: 0.16),
+        ),
+        child: Icon(categoryIcon(categoryId), color: color, size: size * 0.5),
+      ),
+    );
+  }
 }
 
 /// The big left-aligned title of a top-level tab.

@@ -1,16 +1,17 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
+import '../../theme/mon.dart';
 import '../../ui/kit.dart';
+import '../../ui/scene_band.dart';
 import 'payment_apps_view_model.dart';
 
 /// Pick which installed apps Koban listens to. Save with none ticked is allowed.
-/// [onSaved] and [onBack] replace the default, which closes the page.
+/// [onSaved] replaces the default, which closes the page. Back is the system Back.
 class PaymentAppsScreen extends StatefulWidget {
-  const PaymentAppsScreen({super.key, this.onSaved, this.onBack});
+  const PaymentAppsScreen({super.key, this.onSaved});
 
   final VoidCallback? onSaved;
-  final VoidCallback? onBack;
 
   @override
   State<PaymentAppsScreen> createState() => _PaymentAppsScreenState();
@@ -67,71 +68,47 @@ class _PaymentAppsScreenState extends State<PaymentAppsScreen> {
         final shown = vm.shown;
         final n = vm.selected.length;
         return Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 12, 20, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: widget.onBack ?? _close,
-                        tooltip: 'Back',
-                        icon: const Icon(Icons.arrow_back),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Semantics(
-                            header: true,
-                            child: Text('Payment apps', style: text.titleLarge),
+          body: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    const SceneBand(
+                      title: 'Payment apps',
+                      back: true,
+                      compact: true,
+                      face: MonFace.idle,
+                      line: 'Pick the apps I listen to.',
+                      detail: 'Koban reads notifications only from the apps you tick.',
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: TextField(
+                        controller: _search,
+                        onChanged: vm.setQuery,
+                        maxLines: 1,
+                        decoration: InputDecoration(
+                          hintText: 'Search apps',
+                          prefixIcon: const Icon(Icons.search),
+                          filled: true,
+                          fillColor: scheme.surfaceContainer,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(28),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Koban reads notifications only from the apps you tick.',
-                      style: text.bodyMedium!.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: TextField(
-                    controller: _search,
-                    onChanged: vm.setQuery,
-                    maxLines: 1,
-                    decoration: InputDecoration(
-                      hintText: 'Search apps',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: apps == null
-                      ? const Center(child: CircularProgressIndicator())
-                      : ListView(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
+                    if (apps == null)
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             if (shown.isEmpty)
                               Text(
@@ -183,8 +160,13 @@ class _PaymentAppsScreenState extends State<PaymentAppsScreen> {
                             ),
                           ],
                         ),
+                      ),
+                  ],
                 ),
-                Padding(
+              ),
+              SafeArea(
+                top: false,
+                child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: FilledButton(
                     onPressed: apps == null || _saving ? null : _save,
@@ -202,8 +184,8 @@ class _PaymentAppsScreenState extends State<PaymentAppsScreen> {
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },

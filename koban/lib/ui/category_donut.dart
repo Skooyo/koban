@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../data/database.dart';
 import '../data/summaries.dart';
 import '../theme/koban_theme.dart';
+import '../theme/tokens.dart';
 
 /// The filter value for payments with no category. Null means no filter.
 const uncategorizedFilter = '__uncategorized';
@@ -103,10 +104,9 @@ int _percentOf(Decimal part, Decimal whole) => whole == Decimal.zero
           .toBigInt()
           .toInt();
 
-/// Spending by category as a small ring. The ring is a button when [onTap] is set.
-/// The gap between slices has the color of the card the ring sits on.
-class CategoryDonut extends StatelessWidget {
-  const CategoryDonut({super.key, required this.slices, this.onTap});
+/// Spending by category as one stacked bar. The bar is a button when [onTap] is set.
+class CategoryBar extends StatelessWidget {
+  const CategoryBar({super.key, required this.slices, this.onTap});
 
   final List<DonutSlice> slices;
   final VoidCallback? onTap;
@@ -127,79 +127,35 @@ class CategoryDonut extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: CustomPaint(
-          size: const Size.square(104),
-          painter: _DonutPainter(
-            sweeps: [
-              for (final s in slices)
-                2 * math.pi * (s.total / whole).toDouble(),
-            ],
-            colors: [for (final s in slices) _sliceColor(context, s)],
-            gap: Theme.of(context).colorScheme.surfaceContainer,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(KobanRadius.full),
+              child: SizedBox(
+                height: 14,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < slices.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 2),
+                      Expanded(
+                        flex: math.max(
+                          1,
+                          (slices[i].total / whole).toDouble() * 1000 ~/ 1,
+                        ),
+                        child: ColoredBox(
+                          color: _sliceColor(context, slices[i]),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
-}
-
-class _DonutPainter extends CustomPainter {
-  _DonutPainter({
-    required this.sweeps,
-    required this.colors,
-    required this.gap,
-  });
-
-  final List<double> sweeps;
-  final List<Color> colors;
-  final Color gap;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = size.shortestSide * 0.2;
-    final diameter = size.shortestSide - stroke;
-    final center = size.center(Offset.zero);
-    final rect = Rect.fromCenter(
-      center: center,
-      width: diameter,
-      height: diameter,
-    );
-    var start = -math.pi / 2;
-    for (var i = 0; i < sweeps.length; i++) {
-      canvas.drawArc(
-        rect,
-        start,
-        sweeps[i],
-        false,
-        Paint()
-          ..color = colors[i]
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = stroke,
-      );
-      start += sweeps[i];
-    }
-    // A 2 dp gap between neighboring slices.
-    if (sweeps.length > 1) {
-      final inner = diameter / 2 - stroke / 2 - 1;
-      final outer = diameter / 2 + stroke / 2 + 1;
-      final line = Paint()
-        ..color = gap
-        ..strokeWidth = 2;
-      start = -math.pi / 2;
-      for (final sweep in sweeps) {
-        final dx = math.cos(start);
-        final dy = math.sin(start);
-        canvas.drawLine(
-          center + Offset(dx * inner, dy * inner),
-          center + Offset(dx * outer, dy * outer),
-          line,
-        );
-        start += sweep;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DonutPainter old) =>
-      old.sweeps != sweeps || old.colors != colors || old.gap != gap;
 }

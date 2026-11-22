@@ -4,12 +4,14 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../app/app_services.dart';
+import '../../data/database.dart';
 import '../../data/legacy_import.dart';
 import '../../data/summaries.dart';
 import '../../data/user_error.dart';
 import '../../rules/periods.dart';
 import '../../rules/types.dart';
 import '../../ui/alerts_off_row.dart';
+import 'home_mon.dart';
 
 /// The state of the Home tab: the access status, the 3 period summaries and the category names.
 class HomeViewModel extends ChangeNotifier with LoadErrors {
@@ -54,6 +56,8 @@ class HomeViewModel extends ChangeNotifier with LoadErrors {
   PeriodSummary? _today;
   PeriodSummary? _week;
   PeriodSummary? _month;
+  List<Expense> _weekExpenses = const [];
+  List<Expense> _lastWeekExpenses = const [];
   Map<String, String> _categoryNames = const {};
   bool _hasAnyPayment = true;
   int _waitingCount = 0;
@@ -69,6 +73,36 @@ class HomeViewModel extends ChangeNotifier with LoadErrors {
   PeriodSummary? get week => _week;
   PeriodSummary? get month => _month;
   Map<String, String> get categoryNames => _categoryNames;
+
+  /// The Monday of this week, local midnight, for the day of the clock.
+  DateTime get weekStart => DateTime.fromMillisecondsSinceEpoch(
+    PeriodCalculator.range(SpendingPeriod.week, anchor: _s.now()).$1,
+  );
+
+  /// 0 for Monday to 6 for Sunday.
+  int get todayIndex => _s.now().weekday - DateTime.monday;
+
+  /// The spent total of each day of this week, Monday first.
+  List<Decimal> get weekDays => spentPerDay(_weekExpenses, weekStart);
+
+  /// How many days of this week hold a payment.
+  int get daysSaved => daysWithPayments(_weekExpenses);
+
+  /// What was spent last week from Monday to the same weekday as today.
+  Decimal get lastWeekSoFar => spentPerDay(
+    _lastWeekExpenses,
+    DateTime(weekStart.year, weekStart.month, weekStart.day - 7),
+  ).take(todayIndex + 1).fold(Decimal.zero, (a, b) => a + b);
+
+  /// Mon's face and line for the band.
+  MonSay get monSay => homeMon(
+    trackingOn: _isAccessGranted,
+    listensToNoApp: listensToNoApp,
+    waitingCount: _waitingCount,
+    hasAnyPayment: _hasAnyPayment,
+    weekSpent: _week?.total ?? Decimal.zero,
+    lastWeekSoFar: lastWeekSoFar,
+  );
 
   /// Waiting payments. Home shows a row when there is one or more.
   int get waitingCount => _waitingCount;
@@ -98,7 +132,25 @@ class HomeViewModel extends ChangeNotifier with LoadErrors {
       sub.cancel();
     }
     _day = _dayStamp();
+    final (weekStart, weekEnd) = PeriodCalculator.range(
+      SpendingPeriod.week,
+      anchor: _s.now(),
+    );
+    final lastStart = DateTime.fromMillisecondsSinceEpoch(weekStart);
+    final lastWeekStart = DateTime(
+      lastStart.year,
+      lastStart.month,
+      lastStart.day - 7,
+    ).millisecondsSinceEpoch;
     _periodSubs = [
+      _s.expenses.watchInRange(weekStart, weekEnd).listen((v) {
+        _weekExpenses = v;
+        notifyListeners();
+      }, onError: onLoadError),
+      _s.expenses.watchInRange(lastWeekStart, weekStart).listen((v) {
+        _lastWeekExpenses = v;
+        notifyListeners();
+      }, onError: onLoadError),
       _s.expenses.watchPeriodSummary(SpendingPeriod.day).listen((v) {
         _today = v;
         notifyListeners();

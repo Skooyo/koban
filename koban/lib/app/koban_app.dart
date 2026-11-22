@@ -6,7 +6,8 @@ import 'app_services.dart';
 import 'home_shell.dart';
 import 'routes.dart';
 
-/// The system bars follow the theme: the navigation bar has the color of the app tab bar,
+/// The system bars follow the theme: the navigation bar has the page color, as the
+/// pill tab bar floats on the page,
 /// and the icons of both bars are light on dark and dark on light.
 SystemUiOverlayStyle systemBarStyle(ThemeData theme) {
   final icons = theme.brightness == Brightness.dark
@@ -15,7 +16,7 @@ SystemUiOverlayStyle systemBarStyle(ThemeData theme) {
   return SystemUiOverlayStyle(
     statusBarColor: const Color(0x00000000),
     statusBarIconBrightness: icons,
-    systemNavigationBarColor: theme.colorScheme.surfaceContainer,
+    systemNavigationBarColor: theme.scaffoldBackgroundColor,
     systemNavigationBarDividerColor: const Color(0x00000000),
     systemNavigationBarIconBrightness: icons,
     systemNavigationBarContrastEnforced: false,
@@ -84,7 +85,20 @@ class _KobanAppState extends State<KobanApp> {
           value: systemBarStyle(Theme.of(context)),
           child: ColoredBox(
             color: Theme.of(context).scaffoldBackgroundColor,
-            child: navigator,
+            // The status bar is see-through and every page starts with a scene band, so a
+            // band-colored strip keeps scrolled content out from under the clock.
+            child: Stack(
+              children: [
+                navigator!,
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: MediaQuery.paddingOf(context).top,
+                  child: ColoredBox(color: SceneColors.of(context).band),
+                ),
+              ],
+            ),
           ),
         ),
         onGenerateInitialRoutes: (_) => [KobanPageRoute(builder: (_) => home)],

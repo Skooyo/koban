@@ -1,6 +1,5 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
 
@@ -25,10 +24,7 @@ void main() {
     );
     await tester.pump();
 
-    final tab = find.ancestor(
-      of: find.text('People'),
-      matching: find.byType(NavigationDestination),
-    );
+    final tab = find.byTooltip('People');
     expect(find.descendant(of: tab, matching: find.text('2')), findsOneWidget);
     expect(tester.getSemantics(tab).label, '2 open\nPeople\nTab 3 of 4');
     handle.dispose();

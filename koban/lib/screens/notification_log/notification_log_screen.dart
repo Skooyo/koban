@@ -6,7 +6,10 @@ import '../../capture/capture_host.dart';
 import '../../capture/listener_control.dart';
 import '../../rules/card_mask.dart';
 import '../../theme/koban_theme.dart';
+import '../../theme/mon.dart';
+import '../../theme/tokens.dart';
 import '../../ui/date_labels.dart';
+import '../../ui/scene_band.dart';
 import '../../ui/undo_snack_bar.dart';
 import 'notification_log_view_model.dart';
 
@@ -72,91 +75,75 @@ class _NotificationLogScreenState extends State<NotificationLogScreen> {
       listenable: vm,
       builder: (context, _) {
         final shown = vm.shown;
+        final healthy = vm.isAccessGranted && vm.isConnected;
         return Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        tooltip: 'Back',
-                        icon: const Icon(Icons.arrow_back),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Semantics(
-                            header: true,
-                            child: Text(
-                              'Notification log',
-                              style: text.titleLarge,
-                            ),
+          body: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              SceneBand(
+                title: 'Notification log',
+                back: true,
+                compact: true,
+                face: healthy ? MonFace.happy : MonFace.worry,
+                line: healthy ? 'I am listening.' : 'I hear nothing.',
+                action: SceneIconButton(
+                  icon: Icons.refresh,
+                  tooltip: 'Refresh',
+                  onPressed: vm.refresh,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _StatusCard(vm: vm),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final (f, label) in const [
+                          (LogFilter.all, 'All'),
+                          (LogFilter.saved, 'Saved'),
+                          (LogFilter.notPayment, 'Not a payment'),
+                          (LogFilter.noText, 'No text'),
+                        ])
+                          FilterChip(
+                            selected: vm.filter == f,
+                            onSelected: (_) => vm.setFilter(f),
+                            label: Text(label),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (shown.isEmpty)
+                      Text(
+                        vm.rows.isEmpty
+                            ? 'No notifications captured yet. Make a payment or tap “Scan now” after granting access.'
+                            : 'No notifications match this filter.',
+                        style: text.bodyMedium!.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    else
+                      for (final n in shown)
+                        Padding(
+                          key: ValueKey('log-${n.id}'),
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _LogCard(
+                            n,
+                            app: vm.appLabel(n.packageName),
+                            marked: vm.isMarked(n.id),
+                            onMark: vm.isMarked(n.id)
+                                ? null
+                                : () => vm.markAsPayment(n),
                           ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: vm.refresh,
-                        tooltip: 'Refresh',
-                        icon: const Icon(Icons.refresh),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _StatusCard(vm: vm),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final (f, label) in const [
-                            (LogFilter.all, 'All'),
-                            (LogFilter.saved, 'Saved'),
-                            (LogFilter.notPayment, 'Not a payment'),
-                            (LogFilter.noText, 'No text'),
-                          ])
-                            FilterChip(
-                              selected: vm.filter == f,
-                              onSelected: (_) => vm.setFilter(f),
-                              label: Text(label),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (shown.isEmpty)
-                        Text(
-                          vm.rows.isEmpty
-                              ? 'No notifications captured yet. Make a payment or tap “Scan now” after granting access.'
-                              : 'No notifications match this filter.',
-                          style: text.bodyMedium!.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        )
-                      else
-                        for (final n in shown)
-                          Padding(
-                            key: ValueKey('log-${n.id}'),
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _LogCard(
-                              n,
-                              app: vm.appLabel(n.packageName),
-                              marked: vm.isMarked(n.id),
-                              onMark: vm.isMarked(n.id)
-                                  ? null
-                                  : () => vm.markAsPayment(n),
-                            ),
-                          ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -179,7 +166,7 @@ class _Surface extends StatelessWidget {
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: Theme.of(context).colorScheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(KobanRadius.r24),
     ),
     child: child,
   );

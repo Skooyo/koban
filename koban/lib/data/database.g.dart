@@ -6154,6 +6154,21 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
     ).asyncMap(this.expenses.mapFromRow);
   }
 
+  Selectable<RecentItemRowsResult> recentItemRows() {
+    return customSelect(
+      'SELECT i.name AS name, i.quantity AS quantity, i.price AS price, b.merchant AS merchant FROM split_items AS i JOIN split_bills AS b ON b.id = i.billId WHERE b.manual = 0 ORDER BY b.billTime DESC, i.position LIMIT 400',
+      variables: [],
+      readsFrom: {this.splitItems, this.splitBills},
+    ).map(
+      (QueryRow row) => RecentItemRowsResult(
+        name: row.read<String>('name'),
+        quantity: row.read<int>('quantity'),
+        price: SplitItems.$converterprice.fromSql(row.read<String>('price')),
+        merchant: row.readNullable<String>('merchant'),
+      ),
+    );
+  }
+
   Selectable<Expense> findExpenseByNotificationKey(
     String? notificationKey,
     int postTime,
@@ -9313,5 +9328,18 @@ class OpenDebtRowsResult {
     required this.billTime,
     required this.amount,
     required this.manual,
+  });
+}
+
+class RecentItemRowsResult {
+  final String name;
+  final int quantity;
+  final Decimal price;
+  final String? merchant;
+  RecentItemRowsResult({
+    required this.name,
+    required this.quantity,
+    required this.price,
+    this.merchant,
   });
 }

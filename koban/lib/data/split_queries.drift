@@ -97,3 +97,12 @@ ORDER BY notificationPostTime DESC;
 -- ExpenseDao.getById
 expenseById:
 SELECT * FROM expenses WHERE id = :id;
+
+-- The items of earlier bills, newest bill first, for the recent-item chips of the split editor.
+recentItemRows:
+SELECT i.name AS name, i.quantity AS quantity, i.price AS price, b.merchant AS merchant
+FROM split_items i
+JOIN split_bills b ON b.id = i.billId
+WHERE b.manual = 0
+ORDER BY b.billTime DESC, i.position
+LIMIT 400;

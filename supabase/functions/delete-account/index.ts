@@ -1,6 +1,5 @@
 // POST with the person's session ("Authorization: Bearer <access token>") -> 204.
 // Deletes the auth user; `on delete cascade` removes the profile, memberships, shared totals and budget limits.
-// See docs/superpowers/specs/2026-11-12-group-tracker-design.md, section 2.
 import { json } from "../_shared/db.ts";
 
 const URL = Deno.env.get("SUPABASE_URL")!;

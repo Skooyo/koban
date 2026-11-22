@@ -1,0 +1,427 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Koban B. Mon's desk: all sections</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap">
+<style>
+body{margin:0;background:#e9e6df;font-family:'Bricolage Grotesque',sans-serif;color:#161d2b}
+button,input{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+.ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mon{display:inline-block;line-height:0}
+.wrap{padding:40px;display:flex;flex-direction:column;gap:32px}
+.row{display:flex;gap:40px;flex-wrap:wrap}
+.board h2{font-size:18px;margin:0 0 12px}
+.phone{width:390px;height:844px;border-radius:36px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.18)}
+.screen{width:390px;height:844px;position:relative;overflow:hidden;background:#f6f7fa;color:#161d2b}
+/* scene band */
+.scene{position:relative;overflow:hidden;background:#cfe9e6}
+.ground{position:absolute;left:0;right:0;bottom:0;background:#a8d4cf}
+.top{position:absolute;left:20px;right:20px;top:24px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.h1{font-size:24px;font-weight:700}
+.h1s{font-size:18px;font-weight:700}
+.iconbtn{width:44px;height:44px;flex:0 0 44px;border-radius:999px;border:none;background:rgba(255,255,255,.7);color:#161d2b;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.coin{position:absolute;border-radius:50%;background:#f2c94c;border:2px solid #d9ae35;box-sizing:border-box;box-shadow:0 8px 0 #c99a22}
+.at{position:absolute}
+.bubble{position:absolute;background:#fff;border-radius:18px 18px 18px 4px;padding:12px 14px}
+.b1{font-size:15px;font-weight:600}
+.b2{font-size:13px;color:#5a6478;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:#fff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:600}
+/* content */
+.body{padding:0 16px;position:relative;display:flex;flex-direction:column;gap:14px}
+.card{background:#fff;border-radius:24px}
+.list{padding:4px 16px}
+.li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #eef1f6}
+.li:last-child{border-bottom:none}
+.ci{width:40px;height:40px;flex:0 0 40px;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.grow{flex:1;min-width:0}
+.t1{font-size:16px;font-weight:600}
+.t2{font-size:13px;color:#5a6478}
+.amt{font-size:16px;font-weight:600}
+.plus{color:#16804a}
+.lab{font-size:14px;font-weight:600;margin:4px 4px -6px}
+.av{width:36px;height:36px;flex:0 0 36px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#161d2b}
+.av.sm{width:22px;height:22px;flex:0 0 22px;font-size:10px;border:2px solid #fff;margin-left:-6px}
+.you{background:#f2c94c;color:#2a2106}.ml{background:#ffd9d4}.hf{background:#d6e5ff}.ar{background:#e6dcff}.sw{background:#cdeee9}
+.seg{display:inline-flex;gap:4px;background:#eef1f6;border-radius:999px;padding:4px}
+.seg button{border:none;background:none;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:500;color:#3b4a5c;cursor:pointer}
+.seg button[aria-pressed="true"]{background:#161d2b;color:#fff;font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.gold{background:#f2c94c;color:#2a2106}
+.btn{height:56px;border-radius:999px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.sw-t{width:52px;height:32px;flex:0 0 52px;border:none;border-radius:999px;background:#c4cad6;position:relative;cursor:pointer;padding:0}
+.sw-t::after{content:"";position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.sw-t[aria-checked="true"]{background:#161d2b}
+.sw-t[aria-checked="true"]::after{left:24px;background:#f2c94c}
+.fab{position:absolute;right:16px;bottom:92px;width:56px;height:56px;border-radius:999px;border:none;background:#f2c94c;color:#2a2106;display:flex;align-items:center;justify-content:center;cursor:pointer}
+nav.tabs{position:absolute;left:12px;right:12px;bottom:12px;height:64px;background:#161d2b;border-radius:999px;display:flex;justify-content:space-around;align-items:center;font-size:12px;font-weight:500}
+nav.tabs a{color:#edf0f7;display:flex;padding:12px;text-decoration:none}
+nav.tabs a.on{color:#2a2106;align-items:center;gap:6px;background:#f2c94c;border-radius:999px;padding:10px 14px}
+</style></head><body><div class="wrap">
+<h1 style="font-size:40px;margin:0">Koban B. Mon's desk: every section</h1>
+<p style="margin:-20px 0 0;font-size:16px;color:#3b4a5c;max-width:780px">Each screen has a small scene band at the top. Mon does something there that fits the screen. The plain message always stays next to the joke.</p>
+<div class="row">
+
+<!-- 1. HOME -->
+<div class="board"><h2>1. Home</h2><div class="phone">
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #f6f7fa; font-family: 'Bricolage Grotesque', sans-serif; color: #161d2b">
+<div style="height: 300px; background: #cfe9e6; position: relative; overflow: hidden">
+<div style="position: absolute; left: 20px; top: 24px; right: 20px; display: flex; justify-content: space-between; align-items: center">
+<div style="font-size: 24px; font-weight: 700">Good evening</div>
+<button type="button" aria-label="Settings" style="width: 44px; height: 44px; border-radius: 999px; border: none; background: rgba(255,255,255,0.7); color: #161d2b; display: flex; align-items: center; justify-content: center"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"></path></svg></button>
+</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 70px; background: #a8d4cf"></div>
+<div style="position: absolute; left: 36px; bottom: 50px; width: 120px; height: 30px; border-radius: 50%; background: #c99a22"></div>
+<div style="position: absolute; left: 36px; bottom: 58px; width: 120px; height: 30px; border-radius: 50%; background: #f2c94c; border: 2px solid #d9ae35; box-sizing: border-box"></div>
+<div style="position: absolute; left: 44px; bottom: 74px; width: 104px; height: 26px; border-radius: 50%; background: #c99a22"></div>
+<div style="position: absolute; left: 44px; bottom: 80px; width: 104px; height: 26px; border-radius: 50%; background: #f2c94c; border: 2px solid #d9ae35; box-sizing: border-box"></div>
+<div style="position: absolute; left: 40px; bottom: 92px"><span class="mon" data-face="happy" data-size="112"></span></div>
+<div style="position: absolute; left: 172px; top: 104px; right: 20px; background: #ffffff; border-radius: 18px 18px 18px 4px; padding: 12px 14px">
+<div style="font-size: 15px; font-weight: 600">You spent less than last week.</div>
+<div style="font-size: 13px; color: #5a6478; margin-top: 2px">I polished myself to celebrate.</div>
+</div>
+<div style="position: absolute; left: 172px; top: 186px; display: flex; gap: 6px">
+<span style="background: #ffffff; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 600">5 days saved</span>
+<span style="background: #ffffff; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 600">0 to check</span>
+</div>
+</div>
+<div style="padding: 0 16px; margin-top: -24px; position: relative; display: flex; flex-direction: column; gap: 14px">
+<div style="background: #ffffff; border-radius: 24px; padding: 18px">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<div style="font-size: 14px; color: #5a6478; font-weight: 500">Spent this week</div>
+<div style="font-size: 13px; color: #7a5d00; font-weight: 600">Mon 16 – Sun 22 Nov</div>
+</div>
+<div class="num" style="font-size: 44px; font-weight: 800; letter-spacing: -1px; margin-top: 4px">RM 312.40</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: end; height: 84px; margin-top: 12px">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><div style="width: 100%; height: 34px; background: #fbf1cf; border-radius: 8px"></div><span style="font-size: 11px; color: #5a6478">M</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><div style="width: 100%; height: 52px; background: #fbf1cf; border-radius: 8px"></div><span style="font-size: 11px; color: #5a6478">T</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><div style="width: 100%; height: 20px; background: #fbf1cf; border-radius: 8px"></div><span style="font-size: 11px; color: #5a6478">W</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><div style="width: 100%; height: 60px; background: #fbf1cf; border-radius: 8px"></div><span style="font-size: 11px; color: #5a6478">T</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><div style="width: 100%; height: 44px; background: #fbf1cf; border-radius: 8px"></div><span style="font-size: 11px; color: #5a6478">F</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><div style="width: 100%; height: 28px; background: #fbf1cf; border-radius: 8px"></div><span style="font-size: 11px; color: #5a6478">S</span></div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><div style="width: 100%; height: 40px; background: #f2c94c; border-radius: 8px"></div><span style="font-size: 11px; font-weight: 700">S</span></div>
+</div>
+</div>
+<div style="background: #ffffff; border-radius: 24px; padding: 4px 16px">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #eef1f6">
+<div style="width: 40px; height: 40px; border-radius: 999px; background: #ffe9e6; color: #e5483b; display: flex; align-items: center; justify-content: center"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M5 3v4a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 2-2 6 0 8v10"></path></svg></div>
+<div style="flex: 1"><div style="font-size: 16px; font-weight: 600">Nasi Kandar Pelita</div><div style="font-size: 13px; color: #5a6478">Today · Food</div></div>
+<div class="num" style="font-size: 16px; font-weight: 600">RM 14.50</div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #eef1f6">
+<div style="width: 40px; height: 40px; border-radius: 999px; background: #e6efff; color: #1f6fe0; display: flex; align-items: center; justify-content: center"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17h14M6 17l1-6h10l1 6M8 21v-4M16 21v-4M7 11l2-5h6l2 5"></path></svg></div>
+<div style="flex: 1"><div style="font-size: 16px; font-weight: 600">Grab</div><div style="font-size: 13px; color: #5a6478">Today · Transport</div></div>
+<div class="num" style="font-size: 16px; font-weight: 600">RM 18.00</div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 0">
+<div style="width: 40px; height: 40px; border-radius: 999px; background: #fff0de; color: #e07a0f; display: flex; align-items: center; justify-content: center"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"></path></svg></div>
+<div style="flex: 1"><div style="font-size: 16px; font-weight: 600">TNB</div><div style="font-size: 13px; color: #5a6478">Yesterday · Bills</div></div>
+<div class="num" style="font-size: 16px; font-weight: 600">RM 96.35</div>
+</div>
+</div>
+</div>
+<button type="button" aria-label="Add payment" style="position: absolute; right: 16px; bottom: 92px; width: 56px; height: 56px; border-radius: 999px; border: none; background: #f2c94c; color: #2a2106; display: flex; align-items: center; justify-content: center"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+<nav style="position: absolute; left: 12px; right: 12px; bottom: 12px; height: 64px; background: #161d2b; border-radius: 999px; display: flex; justify-content: space-around; align-items: center; font-size: 12px; font-weight: 500">
+<a href="#" style="color: #2a2106; text-decoration: none; display: flex; align-items: center; gap: 6px; background: #f2c94c; border-radius: 999px; padding: 10px 14px"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"></path></svg>Home</a>
+<a href="#" aria-label="Activity" style="color: #edf0f7; display: flex; padding: 12px"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"></path></svg></a>
+<a href="#" aria-label="People" style="color: #edf0f7; display: flex; padding: 12px"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg></a>
+<a href="#" aria-label="Groups" style="color: #edf0f7; display: flex; padding: 12px"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3"></circle><circle cx="16" cy="9" r="3"></circle><path d="M2 20c1-3 3-5 6-5s5 2 6 5M14 15c3 0 5 2 6 5"></path></svg></a>
+</nav>
+</div>
+</div></div>
+
+<!-- 2. CHECK PAYMENTS -->
+<div class="board"><h2>2. Check payments</h2><div class="phone"><div class="screen">
+<div class="scene" style="height:236px">
+<div class="top">
+<button type="button" class="iconbtn" aria-label="Back"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+<div class="h1s" style="flex:1">Check payments</div>
+<span class="pill num">1 of 3</span>
+</div>
+<div class="ground" style="height:58px"></div>
+<div class="coin" style="left:28px;bottom:44px;width:100px;height:26px"></div>
+<div class="coin" style="left:36px;bottom:62px;width:84px;height:22px"></div>
+<div class="at" style="left:34px;bottom:74px"><span class="mon" data-face="look" data-size="88"></span></div>
+<div class="bubble" style="left:146px;top:90px;right:20px">
+<div class="b1">Is this one yours?</div>
+<div class="b2">Maybank says you paid. You decide.</div>
+</div>
+</div>
+<div style="position:relative;margin:-30px 16px 0;height:404px">
+<div aria-hidden="true" style="position:absolute;inset:14px 10px -10px;background:#fbf1cf;border-radius:24px;transform:rotate(4deg)"></div>
+<div aria-hidden="true" style="position:absolute;inset:8px 6px -4px;background:#e3efee;border-radius:24px;transform:rotate(-3deg)"></div>
+<article aria-label="Payment 1 of 3" style="position:absolute;inset:0;background:#fff;border-radius:24px;padding:20px;box-shadow:0 8px 28px rgba(22,29,43,.10);display:flex;flex-direction:column;align-items:center;text-align:center">
+<div style="align-self:stretch;display:flex;justify-content:space-between;align-items:center">
+<span class="pill" style="background:#eef1f6"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/></svg>Maybank</span>
+<span class="t2 num">Sun, 22 Nov · 12:40</span>
+</div>
+<div class="ci" style="width:64px;height:64px;flex-basis:64px;background:#ffe9e6;color:#e5483b;margin-top:24px"><svg class="ic" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M5 3v4a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 2-2 6 0 8v10"/></svg></div>
+<div style="font-size:22px;font-weight:700;margin-top:12px">Nasi Kandar Pelita</div>
+<div class="t2" style="margin-top:10px">Spent</div>
+<div class="num" style="font-size:52px;font-weight:800;letter-spacing:-1.5px;line-height:1.05">RM 14.50</div>
+<button type="button" class="chip" style="background:#ffe9e6;color:#161d2b;margin-top:14px"><span style="width:10px;height:10px;border-radius:999px;background:#e5483b"></span>Food<svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+<div style="margin-top:auto;align-self:stretch;background:#f6f7fa;border-radius:14px;padding:10px 12px;font-size:13px;color:#5a6478;text-align:left">From the notification: "You've spent RM14.50 at NASI KANDAR PELITA."</div>
+</article>
+</div>
+<div style="display:flex;gap:12px;margin:28px 16px 0">
+<button type="button" class="btn" style="flex:1;background:#fff;border:2px solid #161d2b"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>Not a payment</button>
+<button type="button" class="btn gold" style="flex:1;border:none"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>Save payment</button>
+</div>
+<div class="t2" style="text-align:center;margin-top:16px;display:flex;justify-content:center;align-items:center;gap:8px"><span aria-hidden="true" style="display:flex;gap:4px"><span style="width:8px;height:8px;border-radius:999px;background:#161d2b"></span><span style="width:8px;height:8px;border-radius:999px;background:#c4cad6"></span><span style="width:8px;height:8px;border-radius:999px;background:#c4cad6"></span></span>2 more after this</div>
+</div></div></div>
+
+<!-- 3. ACTIVITY -->
+<div class="board"><h2>3. Activity</h2><div class="phone"><div class="screen">
+<div class="scene" style="height:176px">
+<div class="top">
+<div class="h1">Activity</div>
+<button type="button" class="chip" style="background:rgba(255,255,255,.7);color:#161d2b">November<svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+</div>
+<div class="ground" style="height:44px"></div>
+<div class="coin" style="right:26px;bottom:32px;width:70px;height:18px"></div>
+<div class="at" style="right:32px;bottom:42px"><span class="mon" data-face="happy" data-size="58"></span></div>
+<div class="bubble" style="left:20px;top:84px;right:112px;padding:10px 14px">
+<div class="b1">Food leads again.</div>
+<div class="b2">Tealive counts. I checked.</div>
+</div>
+</div>
+<div class="body" style="margin-top:-18px">
+<div class="card" style="padding:18px">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div class="seg" role="group" aria-label="Show"><button type="button" aria-pressed="true">Spent</button><button type="button" aria-pressed="false">Received</button></div>
+<span class="t2">412 payments</span>
+</div>
+<div class="t2" style="margin-top:12px;font-size:14px;font-weight:500">Spent in November</div>
+<div class="num" style="font-size:40px;font-weight:800;letter-spacing:-1px">RM 1,284.50</div>
+<div aria-hidden="true" style="display:flex;height:14px;border-radius:999px;overflow:hidden;gap:2px;margin-top:10px">
+<span style="width:37.9%;background:#e5483b"></span><span style="width:18%;background:#1f6fe0"></span><span style="width:15.5%;background:#7b4fd6"></span><span style="width:15.3%;background:#e07a0f"></span><span style="width:5.6%;background:#0e9c95"></span><span style="width:4.5%;background:#6e9a12"></span><span style="width:3.2%;background:#6b7686"></span>
+</div>
+<div class="num" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin-top:14px;font-size:13px">
+<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:999px;background:#e5483b"></span><span style="flex:1">Food</span><b>RM 486.20</b></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:999px;background:#1f6fe0"></span><span style="flex:1">Transport</span><b>RM 231.00</b></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:999px;background:#7b4fd6"></span><span style="flex:1">Shopping</span><b>RM 198.90</b></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:999px;background:#e07a0f"></span><span style="flex:1">Bills</span><b>RM 196.35</b></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:999px;background:#0e9c95"></span><span style="flex:1">Health</span><b>RM 72.40</b></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:999px;background:#6e9a12"></span><span style="flex:1">Entertainment</span><b>RM 58.00</b></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:999px;background:#6b7686"></span><span style="flex:1">Other</span><b>RM 41.65</b></div>
+</div>
+</div>
+<label style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:999px;height:48px;padding:0 18px;color:#5a6478"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" aria-label="Search payments" placeholder="Search shops or people" style="border:none;outline-offset:4px;background:none;flex:1;font-size:15px;color:#161d2b"></label>
+<div class="lab">Today</div>
+<div class="card list">
+<div class="li"><div class="ci" style="background:#ffe9e6;color:#e5483b"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M5 3v4a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 2-2 6 0 8v10"/></svg></div><div class="grow"><div class="t1">Nasi Kandar Pelita</div><div class="t2">12:40 · Food</div></div><div class="amt num">RM 14.50</div></div>
+<div class="li"><div class="ci" style="background:#e6efff;color:#1f6fe0"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17h14M6 17l1-6h10l1 6M8 21v-4M16 21v-4M7 11l2-5h6l2 5"/></svg></div><div class="grow"><div class="t1">Grab</div><div class="t2">09:12 · Transport</div></div><div class="amt num">RM 18.00</div></div>
+</div>
+<div class="lab">Fri, 20 Nov</div>
+<div class="card list">
+<div class="li"><div class="ci" style="background:#ffe9e6;color:#e5483b"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M5 3v4a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 2-2 6 0 8v10"/></svg></div><div class="grow"><div class="t1">Tealive</div><div class="t2">16:05 · Food</div></div><div class="amt num">RM 8.90</div></div>
+<div class="li"><div class="ci" style="background:#e3f6ec;color:#16804a"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div><div class="grow"><div class="t1">Mei Ling</div><div class="t2">14:22 · Paid you back</div></div><div class="amt num plus">+ RM 23.40</div></div>
+<div class="li"><div class="ci" style="background:#dcf3f1;color:#0e9c95"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></div><div class="grow"><div class="t1">Watsons</div><div class="t2">11:48 · Health</div></div><div class="amt num">RM 32.60</div></div>
+</div>
+</div>
+<button type="button" class="fab" aria-label="Add payment"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<nav class="tabs" aria-label="Main">
+<a href="#" aria-label="Home"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/></svg></a>
+<a href="#" class="on" aria-current="page"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg>Activity</a>
+<a href="#" aria-label="People"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></a>
+<a href="#" aria-label="Groups"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2 20c1-3 3-5 6-5s5 2 6 5M14 15c3 0 5 2 6 5"/></svg></a>
+</nav>
+</div></div></div>
+
+<!-- 4. PEOPLE -->
+<div class="board"><h2>4. People</h2><div class="phone"><div class="screen">
+<div class="scene" style="height:290px">
+<div class="top">
+<div class="h1">People</div>
+<button type="button" class="iconbtn" aria-label="Add person"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 21c1-4 3.5-6 7-6s6 2 7 6M19 8v6M16 11h6"/></svg></button>
+</div>
+<div class="ground" style="height:60px"></div>
+<div class="at" style="left:76px;bottom:104px"><span class="mon" data-face="happy" data-size="100"></span></div>
+<div style="position:absolute;left:28px;bottom:30px;width:200px;background:#fff;border-radius:20px;padding:12px 16px;box-shadow:0 6px 18px rgba(22,29,43,.12);text-align:center">
+<div class="num plus" style="font-size:30px;font-weight:800;letter-spacing:-.5px">+ RM 86.40</div>
+<div style="font-size:13px;font-weight:600;color:#3b4a5c">owed to you</div>
+</div>
+<span aria-hidden="true" style="position:absolute;left:50px;bottom:104px;width:18px;height:18px;border-radius:999px;background:#f2c94c;border:2px solid #d9ae35"></span>
+<span aria-hidden="true" style="position:absolute;left:188px;bottom:104px;width:18px;height:18px;border-radius:999px;background:#f2c94c;border:2px solid #d9ae35"></span>
+<div class="bubble" style="left:224px;top:96px;right:20px;padding:10px 12px">
+<div class="b1" style="font-size:14px">I will hold this.</div>
+<div class="b2">Until they pay.</div>
+</div>
+<div style="position:absolute;left:244px;bottom:72px;display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+<span class="pill">3 owe you</span><span class="pill">You owe 1</span>
+</div>
+</div>
+<div class="body" style="margin-top:-20px">
+<div class="card list">
+<div class="t2" style="padding:12px 0 2px;font-weight:600;color:#3b4a5c">They owe you</div>
+<div class="li" style="flex-wrap:wrap">
+<div class="av ml">ML</div><div class="grow"><div class="t1">Mei Ling</div><div class="t2">2 splits · last Fri, 20 Nov</div></div><div class="amt num plus">+ RM 42.20</div>
+<div style="flex-basis:100%;display:flex;align-items:center;gap:10px;background:#fbf1cf;border-radius:14px;padding:10px 12px;margin-left:48px">
+<div class="grow"><span style="display:inline-block;font-size:12px;font-weight:700;color:#2a2106;background:#f2c94c;border-radius:999px;padding:3px 8px">Suggested match</span><div style="font-size:13px;color:#4a3b00;margin-top:4px" class="num">+ RM 42.20 came in on Maybank. Same person?</div></div>
+<button type="button" class="chip" style="background:#161d2b;color:#fff">Check</button>
+</div>
+</div>
+<div class="li"><div class="av hf">H</div><div class="grow"><div class="t1">Hafiz</div><div class="t2">Nasi Kandar Pelita · Fri, 20 Nov</div></div><div class="amt num plus">+ RM 28.80</div></div>
+<div class="li"><div class="av ar">A</div><div class="grow"><div class="t1">Arjun</div><div class="t2">Grab · Wed, 18 Nov</div></div><div class="amt num plus">+ RM 33.40</div></div>
+</div>
+<div class="card list">
+<div class="t2" style="padding:12px 0 2px;font-weight:600;color:#3b4a5c">You owe</div>
+<div class="li"><div class="av sw">SW</div><div class="grow"><div class="t1">Siew Wen</div><div class="t2">Tealive · Thu, 19 Nov</div></div><div class="amt num">RM 18.00</div></div>
+</div>
+</div>
+<nav class="tabs" aria-label="Main">
+<a href="#" aria-label="Home"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/></svg></a>
+<a href="#" aria-label="Activity"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg></a>
+<a href="#" class="on" aria-current="page"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>People</a>
+<a href="#" aria-label="Groups"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2 20c1-3 3-5 6-5s5 2 6 5M14 15c3 0 5 2 6 5"/></svg></a>
+</nav>
+</div></div></div>
+
+<!-- 5. SPLIT EDITOR -->
+<div class="board"><h2>5. Split editor</h2><div class="phone"><div class="screen">
+<div class="scene" style="height:156px">
+<div class="top">
+<button type="button" class="iconbtn" aria-label="Back"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+<div class="h1s" style="flex:1">Split</div>
+</div>
+<div class="ground" style="height:38px"></div>
+<div class="coin" style="right:24px;bottom:26px;width:72px;height:18px"></div>
+<div class="at" style="right:30px;bottom:36px"><span class="mon" data-face="look" data-size="60"></span></div>
+<div class="bubble" style="left:20px;top:80px;right:112px;padding:8px 12px">
+<div class="b1" style="font-size:14px">I read all 8 lines.</div>
+<div class="b2">Tap a person, then their items.</div>
+</div>
+</div>
+<div class="body" style="margin-top:-16px">
+<div class="card" style="padding:14px 14px 12px">
+<div style="display:flex;align-items:center;gap:12px">
+<div class="ci" style="background:#ffe9e6;color:#e5483b"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/></svg></div>
+<div class="grow"><div class="t1">Nasi Kandar Pelita</div><div class="t2">Fri, 20 Nov · Receipt read by your phone</div></div>
+<div class="amt num">RM 86.40</div>
+</div>
+<div role="group" aria-label="Who are you marking" style="display:flex;justify-content:space-between;margin:12px 0 8px;padding:0 6px">
+<button type="button" aria-pressed="true" style="border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:700;cursor:pointer;padding:0"><span class="av you" style="width:40px;height:40px;box-shadow:0 0 0 3px #fff,0 0 0 5px #161d2b">Y</span>You</button>
+<button type="button" aria-pressed="false" style="border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;padding:0"><span class="av ml" style="width:40px;height:40px">ML</span>Mei Ling</button>
+<button type="button" aria-pressed="false" style="border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;padding:0"><span class="av hf" style="width:40px;height:40px">H</span>Hafiz</button>
+<button type="button" aria-pressed="false" style="border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;padding:0"><span class="av ar" style="width:40px;height:40px">A</span>Arjun</button>
+</div>
+<ul class="num" style="list-style:none;margin:0;padding:0;font-size:14px;display:flex;flex-direction:column;gap:2px">
+<li style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px;background:#fbf1cf"><span class="grow" style="font-weight:600">Nasi kandar ayam</span><span style="display:flex;padding-left:6px"><span class="av sm you">Y</span></span><span style="width:64px;text-align:right">16.50</span></li>
+<li style="display:flex;align-items:center;gap:10px;padding:7px 10px"><span class="grow">Nasi kandar kambing</span><span style="display:flex;padding-left:6px"><span class="av sm ml">ML</span></span><span style="width:64px;text-align:right">22.90</span></li>
+<li style="display:flex;align-items:center;gap:10px;padding:7px 10px"><span class="grow">Roti canai x2</span><span style="display:flex;padding-left:6px"><span class="av sm hf">H</span></span><span style="width:64px;text-align:right">5.60</span></li>
+<li style="display:flex;align-items:center;gap:10px;padding:7px 10px"><span class="grow">Mee goreng mamak</span><span style="display:flex;padding-left:6px"><span class="av sm ar">A</span></span><span style="width:64px;text-align:right">12.50</span></li>
+<li style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px;background:#fbf1cf"><span class="grow" style="font-weight:600">Teh tarik x3</span><span style="display:flex;padding-left:6px"><span class="av sm you">Y</span><span class="av sm ml">ML</span><span class="av sm hf">H</span></span><span style="width:64px;text-align:right">9.90</span></li>
+<li style="display:flex;align-items:center;gap:10px;padding:7px 10px"><span class="grow">Milo ais</span><span style="display:flex;padding-left:6px"><span class="av sm ar">A</span></span><span style="width:64px;text-align:right">4.20</span></li>
+<li style="display:flex;align-items:center;gap:10px;padding:7px 10px"><span class="grow">Telur dadar</span><span style="display:flex;padding-left:6px"><span class="av sm hf">H</span></span><span style="width:64px;text-align:right">3.60</span></li>
+<li style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px;background:#fbf1cf"><span class="grow" style="font-weight:600">Sotong goreng</span><span style="display:flex;padding-left:6px"><span class="av sm you">Y</span><span class="av sm ml">ML</span><span class="av sm hf">H</span><span class="av sm ar">A</span></span><span style="width:64px;text-align:right">11.20</span></li>
+</ul>
+<div role="status" class="num" style="display:flex;align-items:center;gap:10px;background:#e3f6ec;color:#0f5e36;border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;font-weight:600"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="flex:0 0 20px"><path d="M5 12l5 5 9-10"/></svg>8 of 8 items counted, matches the printed total RM 86.40</div>
+</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:24px 24px 0 0;padding:14px 20px 20px;box-shadow:0 -6px 24px rgba(22,29,43,.08)">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<div class="t2" style="font-size:14px;font-weight:500">Your share</div>
+<div class="num" style="font-size:28px;font-weight:800">RM 22.60</div>
+</div>
+<div class="t2 num" style="margin-top:2px">Mei Ling RM 29.00 · Hafiz RM 15.30 · Arjun RM 19.50</div>
+<button type="button" class="btn gold" style="width:100%;border:none;margin-top:12px">Save split</button>
+</div>
+</div></div></div>
+
+<!-- 6. GROUPS -->
+<div class="board"><h2>6. Groups</h2><div class="phone"><div class="screen">
+<div class="scene" style="height:262px">
+<div class="top" style="align-items:flex-start">
+<div>
+<div class="h1">Makan kaki</div>
+<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="display:flex;padding-left:6px"><span class="av sm you">Y</span><span class="av sm ml">ML</span><span class="av sm hf">H</span><span class="av sm ar">A</span></span><span style="font-size:13px;font-weight:600;color:#3b4a5c">4 members</span></div>
+</div>
+<button type="button" class="iconbtn" aria-label="Group settings"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+</div>
+<div class="ground" style="height:52px"></div>
+<!-- podium of coin piles: 2nd, 1st (Mon), 3rd -->
+<div class="coin" style="left:196px;bottom:36px;width:54px;height:16px"></div>
+<div class="coin" style="left:196px;bottom:46px;width:54px;height:16px"></div>
+<div class="coin" style="left:196px;bottom:56px;width:54px;height:16px"></div>
+<div class="at av ml" style="left:205px;bottom:76px;border:2px solid #fff">ML</div>
+<div class="coin" style="left:258px;bottom:36px;width:54px;height:16px"></div>
+<div class="coin" style="left:258px;bottom:46px;width:54px;height:16px"></div>
+<div class="coin" style="left:258px;bottom:56px;width:54px;height:16px"></div>
+<div class="coin" style="left:258px;bottom:66px;width:54px;height:16px"></div>
+<div class="coin" style="left:258px;bottom:76px;width:54px;height:16px"></div>
+<div class="at" style="left:257px;bottom:88px"><span class="mon" data-face="wink" data-size="54"></span></div>
+<div class="coin" style="left:320px;bottom:36px;width:54px;height:16px"></div>
+<div class="coin" style="left:320px;bottom:46px;width:54px;height:16px"></div>
+<div class="at av you" style="left:329px;bottom:66px;border:2px solid #fff">Y</div>
+<div class="bubble" style="left:20px;top:104px;width:150px;padding:10px 12px">
+<div class="b1" style="font-size:14px">Hafiz spent least on food.</div>
+<div class="b2">I am keeping his spot warm.</div>
+</div>
+</div>
+<div class="body" style="margin-top:-18px">
+<div class="card" style="padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div class="seg" role="group" aria-label="Period"><button type="button" aria-pressed="true">Week</button><button type="button" aria-pressed="false">Month</button></div>
+<span class="t2">Mon 16 – Sun 22 Nov</span>
+</div>
+<div role="group" aria-label="Category" style="display:flex;gap:8px;margin-top:12px;overflow:hidden">
+<button type="button" class="chip" aria-pressed="true" style="background:#ffe9e6;color:#161d2b;box-shadow:inset 0 0 0 2px #e5483b"><span style="width:10px;height:10px;border-radius:999px;background:#e5483b"></span>Food</button>
+<button type="button" class="chip" aria-pressed="false" style="background:#eef1f6;color:#3b4a5c"><span style="width:10px;height:10px;border-radius:999px;background:#1f6fe0"></span>Transport</button>
+<button type="button" class="chip" aria-pressed="false" style="background:#eef1f6;color:#3b4a5c"><span style="width:10px;height:10px;border-radius:999px;background:#7b4fd6"></span>Shopping</button>
+<button type="button" class="chip" aria-pressed="false" style="background:#eef1f6;color:#3b4a5c"><span style="width:10px;height:10px;border-radius:999px;background:#e07a0f"></span>Bills</button>
+</div>
+<div class="t2" style="margin-top:14px;font-weight:600;color:#3b4a5c">Food this week, least spent first</div>
+<ol class="num" style="list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px">
+<li style="display:flex;align-items:center;gap:10px;padding:8px 6px"><span style="width:20px;font-weight:800;font-size:16px">1</span><span class="av hf">H</span><div class="grow"><div style="display:flex;justify-content:space-between"><span class="t1" style="font-size:15px">Hafiz</span><b>RM 62.40</b></div><div style="height:8px;border-radius:999px;background:#ffe9e6;margin-top:6px"><div style="width:47.6%;height:8px;border-radius:999px;background:#e5483b"></div></div></div></li>
+<li style="display:flex;align-items:center;gap:10px;padding:8px 6px"><span style="width:20px;font-weight:800;font-size:16px">2</span><span class="av ml">ML</span><div class="grow"><div style="display:flex;justify-content:space-between"><span class="t1" style="font-size:15px">Mei Ling</span><b>RM 88.10</b></div><div style="height:8px;border-radius:999px;background:#ffe9e6;margin-top:6px"><div style="width:67.1%;height:8px;border-radius:999px;background:#e5483b"></div></div></div></li>
+<li style="display:flex;align-items:center;gap:10px;padding:8px 6px;background:#fbf1cf;border-radius:14px"><span style="width:20px;font-weight:800;font-size:16px">3</span><span class="av you">Y</span><div class="grow"><div style="display:flex;justify-content:space-between"><span class="t1" style="font-size:15px">You</span><b>RM 96.50</b></div><div style="height:8px;border-radius:999px;background:#fff;margin-top:6px"><div style="width:73.5%;height:8px;border-radius:999px;background:#e5483b"></div></div></div></li>
+<li style="display:flex;align-items:center;gap:10px;padding:8px 6px"><span style="width:20px;font-weight:800;font-size:16px">4</span><span class="av ar">A</span><div class="grow"><div style="display:flex;justify-content:space-between"><span class="t1" style="font-size:15px">Arjun</span><b>RM 131.20</b></div><div style="height:8px;border-radius:999px;background:#ffe9e6;margin-top:6px"><div style="width:100%;height:8px;border-radius:999px;background:#e5483b"></div></div></div></li>
+</ol>
+</div>
+<div class="card" style="padding:14px 16px;display:flex;gap:12px;align-items:center">
+<div class="ci" style="background:#eef1f6"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+<div class="grow"><div class="t1" style="font-size:15px">Only category totals are shared</div><div class="t2">Your shops, payments and notes stay on your phone.</div></div>
+</div>
+</div>
+<nav class="tabs" aria-label="Main">
+<a href="#" aria-label="Home"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/></svg></a>
+<a href="#" aria-label="Activity"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg></a>
+<a href="#" aria-label="People"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></a>
+<a href="#" class="on" aria-current="page"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2 20c1-3 3-5 6-5s5 2 6 5M14 15c3 0 5 2 6 5"/></svg>Groups</a>
+</nav>
+</div></div></div>
+
+<!-- 7. SETTINGS -->
+<div class="board"><h2>7. Settings</h2><div class="phone"><div class="screen">
+<div class="scene" style="height:250px">
+<div class="top">
+<button type="button" class="iconbtn" aria-label="Back"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+<div class="h1s" style="flex:1">Settings</div>
+</div>
+<div class="ground" style="height:60px"></div>
+<div class="coin" style="left:30px;bottom:44px;width:110px;height:28px"></div>
+<div class="coin" style="left:38px;bottom:64px;width:94px;height:24px"></div>
+<div class="at" style="left:40px;bottom:78px"><span class="mon" data-face="idle" data-size="90"></span></div>
+<div class="bubble" style="left:156px;top:90px;right:20px">
+<div class="b1">I am awake.</div>
+<div class="b2">Reading Maybank, TNG eWallet and Grab.</div>
+</div>
+<span class="pill" style="position:absolute;left:156px;top:176px"><span aria-hidden="true" style="width:8px;height:8px;border-radius:999px;background:#16804a;box-shadow:0 0 0 3px #d4f1e1"></span>Tracking on</span>
+</div>
+<div class="body" style="margin-top:-22px">
+<div class="card list">
+<a href="#" class="li" style="color:inherit;text-decoration:none"><div class="ci" style="background:#fbf1cf;color:#2a2106"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></div><div class="grow"><div class="t1">Payment apps</div><div class="t2">3 apps on</div></div><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="color:#5a6478"><path d="M9 6l6 6-6 6"/></svg></a>
+<a href="#" class="li" style="color:inherit;text-decoration:none"><div class="ci" style="background:#eef1f6"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/></svg></div><div class="grow"><div class="t1">Notification log</div><div class="t2">What Koban read, and why</div></div><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="color:#5a6478"><path d="M9 6l6 6-6 6"/></svg></a>
+</div>
+<div class="card list">
+<div class="li"><div class="ci" style="background:#eef1f6"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></div><div class="grow"><div class="t1" id="of-l">Online features</div><div class="t2">Groups, receipts, updates</div></div><button type="button" class="sw-t" role="switch" aria-checked="true" aria-labelledby="of-l"></button></div>
+<div class="li"><div class="ci" style="background:#eef1f6"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z"/></svg></div><div class="grow"><div class="t1">Invite code</div><div class="t2 num" style="font-weight:600;color:#161d2b;letter-spacing:1px">KBN-7Q4M</div></div><button type="button" class="chip" style="background:#eef1f6;color:#161d2b">Copy</button></div>
+</div>
+<div class="card list">
+<div class="li"><div class="ci" style="background:#eef1f6"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></div><div class="grow"><div class="t1">Check for updates</div><div class="t2 num">Version 0.2.0 · up to date</div></div><button type="button" class="chip" style="background:#eef1f6;color:#161d2b">Check</button></div>
+<div class="li"><div class="ci" style="background:#eef1f6"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z"/></svg></div><div class="grow"><div class="t1" id="dm-l">Dark mode</div></div><button type="button" class="sw-t" role="switch" aria-checked="false" aria-labelledby="dm-l"></button></div>
+</div>
+<div class="t2 num" style="text-align:center">Koban 0.2.0</div>
+</div>
+</div></div></div>
+
+</div></div>
+<script src="mon.js"></script>
+</body></html>

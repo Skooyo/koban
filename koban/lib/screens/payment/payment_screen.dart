@@ -3,11 +3,13 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/app_services.dart';
 import '../../rules/types.dart';
 import '../../theme/koban_theme.dart';
+import '../../theme/mon.dart';
 import '../../ui/amount_input.dart';
 import '../../ui/category_chips.dart';
 import '../../ui/date_labels.dart';
 import '../../ui/dialogs.dart';
 import '../../ui/kit.dart';
+import '../../ui/scene_band.dart';
 import 'category_sheet.dart';
 import 'payment_view_model.dart';
 
@@ -106,7 +108,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) _leave();
           },
-          child: Scaffold(body: SafeArea(child: _content(context, f))),
+          child: Scaffold(
+            body: SafeArea(top: false, child: _content(context, f)),
+          ),
         );
       },
     );
@@ -117,22 +121,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final error = _vm.loadError;
     if (error == null) return const Scaffold();
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                tooltip: 'Close',
-                icon: const Icon(Icons.close),
-              ),
-              const SizedBox(height: 12),
-              WarningRow(error),
-            ],
+      body: Column(
+        children: [
+          const SceneBand(
+            title: 'Payment',
+            face: MonFace.worry,
+            line: 'That did not load.',
+            back: true,
+            compact: true,
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+            child: WarningRow(error),
+          ),
+        ],
       ),
     );
   }
@@ -143,159 +145,207 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final income = f.type == TransactionType.receive;
     final editing = _vm.isEditing;
     final valid = AmountInput.toAmount(f.amountText) != null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _TopRow(
-            type: f.type,
-            editing: editing,
-            onClose: _leave,
-            onType: _vm.setType,
-            onDelete: _vm.saving ? null : _delete,
-          ),
-          _AmountField(
-            initial: f.amountText,
-            autofocus: !editing,
-            income: income,
-            hint: editing || f.amountText.isNotEmpty
-                ? '${income ? 'Received' : 'Spent'} · ${dateTimeLabel(f.postTime)}'
-                : 'Type the amount.',
-            onChanged: _vm.setAmount,
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 4),
-                  if (_vm.loadError case final error?) ...[
-                    WarningRow(error),
-                    const SizedBox(height: 12),
-                  ],
-                  CategoryChips(
-                    chips: _vm.chipCategories,
-                    selectedId: f.categoryId,
-                    flagNotSet: false,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    onPick: _vm.setCategory,
-                    onMore: () => showCategorySheet(
-                      context,
-                      categories: _vm.categories,
-                      selectedId: f.categoryId,
-                      onPick: _vm.setCategory,
-                    ),
-                  ),
-                  if (!editing && _vm.recentShops.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _RecentShops(
-                      shops: _vm.recentShops,
-                      selected: f.merchant.trim().toLowerCase(),
-                      onPick: _vm.pickRecentShop,
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  ListGroup(
+    final card = scheme.surfaceContainer;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SceneBand(
+                  title: editing ? 'Payment' : 'Add payment',
+                  face: MonFace.idle,
+                  line: editing ? 'Fix what I got wrong.' : 'Where did it go?',
+                  detail: editing ? null : 'Type the amount first.',
+                  back: true,
+                  compact: true,
+                  action: editing
+                      ? SceneIconButton(
+                          icon: Icons.delete,
+                          tooltip: 'Delete payment',
+                          onPressed: _vm.saving ? null : _delete,
+                        )
+                      : null,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      KobanRow(
-                        title: dateLabel(f.postTime, _s.now()),
-                        subtitle: 'Date',
-                        leading: const Icon(Icons.calendar_month),
-                        showChevron: true,
-                        onTap: () => _pickDate(f),
-                        onTapLabel: 'Change date',
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        decoration: BoxDecoration(
+                          color: card,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            DirectionSegments(
+                              selected: f.type,
+                              onPick: _vm.setType,
+                            ),
+                            const SizedBox(height: 12),
+                            Center(
+                              child: CategoryBadge(f.categoryId, size: 48),
+                            ),
+                            _AmountField(
+                              initial: f.amountText,
+                              autofocus: !editing,
+                              income: income,
+                              hint: editing || f.amountText.isNotEmpty
+                                  ? '${income ? 'Received' : 'Spent'} · ${dateTimeLabel(f.postTime)}'
+                                  : 'Type the amount.',
+                              onChanged: _vm.setAmount,
+                            ),
+                          ],
+                        ),
                       ),
-                      _TextRow(
-                        label: 'Shop',
-                        placeholder: 'Not set',
-                        icon: Icons.storefront,
-                        value: f.merchant,
-                        onChanged: _vm.setMerchant,
-                        singleLine: true,
-                      ),
-                      _TextRow(
-                        label: 'Note',
-                        placeholder: 'Optional',
-                        icon: Icons.edit_note,
-                        value: f.notes,
-                        onChanged: _vm.setNotes,
-                        singleLine: false,
-                      ),
-                    ],
-                  ),
-                  if (_vm.inGroups && !income) ...[
-                    const SizedBox(height: 12),
-                    ListGroup(
-                      children: [
-                        KobanRow(
-                          title: 'Count in group totals',
-                          subtitle: f.privateToGroups
-                              ? 'Group members do not see this payment'
-                              : 'Group members see this in your totals',
-                          trailing: ExcludeSemantics(
-                            child: IgnorePointer(
-                              child: Switch(
-                                value: !f.privateToGroups,
-                                onChanged: (_) {},
+                      const SizedBox(height: 4),
+                      if (_vm.loadError case final error?) ...[
+                        WarningRow(error),
+                        const SizedBox(height: 12),
+                      ],
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: card,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            CategoryChips(
+                              chips: _vm.chipCategories,
+                              selectedId: f.categoryId,
+                              flagNotSet: false,
+                              padding: EdgeInsets.zero,
+                              onPick: _vm.setCategory,
+                              onMore: () => showCategorySheet(
+                                context,
+                                categories: _vm.categories,
+                                selectedId: f.categoryId,
+                                onPick: _vm.setCategory,
                               ),
                             ),
+                            if (!editing && _vm.recentShops.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              _RecentShops(
+                                shops: _vm.recentShops,
+                                selected: f.merchant.trim().toLowerCase(),
+                                onPick: _vm.pickRecentShop,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ListGroup(
+                        children: [
+                          KobanRow(
+                            title: dateLabel(f.postTime, _s.now()),
+                            subtitle: 'Date',
+                            leading: const Icon(Icons.calendar_month),
+                            showChevron: true,
+                            onTap: () => _pickDate(f),
+                            onTapLabel: 'Change date',
                           ),
-                          onTap: () =>
-                              _vm.setPrivateToGroups(!f.privateToGroups),
+                          _TextRow(
+                            label: 'Shop',
+                            placeholder: 'Not set',
+                            icon: Icons.storefront,
+                            value: f.merchant,
+                            onChanged: _vm.setMerchant,
+                            singleLine: true,
+                          ),
+                          _TextRow(
+                            label: 'Note',
+                            placeholder: 'Optional',
+                            icon: Icons.edit_note,
+                            value: f.notes,
+                            onChanged: _vm.setNotes,
+                            singleLine: false,
+                          ),
+                        ],
+                      ),
+                      if (_vm.inGroups && !income) ...[
+                        const SizedBox(height: 12),
+                        ListGroup(
+                          children: [
+                            KobanRow(
+                              title: 'Count in group totals',
+                              subtitle: f.privateToGroups
+                                  ? 'Group members do not see this payment'
+                                  : 'Group members see this in your totals',
+                              trailing: ExcludeSemantics(
+                                child: IgnorePointer(
+                                  child: Switch(
+                                    value: !f.privateToGroups,
+                                    onChanged: (_) {},
+                                  ),
+                                ),
+                              ),
+                              onTap: () =>
+                                  _vm.setPrivateToGroups(!f.privateToGroups),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                  ],
-                  if (f.categoryId != null &&
-                      f.categoryId != _vm.loadedCategoryId &&
-                      f.merchant.trim().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        'A new category also applies to past payments from this shop',
-                        style: theme.textTheme.bodySmall!.copyWith(
-                          color: scheme.onSurfaceVariant,
+                      if (f.categoryId != null &&
+                          f.categoryId != _vm.loadedCategoryId &&
+                          f.merchant.trim().isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            'A new category also applies to past payments from this shop',
+                            style: theme.textTheme.bodySmall!.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                  if (editing && f.type == TransactionType.withdraw) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 56,
-                      child: TonalButton(
-                        'Split this bill',
-                        valid ? _saveAndSplit : null,
-                        icon: Icons.groups,
-                      ),
-                    ),
-                  ],
+                      ],
+                      if (editing && f.type == TransactionType.withdraw) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 56,
+                          child: TonalButton(
+                            'Split this bill',
+                            valid ? _saveAndSplit : null,
+                            icon: Icons.groups,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: SizedBox(
+            height: 56,
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: valid ? _save : null,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('Save payment'),
                 ],
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 12),
-            child: SizedBox(
-              height: 56,
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: valid ? _save : null,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.check, size: 18),
-                    const SizedBox(width: 8),
-                    const Text('Save payment'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -340,66 +390,6 @@ class _RecentShops extends StatelessWidget {
                 ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TopRow extends StatelessWidget {
-  const _TopRow({
-    required this.type,
-    required this.editing,
-    required this.onClose,
-    required this.onType,
-    required this.onDelete,
-  });
-
-  final TransactionType type;
-  final bool editing;
-  final VoidCallback onClose;
-  final ValueChanged<TransactionType> onType;
-  final VoidCallback? onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: onClose,
-                tooltip: 'Close',
-                icon: const Icon(Icons.close),
-              ),
-              const SizedBox(width: 8),
-              if (editing) ...[
-                Expanded(
-                  child: Semantics(
-                    header: true,
-                    child: Text('Payment', style: theme.textTheme.titleLarge),
-                  ),
-                ),
-                IconButton(
-                  onPressed: onDelete,
-                  tooltip: 'Delete payment',
-                  icon: Icon(Icons.delete, color: theme.colorScheme.error),
-                ),
-              ] else
-                Expanded(
-                  child: DirectionSegments(selected: type, onPick: onType),
-                ),
-            ],
-          ),
-          // Edit keeps the Spent and Received switch under the title row.
-          if (editing) ...[
-            const SizedBox(height: 8),
-            DirectionSegments(selected: type, onPick: onType),
-          ],
         ],
       ),
     );

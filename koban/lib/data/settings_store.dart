@@ -3,7 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../online/secret_store.dart';
 
-/// The app settings. The keys and defaults equal `SettingsRepository.kt` of 0.1.1.
+/// The app settings. The keys and defaults equal `SettingsRepository.kt` of 0.1.1,
+/// except dark mode, which is off by default since the Mon's desk redesign.
 /// The 0.1.1 import copied the values into the same keys.
 /// The device token is in the [SecretStore], as 0.1.1 kept it in its secrets store.
 class KobanSettings {
@@ -23,7 +24,7 @@ class KobanSettings {
   final SharedPreferencesAsync _prefs;
   final SecretStore _secrets;
 
-  final _darkMode = ValueNotifier<bool>(true);
+  final _darkMode = ValueNotifier<bool>(false);
   final _onboardingDone = ValueNotifier<bool>(false);
   final _paymentAppsChosen = ValueNotifier<bool>(false);
   final _paymentApps = ValueNotifier<Set<String>>(const {});
@@ -46,7 +47,7 @@ class KobanSettings {
   void _readDeviceToken() =>
       _hasDeviceToken.value = _secrets.deviceToken.value.isNotEmpty;
 
-  /// Dark mode. On by default.
+  /// Dark mode. Off by default. A stored choice wins.
   ValueListenable<bool> get darkMode => _darkMode;
   ValueListenable<bool> get onboardingDone => _onboardingDone;
 
@@ -114,7 +115,7 @@ class KobanSettings {
     _paymentApps.value = list;
     _paymentAppsChosen.value =
         await _prefs.getBool(_chosenKey) ?? list.isNotEmpty;
-    _darkMode.value = await _prefs.getBool(_darkModeKey) ?? true;
+    _darkMode.value = await _prefs.getBool(_darkModeKey) ?? false;
     _onboardingDone.value = await _prefs.getBool(_onboardingDoneKey) ?? false;
     _onboardingStep = await _prefs.getString(_onboardingStepKey);
     _onboardingOpenedSettings =

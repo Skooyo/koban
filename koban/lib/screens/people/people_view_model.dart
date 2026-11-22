@@ -1,12 +1,21 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../app/app_services.dart';
 import '../../data/database.dart';
 import '../../data/people_repository.dart';
 import '../../rules/people_math.dart';
+
+/// What people owe you and what you owe, and how many people stand on each side.
+typedef PeopleTotals = ({
+  Decimal owed,
+  int owedCount,
+  Decimal owe,
+  int oweCount,
+});
 
 /// The state of the People tab: the people in groups, the search and the past splits.
 /// A port of `PeopleViewModel.kt`.
@@ -58,6 +67,26 @@ class PeopleViewModel extends ChangeNotifier {
           ],
         ),
     ].where((e) => e.$2.isNotEmpty).toList();
+  }
+
+  /// The totals of everyone. The search does not change them.
+  PeopleTotals get totals {
+    var owed = Decimal.zero;
+    var owe = Decimal.zero;
+    var owedCount = 0;
+    var oweCount = 0;
+    for (final p in _people) {
+      switch (p.balance) {
+        case PaysYou(:final amount):
+          owed += amount;
+          owedCount++;
+        case YouPay(:final amount):
+          owe += amount;
+          oweCount++;
+        default:
+      }
+    }
+    return (owed: owed, owedCount: owedCount, owe: owe, oweCount: oweCount);
   }
 
   List<SplitBill> get bills => _bills;

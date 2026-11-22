@@ -4,7 +4,7 @@ import 'package:koban/rules/types.dart';
 import 'package:koban/screens/groups/groups_screen.dart';
 import 'package:koban/screens/home/home_screen.dart';
 import 'package:koban/app/home_shell.dart';
-import 'package:koban/ui/kit.dart';
+import 'package:koban/ui/scene_band.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
@@ -20,26 +20,47 @@ void main() {
     'the tab bar has Home, Activity, People and Groups with Home on',
     (tester) async {
       await pumpKoban(tester, await testServices());
-      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-      expect(bar.selectedIndex, 0);
-      final items = bar.destinations.cast<NavigationDestination>();
-      expect(
-        [for (final d in items) d.label],
-        ['Home', 'Activity', 'People', 'Groups'],
-      );
+      final bar = find.byType(KobanTabBar);
       expect(
         [
-          for (final d in items)
-            tester
-                .widget<Icon>(
-                  find.descendant(
-                    of: find.byWidget(d),
-                    matching: find.byType(Icon),
-                  ),
-                )
-                .icon,
+          for (final icon in tester.widgetList<Icon>(
+            find.descendant(of: bar, matching: find.byType(Icon)),
+          ))
+            icon.icon,
         ],
         [Icons.home, Icons.receipt_long, Icons.people, Icons.groups],
+      );
+      // The shown tab has its label. The others have the label as tooltip only.
+      expect(
+        find.descendant(of: bar, matching: find.text('Home')),
+        findsOneWidget,
+      );
+      for (final label in ['Activity', 'People', 'Groups']) {
+        expect(find.byTooltip(label), findsOneWidget);
+        expect(
+          find.descendant(of: bar, matching: find.text(label)),
+          findsNothing,
+        );
+      }
+      final handle = tester.ensureSemantics();
+      expect(
+        tester.getSemantics(find.byTooltip('Activity')),
+        matchesSemantics(
+          label: 'Activity\nTab 2 of 4',
+          isButton: true,
+          hasSelectedState: true,
+          hasTapAction: true,
+        ),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Home\nTab 1 of 4')),
+        matchesSemantics(
+          label: 'Home\nTab 1 of 4',
+          isButton: true,
+          hasSelectedState: true,
+          isSelected: true,
+          hasTapAction: true,
+        ),
       );
       expect(shownTab(tester), 0);
       expect(
@@ -48,6 +69,7 @@ void main() {
       );
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      handle.dispose();
     },
   );
 
@@ -76,23 +98,26 @@ void main() {
       await tester.pump();
       expect(tester.state<ScrollableState>(home).position.pixels, 200);
 
-      await tester.tap(find.text('Groups'));
+      await tester.tap(find.byTooltip('Groups'));
       await tester.pump();
       expect(shownTab(tester), 3);
       expect(find.text(groupsLine), findsOneWidget);
       final groups = tester.element(find.byType(GroupsScreen));
 
-      await tester.tap(find.text('Activity'));
+      await tester.tap(find.byTooltip('Activity'));
       await tester.pump();
       expect(shownTab(tester), 1);
       expect(
-        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-        1,
+        find.descendant(
+          of: find.byType(KobanTabBar),
+          matching: find.text('Activity'),
+        ),
+        findsOneWidget,
       );
       // The real Activity tab shows in the same frame, with no settle.
       expect(
         find.descendant(
-          of: find.byType(LargeTopBar),
+          of: find.byType(SceneBand),
           matching: find.text('Activity'),
         ),
         findsOneWidget,
@@ -110,7 +135,7 @@ void main() {
       expect(shownTab(tester), 3);
       expect(tester.element(find.byType(GroupsScreen)), same(groups));
 
-      await tester.tap(find.text('Home'));
+      await tester.tap(find.byTooltip('Home'));
       await tester.pump();
       expect(shownTab(tester), 0);
       expect(tester.state<ScrollableState>(home).position.pixels, 200);
@@ -121,7 +146,7 @@ void main() {
     tester,
   ) async {
     await pumpKoban(tester, await testServices());
-    await tester.tap(find.text('Activity'));
+    await tester.tap(find.byTooltip('Activity'));
     await tester.pump();
     expect(shownTab(tester), 1);
     await tester.binding.handlePopRoute();
@@ -137,7 +162,7 @@ void main() {
 
   testWidgets('the Groups tab shows the online placeholder', (tester) async {
     await pumpKoban(tester, await testServices(), textScale: 1.3);
-    await tester.tap(find.text('Groups'));
+    await tester.tap(find.byTooltip('Groups'));
     await tester.pump();
     // 'Groups' is the tab label and the placeholder title.
     expect(find.text('Groups'), findsNWidgets(2));

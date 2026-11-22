@@ -64,7 +64,7 @@ void main() {
     ]);
   });
 
-  testWidgets('the donut tells the percent of each slice and its tap action', (
+  testWidgets('the bar tells the percent of each slice and its tap action', (
     tester,
   ) async {
     var taps = 0;
@@ -73,7 +73,7 @@ void main() {
       MaterialApp(
         theme: kobanTheme(Brightness.light),
         home: Center(
-          child: CategoryDonut(
+          child: CategoryBar(
             slices: donutSlices([
               row('food', 'Food', '60'),
               row('bills', 'Bills', '40'),
@@ -83,13 +83,13 @@ void main() {
         ),
       ),
     );
-    final node = tester.getSemantics(find.byType(CategoryDonut));
+    final node = tester.getSemantics(find.byType(CategoryBar));
     expect(
       node.getSemanticsData().label,
       'Spending by category: Food 60 percent, Bills 40 percent',
     );
     expect(node.hintOverrides?.onTapHint, 'Filter by category');
-    await tester.tap(find.byType(CategoryDonut));
+    await tester.tap(find.byType(CategoryBar));
     expect(taps, 1);
     handle.dispose();
   });

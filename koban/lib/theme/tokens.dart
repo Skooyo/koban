@@ -29,6 +29,10 @@ class KobanPalette {
     required this.coinRim,
     required this.coinShade,
     required this.coinShine,
+    required this.sceneBand,
+    required this.sceneGround,
+    required this.tabBar,
+    required this.onTabBar,
   });
 
   final int night;
@@ -55,6 +59,14 @@ class KobanPalette {
   final int coinRim;
   final int coinShade;
   final int coinShine;
+
+  /// The scene band at the top of a screen, and the ground strip at its foot.
+  final int sceneBand;
+  final int sceneGround;
+
+  /// The floating pill tab bar and its inactive icons.
+  final int tabBar;
+  final int onTabBar;
 }
 
 class KobanColors {
@@ -85,6 +97,11 @@ class KobanColors {
     coinRim: 0xFFD9AE35,
     coinShade: 0xFFC99A22,
     coinShine: 0xFFFFF3C4,
+    sceneBand: 0xFF17302F,
+    sceneGround: 0xFF12403C,
+    // One step lighter than the page, so the pill shows on night.
+    tabBar: 0xFF2B3957,
+    onTabBar: 0xFFEDF0F7,
   );
 
   static const light = KobanPalette(
@@ -112,6 +129,10 @@ class KobanColors {
     coinRim: 0xFFD9AE35,
     coinShade: 0xFFC99A22,
     coinShine: 0xFFFFF3C4,
+    sceneBand: 0xFFCFE9E6,
+    sceneGround: 0xFFA8D4CF,
+    tabBar: 0xFF161D2B,
+    onTabBar: 0xFFEDF0F7,
   );
 }
 
