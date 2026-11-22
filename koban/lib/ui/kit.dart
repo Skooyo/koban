@@ -5,12 +5,7 @@ import '../rules/types.dart';
 import '../theme/koban_theme.dart';
 import '../theme/tokens.dart';
 
-/// The style for a token weight. Every text uses the 0.1.1 release look (see
-/// [kobanFontVariations]), so [weight] does not change the drawn weight.
-TextStyle weighted(TextStyle style, int weight) => style.copyWith(
-  fontWeight: FontWeight.w800,
-  fontVariations: kobanFontVariations,
-);
+export '../theme/koban_theme.dart' show weighted;
 
 /// One rounded group of rows. A divider shows between rows only.
 class ListGroup extends StatelessWidget {

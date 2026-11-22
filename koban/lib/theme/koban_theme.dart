@@ -266,21 +266,31 @@ const _darkScheme = ColorScheme(
   outlineVariant: Color(0xFF2F3B57),
 );
 
-/// The font look of the 0.1.1 release build. On the phone, 0.1.1 draws every text at the
-/// font's default instance (weight 800, optical size 96), and the owner keeps that look.
-/// The token weights and optical sizes stay for size, line height and tracking only.
-const kobanFontVariations = [
-  FontVariation('wght', 800),
-  FontVariation('opsz', 96),
-];
+/// [style] at [weight]. Both fonts are variable, so the wght axis draws the weight;
+/// fontWeight alone does not. Nunito draws lighter than Bricolage at the same number,
+/// so it gets one step more.
+TextStyle weighted(TextStyle style, int weight) {
+  final nunito = style.fontFamily == 'Nunito';
+  final w = nunito ? (weight + 100).clamp(100, 900) : weight;
+  return style.copyWith(
+    fontWeight: FontWeight.values[w ~/ 100 - 1],
+    fontVariations: [
+      FontVariation('wght', w.toDouble()),
+      if (!nunito) const FontVariation('opsz', 96),
+    ],
+  );
+}
 
-TextStyle _style(KobanTextStyle t, double opticalSize) => TextStyle(
-  fontFamily: 'Bricolage',
-  fontSize: t.size,
-  height: t.lineHeight / t.size,
-  letterSpacing: t.tracking,
-  fontWeight: FontWeight.w800,
-  fontVariations: kobanFontVariations,
+/// Bricolage Grotesque for the display and headline styles (big totals and titles),
+/// Nunito for every text people read.
+TextStyle _style(KobanTextStyle t, String family) => weighted(
+  TextStyle(
+    fontFamily: family,
+    fontSize: t.size,
+    height: t.lineHeight / t.size,
+    letterSpacing: t.tracking,
+  ),
+  t.weight,
 );
 
 /// The Koban theme. It is the 0.1.1 theme with the colors of DESIGN.md.
@@ -291,21 +301,21 @@ ThemeData kobanTheme(Brightness brightness) {
   final night = Color(p.night);
   final ink = Color(p.ink);
   final textTheme = TextTheme(
-    displayLarge: _style(KobanType.displayLarge, 96),
-    displayMedium: _style(KobanType.displayMedium, 96),
-    displaySmall: _style(KobanType.displaySmall, 96),
-    headlineLarge: _style(KobanType.headlineLarge, 96),
-    headlineMedium: _style(KobanType.headlineMedium, 96),
-    headlineSmall: _style(KobanType.headlineSmall, 96),
-    titleLarge: _style(KobanType.titleLarge, 14),
-    titleMedium: _style(KobanType.titleMedium, 14),
-    titleSmall: _style(KobanType.titleSmall, 14),
-    bodyLarge: _style(KobanType.bodyLarge, 14),
-    bodyMedium: _style(KobanType.bodyMedium, 14),
-    bodySmall: _style(KobanType.bodySmall, 14),
-    labelLarge: _style(KobanType.labelLarge, 14),
-    labelMedium: _style(KobanType.labelMedium, 14),
-    labelSmall: _style(KobanType.labelSmall, 14),
+    displayLarge: _style(KobanType.displayLarge, 'Bricolage'),
+    displayMedium: _style(KobanType.displayMedium, 'Bricolage'),
+    displaySmall: _style(KobanType.displaySmall, 'Bricolage'),
+    headlineLarge: _style(KobanType.headlineLarge, 'Bricolage'),
+    headlineMedium: _style(KobanType.headlineMedium, 'Bricolage'),
+    headlineSmall: _style(KobanType.headlineSmall, 'Bricolage'),
+    titleLarge: _style(KobanType.titleLarge, 'Nunito'),
+    titleMedium: _style(KobanType.titleMedium, 'Nunito'),
+    titleSmall: _style(KobanType.titleSmall, 'Nunito'),
+    bodyLarge: _style(KobanType.bodyLarge, 'Nunito'),
+    bodyMedium: _style(KobanType.bodyMedium, 'Nunito'),
+    bodySmall: _style(KobanType.bodySmall, 'Nunito'),
+    labelLarge: _style(KobanType.labelLarge, 'Nunito'),
+    labelMedium: _style(KobanType.labelMedium, 'Nunito'),
+    labelSmall: _style(KobanType.labelSmall, 'Nunito'),
   );
   const stadium = StadiumBorder();
   const minHeight = WidgetStatePropertyAll(Size(0, 48));

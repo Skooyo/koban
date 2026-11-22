@@ -16,7 +16,7 @@ Koban also splits bills from a receipt photo, keeps a list of who owes you, and 
 
 Koban is built for Malaysian Ringgit notifications (`RM` and `MYR`). Maybank and Touch 'n Go have exact rules. Other apps use a generic rule. Koban reads the notification text on the phone and never sends it to a server.
 
-The app is written in Flutter, in [`koban/`](koban/). Version 0.2.0 is the first Flutter release. Versions 0.1.0 and 0.1.1 came from the Kotlin app in [`app/`](app/), which is now legacy code.
+The app is written in Flutter, in [`koban/`](koban/). The latest release is 0.3.0, with a warmer look and a faster bill split. Version 0.2.0 was the first Flutter release. Versions 0.1.0 and 0.1.1 came from the Kotlin app in [`app/`](app/), which is now legacy code.
 
 ```text
 Bank or wallet notification (only the apps you picked)
@@ -46,7 +46,7 @@ Home · Activity · People · Groups
 
 ## Demo
 
-The demo video and its cover image come from the Kotlin app, version 0.1. The Flutter app has the same capture, check and split flow with a new look. New screenshots follow the next UI pass.
+The demo video and its cover image come from the Kotlin app, version 0.1. The Flutter app has the same capture and check flow. Its look and its split flow are new since 0.3.0. [docs/prototypes/warmer-ui/](docs/prototypes/warmer-ui/) has the design mockups of the new look.
 
 The 37-second video has sound. It shows a payment notification that Koban reads, a swipe to save it and a swipe to drop a promotion, spending by month and week, a cash payment on a number pad, a bill split from a receipt photo, and who owes you. All data is made up.
 
@@ -65,14 +65,14 @@ The 37-second video has sound. It shows a payment notification that Koban reads,
 
 ### Money views
 
-- **Home** shows what you spent today, the payments that wait in Check payments, and the latest payments of this week.
-- **Activity** shows one month at a time, with a category donut, a search by shop or note, and a category filter.
+- **Home** greets you by the time of day. It shows what you spent this week with a bar for each day, the payments that wait in Check payments, and the latest payments of this week.
+- **Activity** shows one month at a time, or all payments. Pick one week of the month with the week chips. It has a bar of spending by category, a search by shop or note, and a category filter.
 - **Add payment** adds a cash payment by hand.
 - **Categories.** The built-in categories take the colors of ringgit notes: Food is red (RM10), Transport is blue (RM1), Shopping is purple (RM100), Bills is orange (RM20), Health is teal (RM50) and Entertainment is green (RM5). You can add your own categories in **Settings**.
 
 ### Splits and people
 
-- **Bill splits.** Take a photo of a receipt or pick one from the gallery. Koban reads the items on the phone with ML Kit. Then you pick who had each item. Only your share counts as your spending. You can also type the items, or split one amount with no receipt.
+- **Bill splits.** First tap the people who ate with you. Then take a photo of the receipt or pick one from the gallery, and Koban reads the items on the phone with ML Kit. You can also add items by hand from a quick sheet, with the recent items of that shop and a number pad with a `×` key. You mark who had each item as you add it. A meter shows what is not split yet, and **Split the rest evenly** shares it. Service charge and tax are percent chips, and a rounding gap of up to 5 sen fills itself. Only your share counts as your spending. You can also split one amount with no receipt.
 - **Read with Claude (optional).** With an invite code from the owner, Koban also sends the receipt photo to Claude and uses the read that matches the printed total. Each phone has 10 Claude reads a day. See [Privacy](#privacy).
 - **People.** See who owes you and whom you owe. Store a friend's payment QR, save it to the gallery, and pay from your bank app. Send a reminder through the share menu. When a Received payment matches an open debt, Koban suggests the match.
 
@@ -90,7 +90,7 @@ The 37-second video has sound. It shows a payment notification that Koban reads,
 - **Self-updater.** Once a day, Koban checks the latest GitHub release and shows **Update available**. The update is optional. Koban installs only an APK with the Koban app ID and the expected version code. **Settings → Check for updates** checks at once.
 - **Online features** switch in **Settings**. It is on by default. When it is off, Koban makes no network calls: groups, Claude reads and update checks stop.
 - **Import of 0.1.1 data.** When 0.2.0 installs over the Kotlin 0.1.1 app, the first start copies the old database rows and settings into the new database. Koban keeps the old database file under a `.pre-flutter` name.
-- **Look.** Night blue with one gold action color, and the Bricolage Grotesque font. Dark mode is on by default. Turn it off in **Settings**. Mon, a gold koban coin, shows on empty and finished screens. [docs/DESIGN.md](docs/DESIGN.md) has the full design rules and the app's word list.
+- **Look.** Each screen starts with a teal band where Mon, a gold koban coin, sits on a pile of coins and says one short line. Mon looks calm, happy or worried to match the screen. The tab bar floats at the bottom as a dark pill. Gold marks the one main action on each screen. Big totals and titles use Bricolage Grotesque, and all other text uses Nunito, a round font that is easy to read. Light mode is the default. Turn on dark mode in **Settings**. [docs/DESIGN.md](docs/DESIGN.md) has the full design rules and the app's word list.
 
 ## Getting started
 
@@ -153,7 +153,7 @@ GitHub Actions runs `flutter analyze` and `flutter test` on each push and pull r
 
 | Area | Stack |
 |------|--------|
-| UI | Flutter, Material 3, Bricolage Grotesque font |
+| UI | Flutter, Material 3, Bricolage Grotesque and Nunito fonts |
 | Storage | drift on SQLite (payments, categories, people, splits), `shared_preferences` (settings) |
 | Capture | Kotlin `NotificationListenerService`, a foreground keep-alive service, a SQLite queue, and a background Dart engine |
 | Rules | Pure Dart regex rules (`PaymentRules`, `NotificationParser`) and the receipt rule engine (`ReceiptRules`) |
@@ -227,4 +227,4 @@ Yes, if both are Spent payments of the same amount within about 5 minutes. Koban
 Yes. Capture, Check payments, People, and splits that ML Kit reads work offline. Groups, Claude reads and update checks need the internet.
 
 **Does Koban work on iPhone?**
-No. Koban 0.2.0 ships only as an Android APK.
+No. Koban ships only as an Android APK.

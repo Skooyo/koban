@@ -588,9 +588,7 @@ class _GroupScreenState extends State<GroupScreen> {
                   ),
                   Text(
                     d.group.code,
-                    style: theme.textTheme.headlineSmall!.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: theme.textTheme.headlineSmall,
                   ),
                 ],
               ),
@@ -862,10 +860,10 @@ class _MemberRow extends StatelessWidget {
                         padding: const EdgeInsets.only(left: 12),
                         child: Text(
                           name,
-                          style: theme.textTheme.bodyLarge!.copyWith(
-                            fontWeight: isMe ? FontWeight.w600 : null,
-                            color: scheme.onSurface,
-                          ),
+                          style: (isMe
+                                  ? weighted(theme.textTheme.bodyLarge!, 600)
+                                  : theme.textTheme.bodyLarge!)
+                              .copyWith(color: scheme.onSurface),
                         ),
                       ),
                     ),
