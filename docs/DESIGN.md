@@ -42,9 +42,11 @@ The category colors come from Malaysian ringgit notes, so they feel familiar:
 
 ## Type
 
-One font: Bricolage Grotesque, a variable font. The Android code loads it from `app/src/main/res/font/bricolage_grotesque.ttf`.
+Two variable fonts, in `koban/assets/fonts/`:
 
-- Display and headline styles use optical size 96. Text, title and label styles use optical size 14. This matches `Theme.kt`.
+- Bricolage Grotesque for the display and headline styles: the big money totals and the screen titles. Optical size 96. It gives Koban its character.
+- Nunito for the title, body and label styles: every text that people read. Its round letter ends match the coin Mon. Nunito draws lighter than Bricolage at the same number, so the app draws it one weight step above the token (400 becomes 500). `weighted()` in `koban/lib/theme/koban_theme.dart` does this.
+- Do not draw every text bold. Bold marks only the total, the title and the row names, so they stand out.
 - Amounts use tabular figures (`font-feature-settings: "tnum"`; in Compose `fontFeatureSettings = "tnum"`), so columns of money line up.
 - Write money as `RM 12.50`: a space after RM, always two decimals. A received amount is `+ RM 12.50`.
 - Write dates as `Fri, 13 Nov`. Write ranges as `Mon 9 – Sun 15 Nov`. Say `Today` and `Yesterday` for the last two days.
@@ -178,7 +180,7 @@ The Compose theme is `app/src/main/java/com/expensetracker/app/ui/theme/Theme.kt
 
 ### Type
 
-Bricolage Grotesque. Sizes in sp. Display group uses optical size 96, Text group optical size 14.
+Display and headline: Bricolage Grotesque, optical size 96. Title, body and label: Nunito, drawn one weight step above the token. Sizes in sp.
 
 | Style | Size / line | Weight | Tracking | Use |
 | --- | --- | --- | --- | --- |

@@ -25,15 +25,19 @@ void main() {
     expect(s.displayLarge!.fontSize, 57);
     expect(s.displayLarge!.height, 64 / 57);
     expect(s.displayLarge!.letterSpacing, -1.5);
+    // Big totals and titles: Bricolage at the token weight.
     expect(s.displayLarge!.fontFamily, 'Bricolage');
-    // Every style draws the 0.1.1 release look: weight 800, optical size 96.
-    for (final style in [s.displayLarge!, s.titleLarge!, s.bodyMedium!]) {
-      expect(style.fontWeight, FontWeight.w800);
-      expect(style.fontVariations, [
-        const FontVariation('wght', 800),
-        const FontVariation('opsz', 96),
-      ]);
-    }
+    expect(s.displayLarge!.fontVariations, [
+      const FontVariation('wght', 700),
+      const FontVariation('opsz', 96),
+    ]);
+    expect(s.headlineLarge!.fontVariations!.first, const FontVariation('wght', 600));
+    // Text people read: Nunito, one step above the token weight.
+    expect(s.bodyMedium!.fontFamily, 'Nunito');
+    expect(s.bodyMedium!.fontVariations, [const FontVariation('wght', 500)]);
+    expect(s.titleMedium!.fontFamily, 'Nunito');
+    expect(s.titleMedium!.fontWeight, FontWeight.w700);
+    expect(s.titleMedium!.fontVariations, [const FontVariation('wght', 700)]);
   });
 
   testWidgets('category colors follow the category ids', (tester) async {
