@@ -11,7 +11,6 @@ import '../../receipts/receipt_photos.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/split_math.dart';
 import '../../theme/koban_theme.dart';
-import '../../theme/mon.dart';
 import '../../theme/tokens.dart';
 import '../../ui/amount_input.dart';
 import '../../ui/dialogs.dart';
@@ -127,6 +126,7 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
             body: Column(
               children: [
                 _band(context, state),
+                _stepLine(context, state),
                 Expanded(child: _content(state, vm)),
                 ?_bottomBar(context, state, vm),
               ],
@@ -138,7 +138,6 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
   }
 
   Widget _band(BuildContext context, SplitEditorState s) {
-    final (face, line, detail) = _monSays(s);
     final shop = SplitEditorViewModel.shopOf(s);
     final (title, number) = switch (s.step) {
       _ when s.loading => ('Split a bill', null),
@@ -148,78 +147,74 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
       SplitStep.link => ('Payment', 3),
       SplitStep.summary => ('Split done', 3),
     };
-    return SceneBand(
+    return TaskHeader(
       title: title,
-      face: face,
-      line: line,
-      detail: detail,
-      back: true,
-      compact: true,
       action: number == null || s.billId != null ? null : _StepPill(number),
     );
   }
 
-  /// Mon's face, line and plain detail for the step.
-  (MonFace, String, String?) _monSays(SplitEditorState s) {
-    if (s.loading) return (MonFace.idle, 'Opening the bill.', null);
+  Widget _stepLine(BuildContext context, SplitEditorState s) {
+    final (line, detail) = _stepSays(s);
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(line, style: theme.textTheme.titleMedium),
+          if (detail != null)
+            Text(
+              detail,
+              style: theme.textTheme.bodyMedium!.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// The plain line and detail for the step, shown under the header.
+  (String, String?) _stepSays(SplitEditorState s) {
+    if (s.loading) return ('Opening the bill.', null);
     switch (s.step) {
       case SplitStep.people:
-        if (s.error != null) return (MonFace.worry, 'That did not open.', null);
-        return (MonFace.idle, 'Who ate with you?', 'Tap names. No typing.');
+        if (s.error != null) return ('That did not open.', null);
+        return ('Who ate with you?', 'Tap names. No typing.');
       case SplitStep.start:
-        return (MonFace.idle, 'Got the receipt?', 'I can read it for you.');
+        return ('Got the receipt?', 'I can read it for you.');
       case SplitStep.reading:
-        return (
-          MonFace.idle,
-          'Reading every line.',
-          'This takes a few seconds.',
-        );
+        return ('Reading every line.', 'This takes a few seconds.');
       case SplitStep.items:
         final missing = SplitEditorViewModel.unassigned(s).length;
         final rest = SplitEditorViewModel.missingItemsOf(s);
         if (s.items.isEmpty) {
-          return (
-            MonFace.idle,
-            'What did you have?',
-            'Add the items. I do the sums.',
-          );
+          return ('What did you have?', 'Add the items. I do the sums.');
         }
         if (rest != null && rest.sign > 0) {
           return (
-            MonFace.idle,
             '${splitRm(rest)} is on no one yet.',
             'Shared food? Split it evenly.',
           );
         }
         if (missing > 0) {
           return (
-            MonFace.worry,
             missing == 1 ? '1 item has no one.' : '$missing items have no one.',
             'Tap the faces on each item.',
           );
         }
         if (SplitEditorViewModel.difference(s) != null) {
-          return (
-            MonFace.worry,
-            'This does not match the receipt.',
-            'Fix it below.',
-          );
+          return ('This does not match the receipt.', 'Fix it below.');
         }
-        return (
-          MonFace.happy,
-          'Every item has someone.',
-          'Check the charges, then Next.',
-        );
+        return ('Every item has someone.', 'Check the charges, then Next.');
       case SplitStep.link:
         return (
-          MonFace.idle,
           'Which payment was this?',
           'Link the card payment, so your spending counts only your share.',
         );
       case SplitStep.summary:
         final owing = owingNames(s);
         return (
-          MonFace.happy,
           'Every sen is on someone.',
           s.locked
               ? "Someone has paid you back, so the items can't change."

@@ -40,7 +40,15 @@ Future<void> pumpActivity(
   addTearDown(tester.view.reset);
   await pumpKoban(tester, s, textScale: textScale);
   await tester.pumpAndSettle();
-  await tester.tap(find.byTooltip('Activity'));
+  await tester.tap(
+    find.ancestor(
+      of: find.descendant(
+        of: find.byType(KobanTabBar),
+        matching: find.text('Activity'),
+      ),
+      matching: find.byType(InkResponse),
+    ),
+  );
   await tester.pumpAndSettle();
 }
 

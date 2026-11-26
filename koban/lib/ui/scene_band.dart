@@ -204,6 +204,64 @@ class SceneBand extends StatelessWidget {
   }
 }
 
+/// The plain teal header of a pushed task screen: Back, the title and at most one
+/// action. No Mon, no bubble, no coin pile, so the task starts near the top.
+///
+/// Put it first in the screen's column or list. It pads itself for the status bar from
+/// [MediaQuery.paddingOf], so do not put it in a top [SafeArea]. Screen readers read the
+/// title as a header. Content that follows needs its own top gap (16 px).
+class TaskHeader extends StatelessWidget {
+  const TaskHeader({super.key, required this.title, this.action});
+
+  final String title;
+
+  /// The one widget at the end of the row. Use a [SceneIconButton] for an icon.
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: SceneColors.of(context).band,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          12,
+          MediaQuery.paddingOf(context).top + KobanSpace.s8,
+          20,
+          KobanSpace.s8,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Row(
+            children: [
+              SceneIconButton(
+                icon: Icons.arrow_back,
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: () => Navigator.maybePop(context),
+              ),
+              const SizedBox(width: KobanSpace.s8),
+              Expanded(
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge!
+                        .copyWith(color: scheme.onSurface),
+                  ),
+                ),
+              ),
+              if (action != null) ...[
+                const SizedBox(width: KobanSpace.s12),
+                action!,
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A round icon button for the title row of a [SceneBand], such as Settings.
 /// The target is 48 dp. [tooltip] is the screen reader label too.
 class SceneIconButton extends StatelessWidget {

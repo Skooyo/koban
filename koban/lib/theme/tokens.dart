@@ -18,6 +18,7 @@ class KobanPalette {
     required this.received,
     required this.error,
     required this.review,
+    required this.warn,
     required this.catFood,
     required this.catTransport,
     required this.catShopping,
@@ -48,6 +49,9 @@ class KobanPalette {
   final int received;
   final int error;
   final int review;
+
+  /// A budget at 80% to 99%. Amber, the same value as `review`.
+  final int warn;
   final int catFood;
   final int catTransport;
   final int catShopping;
@@ -86,6 +90,7 @@ class KobanColors {
     received: 0xFF6FD3A0,
     error: 0xFFFF7B6B,
     review: 0xFFF0B060,
+    warn: 0xFFF0B060,
     catFood: 0xFFFF6B5E,
     catTransport: 0xFF5B9BFF,
     catShopping: 0xFFA98BFF,
@@ -118,6 +123,7 @@ class KobanColors {
     received: 0xFF16804A,
     error: 0xFFC8372A,
     review: 0xFFA85A00,
+    warn: 0xFFA85A00,
     catFood: 0xFFE5483B,
     catTransport: 0xFF1F6FE0,
     catShopping: 0xFF7B4FD6,

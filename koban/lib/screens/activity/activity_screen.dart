@@ -263,6 +263,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
               ),
             );
           }
+        } else if (vm.loading) {
+          slivers.add(const SliverToBoxAdapter(child: LoadingLine()));
         } else if (state.expenses.isEmpty) {
           slivers.add(
             _emptySliver(

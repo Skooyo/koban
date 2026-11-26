@@ -3,7 +3,6 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/app_services.dart';
 import '../../rules/types.dart';
 import '../../theme/koban_theme.dart';
-import '../../theme/mon.dart';
 import '../../ui/amount_input.dart';
 import '../../ui/category_chips.dart';
 import '../../ui/date_labels.dart';
@@ -123,13 +122,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return Scaffold(
       body: Column(
         children: [
-          const SceneBand(
-            title: 'Payment',
-            face: MonFace.worry,
-            line: 'That did not load.',
-            back: true,
-            compact: true,
-          ),
+          const TaskHeader(title: 'Payment'),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
             child: WarningRow(error),
@@ -154,13 +147,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SceneBand(
+                TaskHeader(
                   title: editing ? 'Payment' : 'Add payment',
-                  face: MonFace.idle,
-                  line: editing ? 'Fix what I got wrong.' : 'Where did it go?',
-                  detail: editing ? null : 'Type the amount first.',
-                  back: true,
-                  compact: true,
                   action: editing
                       ? SceneIconButton(
                           icon: Icons.delete,
@@ -169,6 +157,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         )
                       : null,
                 ),
+                const SizedBox(height: 16),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(

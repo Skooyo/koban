@@ -214,21 +214,17 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
     if (cards == null) {
       // Empty while the cards load. A failed load shows its text and Back.
       final error = vm.loadError;
-      if (error == null) return const Scaffold();
       return Scaffold(
         body: Column(
           children: [
-            const SceneBand(
-              title: 'Check payments',
-              face: MonFace.worry,
-              line: 'That did not load.',
-              back: true,
-              compact: true,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
-              child: WarningRow(error),
-            ),
+            const TaskHeader(title: 'Check payments'),
+            if (error == null)
+              const LoadingLine()
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: WarningRow(error),
+              ),
           ],
         ),
       );
@@ -255,22 +251,15 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
           children: [
             Column(
               children: [
-                SceneBand(
+                TaskHeader(
                   title: 'Check payments',
-                  face: top == null ? MonFace.happy : MonFace.idle,
-                  line: top == null
-                      ? 'That was the last one.'
-                      : 'Is this one yours?',
-                  detail: top == null ? null : _sourceLine(top),
-                  back: true,
-                  compact: true,
                   action: top == null
                       ? null
                       : _CounterPill('${vm.handled + 1} of $total'),
                 ),
                 if (_alertsOff)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     child: AlertsOffRow(onTurnOn: _turnOnAlerts),
                   ),
                 // The card takes the height it needs (up to a limit); the hint sits under it.
@@ -278,12 +267,21 @@ class _CheckPaymentsScreenState extends State<CheckPaymentsScreen>
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       16,
-                      _alertsOff ? 12 : 8,
+                      _alertsOff ? 12 : 16,
                       16,
                       0,
                     ),
                     child: Column(
                       children: [
+                        if (top != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              _sourceLine(top),
+                              style: text.bodyMedium!.copyWith(color: muted),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         Flexible(
                           fit: top == null ? FlexFit.tight : FlexFit.loose,
                           child: ConstrainedBox(
@@ -625,6 +623,7 @@ class _AllChecked extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        const Mon(MonFace.happy, size: 72),
         Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Text('All checked', style: theme.textTheme.headlineMedium),

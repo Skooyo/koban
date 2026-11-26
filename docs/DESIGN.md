@@ -6,7 +6,7 @@ Koban is an Android expense tracker for people in Malaysia. It reads bank notifi
 
 ## The vibe
 
-Warm, exact, a little dry. Mon, a gold coin, sits on its desk at the top of every screen. The app counts money for you and does not shout about it. This is direction B, "Mon's desk" (`docs/prototypes/warmer-ui/b-mons-desk.html`).
+Warm, exact, a little dry. Mon, a gold coin, sits on its desk at the top of each tab and on empty and finished screens. The app counts money for you and does not shout about it. This is direction B, "Mon's desk" (`docs/prototypes/warmer-ui/b-mons-desk.html`).
 
 - **Warm:** a light page, a soft teal scene band on top, white cards, few colors, no motion that nobody asked for.
 - **Exact:** every amount is a real number in tabular figures. Every button says what it does.
@@ -24,6 +24,8 @@ The values are in the Tokens section below. Light is the main theme; dark is a s
 5. Use `error` for errors only. Spent money is `ink`, not red.
 6. Use `received` for money that came in. Put a plus sign in front: `+ RM 50.00`. Color is never the only sign.
 7. Use `review` only for payments that wait in Check payments.
+   - Use `warn` (amber) for a budget at 80% to 99% of its limit. Use `error` for over budget only, always with the word "over".
+   - A red button is only for an action that removes something, such as Delete or Remove.
 8. Use the `cat-*` colors only for category dots, chart parts and the edge of a category chip. Never for text, never for a button fill.
 9. Keep text at 4.5:1 or more on its ground in both themes. Dots, icons and focus rings need 3:1. Every token note gives its number.
 
@@ -57,7 +59,10 @@ Two variable fonts, in `koban/assets/fonts/`:
 
 - Side margin `space-16`. Gap between groups `space-24`.
 - Every tap target is `tap-48` or more. A list row is 56px tall or more.
-- Every screen starts with the scene band (`SceneBand`): the title row, Mon on a small coin pile, and a white speech bubble. Top-level tabs use the full band; pushed screens use the compact band with Back. The first card overlaps the band by 24px.
+- Each of the 4 tabs starts with the scene band (`SceneBand`): the title row, Mon on a small coin pile, and a white speech bubble. The first card overlaps the band by 24px.
+- A pushed task screen (Add payment, Check payments, Split editor, Settings, Person) starts with the task header (`TaskHeader`): a plain `scene-band` bar with Back, the title and at most one action. No Mon, no bubble, no coin pile. Mon shows only on the 4 tabs and on empty and finished screens.
+- The tab bar shows the name under the icon on all 4 tabs. People uses a one-person icon and Groups a three-person icon, so they look different.
+- While data loads, show a quiet `Loading` line (`LoadingLine`). Show the empty copy only after the load ends.
 - Lists sit in one `surface` group with `radius-24` and `line` dividers. Do not put each row in its own card. A row leads with a `CategoryBadge` (a tinted circle with the category glyph).
 - Sheets have `radius-24` top corners. Dialogs have `radius-24`. Buttons are `radius-full`.
 - The add button sits bottom right above the bottom bar. Give the last list row enough bottom padding so the add button never covers it.
@@ -111,7 +116,7 @@ Before Koban drops typed data (X, Back, swipe down), it asks `Discard changes?` 
 
 Mon is a plain gold koban oval with dot eyes: one shape, no rim, no shine, so it reads at 24 px. The Mon section below shows the rules.
 
-- Mon sits in the scene band of every screen, and on empty and finished screens. Its face and line follow the screen's real state.
+- Mon sits in the scene band of the 4 tabs, and on empty and finished screens. A pushed task screen has no Mon. Its face and line follow the screen's real state.
 - Never more than one Mon on a screen. Never on a list row, a button or a chart.
 - Mon has 5 faces: `idle` (usual), `sleep` (tracking is off), `happy` (all done), `worry` (an error with a fix), `look` (working: reading a receipt, syncing).
 - Mon's line is one short sentence, dry, under 60 characters. The real message stays in plain text next to it, so the screen works without the joke.
@@ -175,6 +180,7 @@ The Compose theme is `app/src/main/java/com/expensetracker/app/ui/theme/Theme.kt
 | `coin-shine` | `#fff3c4` | `#fff3c4` | Mon and the logo only: the highlight, at 55% opacity. |
 | `scene-band` | `#17302f` | `#cfe9e6` | The scene band at the top of every screen, behind the title and Mon. Ink on it is 12.3:1 or more. |
 | `scene-ground` | `#12403c` | `#a8d4cf` | The lower strip of the scene band, where Mon's coin pile stands. Ink on it is 10:1 or more. |
+| `warn` | `#f0b060` | `#a85a00` | A budget at 80% to 99% of its limit. Amber, the same value as `review`. Text on `surface` is 4.5:1 or more in both themes. |
 | `tab-bar` | `#2b3957` | `#161d2b` | The floating tab bar pill. |
 | `on-tab-bar` | `#edf0f7` | `#edf0f7` | Icons on the tab bar. 10:1 or more. |
 

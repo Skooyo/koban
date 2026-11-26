@@ -130,7 +130,15 @@ void main() {
 
   testWidgets('the Activity month label has the primary color', (tester) async {
     await pumpHome(tester, await testServices());
-    await tester.tap(find.byTooltip('Activity'));
+    await tester.tap(
+      find.ancestor(
+        of: find.descendant(
+          of: find.byType(KobanTabBar),
+          matching: find.text('Activity'),
+        ),
+        matching: find.byType(InkResponse),
+      ),
+    );
     await settle(tester);
     final button = find.ancestor(
       of: find.byIcon(Icons.arrow_drop_down),

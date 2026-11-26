@@ -4,7 +4,6 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/app_services.dart';
 import '../../app/routes.dart';
 import '../../theme/koban_theme.dart';
-import '../../theme/mon.dart';
 import '../../theme/tokens.dart';
 import '../../ui/kit.dart';
 import '../../ui/scene_band.dart';
@@ -105,19 +104,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           body: ListView(
             padding: EdgeInsets.zero,
             children: [
-              SceneBand(
-                title: 'Settings',
-                back: true,
-                compact: true,
-                face: granted ? MonFace.happy : MonFace.worry,
-                line: granted ? 'I am awake.' : 'I cannot read your alerts.',
-                detail: granted
-                    ? 'Tracking on'
-                    : 'Turn on notification access to fix it.',
-              ),
+              const TaskHeader(title: 'Settings'),
               Padding(
                 // The first child is a heading, not a card, so it starts below the band.
-                padding: const EdgeInsets.fromLTRB(16, SceneBand.overlap + 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

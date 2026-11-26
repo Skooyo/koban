@@ -100,7 +100,7 @@ void main() {
     );
     await pumpSettings(tester, s);
     expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Tracking on'), findsOneWidget);
+    expect(find.text('Tracking is off'), findsNothing);
     expect(find.text('2 apps chosen'), findsOneWidget);
     expect(find.text('2 notifications captured'), findsOneWidget);
     expect(

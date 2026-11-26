@@ -8,6 +8,7 @@ class MoneyColors extends ThemeExtension<MoneyColors> {
   const MoneyColors({
     required this.received,
     required this.review,
+    required this.warn,
     required this.red,
     required this.blue,
     required this.orange,
@@ -23,6 +24,9 @@ class MoneyColors extends ThemeExtension<MoneyColors> {
 
   final Color received;
   final Color review;
+
+  /// A budget at 80% to 99%.
+  final Color warn;
   final Color red;
   final Color blue;
   final Color orange;
@@ -38,6 +42,7 @@ class MoneyColors extends ThemeExtension<MoneyColors> {
   static final light = MoneyColors(
     received: Color(0xFF16804A),
     review: Color(0xFFA85A00),
+    warn: Color(0xFFA85A00),
     red: Color(0xFFE5483B),
     blue: Color(0xFF1F6FE0),
     orange: Color(KobanColors.light.catBills),
@@ -54,6 +59,7 @@ class MoneyColors extends ThemeExtension<MoneyColors> {
   static const dark = MoneyColors(
     received: Color(0xFF6FD3A0),
     review: Color(0xFFF0B060),
+    warn: Color(0xFFF0B060),
     red: Color(0xFFFF6B5E),
     blue: Color(0xFF5B9BFF),
     orange: Color(0xFFFFA94D),
@@ -74,6 +80,7 @@ class MoneyColors extends ThemeExtension<MoneyColors> {
   MoneyColors copyWith({
     Color? received,
     Color? review,
+    Color? warn,
     Color? red,
     Color? blue,
     Color? orange,
@@ -88,6 +95,7 @@ class MoneyColors extends ThemeExtension<MoneyColors> {
   }) => MoneyColors(
     received: received ?? this.received,
     review: review ?? this.review,
+    warn: warn ?? this.warn,
     red: red ?? this.red,
     blue: blue ?? this.blue,
     orange: orange ?? this.orange,
@@ -108,6 +116,7 @@ class MoneyColors extends ThemeExtension<MoneyColors> {
     return MoneyColors(
       received: l(received, other.received),
       review: l(review, other.review),
+      warn: l(warn, other.warn),
       red: l(red, other.red),
       blue: l(blue, other.blue),
       orange: l(orange, other.orange),

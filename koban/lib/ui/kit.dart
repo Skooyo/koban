@@ -35,6 +35,27 @@ class ListGroup extends StatelessWidget {
   }
 }
 
+/// A quiet line while data loads. Show empty copy only after the load ends.
+class LoadingLine extends StatelessWidget {
+  const LoadingLine({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(KobanSpace.s24),
+      child: Center(
+        child: Text(
+          'Loading',
+          style: theme.textTheme.bodyMedium!.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// One row with a warning icon and [text], for a problem the user must know about.
 class WarningRow extends StatelessWidget {
   const WarningRow(this.text, {super.key});

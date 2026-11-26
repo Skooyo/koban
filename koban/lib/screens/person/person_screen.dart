@@ -14,7 +14,6 @@ import '../../rules/people_math.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/date_labels.dart';
 import '../../ui/kit.dart';
-import '../../theme/mon.dart';
 import '../../theme/tokens.dart';
 import '../../ui/money.dart';
 import '../../ui/scene_band.dart';
@@ -232,21 +231,15 @@ class PersonScreenState extends State<PersonScreen> {
                   ),
                 ],
               );
-        final say = _monSay(detail?.balance);
         return Scaffold(
           body: ListView(
             padding: EdgeInsets.zero,
             children: [
-              SceneBand(
-                title: name,
-                back: true,
-                compact: true,
-                face: say.face,
-                line: say.line,
-                detail: say.detail,
-                action: menu,
-              ),
-              if (detail != null) _content(context, vm, detail),
+              TaskHeader(title: name, action: menu),
+              if (detail != null)
+                _content(context, vm, detail)
+              else if (!vm.gone)
+                const LoadingLine(),
             ],
           ),
         );
@@ -258,7 +251,7 @@ class PersonScreenState extends State<PersonScreen> {
     final name = d.person.name;
     final qrPath = d.person.qrPath;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -407,21 +400,6 @@ class PersonScreenState extends State<PersonScreen> {
         ),
       );
 }
-
-({MonFace face, String line, String? detail}) _monSay(Balance? balance) =>
-    switch (balance) {
-      PaysYou() => (
-        face: MonFace.idle,
-        line: 'I am holding this for you.',
-        detail: 'Until they pay.',
-      ),
-      YouPay() => (
-        face: MonFace.worry,
-        line: 'You owe. I kept count.',
-        detail: 'Pay it when you can.',
-      ),
-      _ => (face: MonFace.happy, line: 'All square.', detail: null),
-    };
 
 /// The QR on a white box with a gold frame. A tap adds or replaces it.
 /// White stays white in the dark theme, so the QR scans.

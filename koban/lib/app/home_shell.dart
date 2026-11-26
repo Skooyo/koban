@@ -17,7 +17,7 @@ import 'routes.dart';
 enum KobanTab {
   home(Icons.home, 'Home'),
   activity(Icons.receipt_long, 'Activity'),
-  people(Icons.people, 'People'),
+  people(Icons.person, 'People'),
   groups(Icons.groups, 'Groups');
 
   const KobanTab(this.icon, this.label);
@@ -163,8 +163,8 @@ class HomeShellState extends State<HomeShell> {
   }
 }
 
-/// The floating dark pill of the 4 tabs. The shown tab is a gold pill with its icon and
-/// label. The other tabs show the icon only, with the label as tooltip and for screen readers.
+/// The floating dark pill of the 4 tabs. Every tab shows its icon with its name under it.
+/// The shown tab is a gold pill.
 class KobanTabBar extends StatelessWidget {
   const KobanTabBar({
     super.key,
@@ -196,11 +196,13 @@ class KobanTabBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             for (final tab in KobanTab.values)
-              _TabItem(
-                tab: tab,
-                selected: tab == selected,
-                badge: tab == KobanTab.people ? openPeople : 0,
-                onTap: () => onSelect(tab),
+              Expanded(
+                child: _TabItem(
+                  tab: tab,
+                  selected: tab == selected,
+                  badge: tab == KobanTab.people ? openPeople : 0,
+                  onTap: () => onSelect(tab),
+                ),
               ),
           ],
         ),
@@ -233,23 +235,23 @@ class _TabItem extends StatelessWidget {
     }
     final face = AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      height: 44,
-      padding: EdgeInsets.symmetric(horizontal: selected ? 16 : 12),
+      constraints: const BoxConstraints(minHeight: 52),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: ShapeDecoration(
         color: selected ? MoneyColors.of(context).gold : null,
         shape: const StadiumBorder(),
       ),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           icon,
-          if (selected) ...[
-            const SizedBox(width: 6),
-            Text(
-              tab.label,
-              style: theme.textTheme.labelLarge!.copyWith(color: color),
-            ),
-          ],
+          Text(
+            tab.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelMedium!.copyWith(color: color),
+          ),
         ],
       ),
     );
@@ -262,7 +264,6 @@ class _TabItem extends StatelessWidget {
         child: Center(widthFactor: 1, child: face),
       ),
     );
-    if (!selected) target = Tooltip(message: tab.label, child: target);
     return Semantics(
       container: true,
       button: true,
@@ -271,10 +272,9 @@ class _TabItem extends StatelessWidget {
       label: [
         if (badge > 0) '$badge open',
         tab.label,
-        MaterialLocalizations.of(context).tabLabel(
-          tabIndex: tab.index + 1,
-          tabCount: KobanTab.values.length,
-        ),
+        MaterialLocalizations.of(
+          context,
+        ).tabLabel(tabIndex: tab.index + 1, tabCount: KobanTab.values.length),
       ].join('\n'),
       excludeSemantics: true,
       child: target,
