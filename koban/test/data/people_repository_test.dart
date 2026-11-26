@@ -265,7 +265,7 @@ void main() {
   );
 
   group('replace QR keeps the old picture on disk until the snackbar ends', () {
-    Future<(String, File, File, File)> seed() async {
+    Future<(String, File, File, Directory)> seed() async {
       final ali = await repo.addPerson('Ali');
       final qr = File(p.join(files.path, 'qr', '$ali.img'))
         ..createSync(recursive: true)
@@ -274,43 +274,50 @@ void main() {
       await (db.update(db.splitPeople)..where((p) => p.id.equals(ali))).write(
         SplitPeopleCompanion(qrPath: Value(qr.path)),
       );
-      final picked = File('${files.path}/picked.png')
+      final picked = File(p.join(files.path, 'picked.png'))
         ..writeAsBytesSync(wideBytes);
-      return (ali, qr, picked, File(p.join(files.path, 'qr', '$ali.old')));
+      return (ali, qr, picked, qr.parent);
     }
+
+    /// The side files that keep old pictures.
+    List<File> sides(Directory dir) => [
+      for (final e in dir.listSync())
+        if (e is File && e.path.endsWith('.old')) e,
+    ];
 
     test(
       'the old file stays beside the new one, and Undo puts it back',
       () async {
-        final (ali, qr, picked, old) = await seed();
+        final (ali, qr, picked, dir) = await seed();
 
         final undo = await repo.replaceQr(ali, picked.path);
 
         expect(qr.readAsBytesSync(), wideBytes);
-        expect(old.readAsBytesSync(), pngBytes);
+        expect(sides(dir).single.readAsBytesSync(), pngBytes);
         await undo!.undo();
         expect(qr.readAsBytesSync(), pngBytes);
         expect(qr.lastModifiedSync(), DateTime(2026, 11, 5, 9));
-        expect(old.existsSync(), isFalse);
+        expect(sides(dir), isEmpty);
       },
     );
 
     test(
       'the end of the snackbar deletes the old file and keeps the new one',
       () async {
-        final (ali, qr, picked, old) = await seed();
+        final (ali, qr, picked, dir) = await seed();
 
         final undo = await repo.replaceQr(ali, picked.path);
         await undo!.commit!();
 
-        expect(old.existsSync(), isFalse);
+        expect(sides(dir), isEmpty);
         expect(qr.readAsBytesSync(), wideBytes);
       },
     );
 
     test('a failed copy keeps the old QR and leaves no side file', () async {
-      final (ali, qr, _, old) = await seed();
-      final notImage = File('${files.path}/x.txt')..writeAsStringSync('no');
+      final (ali, qr, _, dir) = await seed();
+      final notImage = File(p.join(files.path, 'x.txt'))
+        ..writeAsStringSync('no');
 
       await expectLater(
         repo.replaceQr(ali, notImage.path),
@@ -318,7 +325,38 @@ void main() {
       );
 
       expect(qr.readAsBytesSync(), pngBytes);
-      expect(old.existsSync(), isFalse);
+      expect(sides(dir), isEmpty);
     });
+
+    test('a second replace in the window of the first: the first commit does not break the second Undo', () async {
+      final (ali, qr, picked, dir) = await seed();
+
+      final first = await repo.replaceQr(ali, picked.path);
+      // The first replacement is the picture that the second Undo must bring back.
+      expect(qr.readAsBytesSync(), wideBytes);
+      final third = File(p.join(files.path, 'third.png'))
+        ..writeAsBytesSync(pngBytes);
+      final second = await repo.replaceQr(ali, third.path);
+      // The new snackbar hides the first one, and its end runs the first commit.
+      await first!.commit!();
+
+      await second!.undo();
+
+      expect(qr.readAsBytesSync(), wideBytes);
+      expect(sides(dir), isEmpty);
+    });
+
+    test(
+      'a side file that a dead app left behind goes with the next replace',
+      () async {
+        final (ali, qr, picked, dir) = await seed();
+        File(p.join(dir.path, '$ali.12345.old')).writeAsBytesSync(wideBytes);
+
+        final undo = await repo.replaceQr(ali, picked.path);
+        await undo!.commit!();
+
+        expect(sides(dir), isEmpty);
+      },
+    );
   });
 }

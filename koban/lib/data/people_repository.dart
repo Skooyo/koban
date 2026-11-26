@@ -241,27 +241,27 @@ class PeopleRepository {
   /// ([Undoable.commit]) deletes it. Returns null when there was no QR before.
   Future<Undoable?> replaceQr(String personId, String sourcePath) async {
     final old = (await _db.person(personId).getSingleOrNull())?.qrPath;
-    final kept = old != null && await _qr.keepOld(old);
+    final side = old == null ? null : await _qr.keepOld(old);
     try {
       await setQr(personId, sourcePath);
     } catch (_) {
-      if (kept) await _qr.dropOld(old);
+      if (side != null) await _qr.dropOld(side);
       rethrow;
     }
-    if (!kept) return null;
+    if (old == null || side == null) return null;
     return Undoable(
       undo: () async {
         final person = await _db.person(personId).getSingleOrNull();
         // Removed or deleted since: do not bring a file back that nothing points to.
         if (person == null || person.qrPath != old) {
-          await _qr.dropOld(old);
+          await _qr.dropOld(side);
           return;
         }
-        await _qr.restoreOld(old);
+        await _qr.restoreOld(side, old);
         // The file changed, not the row: write the row so the page reads the date again.
         await _upsertPerson(person);
       },
-      commit: () => _qr.dropOld(old),
+      commit: () => _qr.dropOld(side),
     );
   }
 

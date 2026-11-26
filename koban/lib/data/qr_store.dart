@@ -88,23 +88,32 @@ class QrStore {
     return await file.exists() ? file.lastModified() : null;
   }
 
-  /// The side file that keeps the old picture while Undo is possible.
-  String _oldPath(String path) => '${p.withoutExtension(path)}.old';
-
-  /// Copies the picture at [path] to its side file, with the same day. False when there is none.
-  Future<bool> keepOld(String path) async {
+  /// Copies the picture at [path] to a side file of its own and returns the side file path,
+  /// with the same day. Null when there is no picture. Each replace has its own side file, so
+  /// the end of an older snackbar never deletes the file of a newer one. A side file of an
+  /// older replace is useless once a newer one starts, and so is one that a dead app left
+  /// behind: both go now.
+  Future<String?> keepOld(String path) async {
     final file = File(path);
-    if (!await file.exists()) return false;
-    // A side file that a dead app left behind: copy does not replace it on Windows.
-    await dropOld(path);
-    final kept = await file.copy(_oldPath(path));
+    if (!await file.exists()) return null;
+    final name = p.basenameWithoutExtension(path);
+    await for (final e in file.parent.list()) {
+      final base = p.basename(e.path);
+      if (e is File && base.startsWith('$name.') && base.endsWith('.old')) {
+        await e.delete();
+      }
+    }
+    final side =
+        '${p.withoutExtension(path)}.${DateTime.now().microsecondsSinceEpoch}.old';
+    final kept = await file.copy(side);
     await kept.setLastModified(await file.lastModified());
-    return true;
+    return side;
   }
 
-  /// Puts the side file back as the picture at [path], and deletes the side file.
-  Future<void> restoreOld(String path) async {
-    final kept = File(_oldPath(path));
+  /// Puts the side file [side] back as the picture at [path], and deletes it.
+  /// Nothing happens when the side file is gone.
+  Future<void> restoreOld(String side, String path) async {
+    final kept = File(side);
     if (!await kept.exists()) return;
     // Write in place: a picture that the page still reads cannot be replaced by a rename on
     // Windows. The side file stays until the write is done, so a crash loses nothing.
@@ -117,9 +126,9 @@ class QrStore {
     await qrImage(path).evict();
   }
 
-  /// Deletes the side file. Nothing happens when there is none.
-  Future<void> dropOld(String path) async {
-    final kept = File(_oldPath(path));
+  /// Deletes the side file [side]. Nothing happens when there is none.
+  Future<void> dropOld(String side) async {
+    final kept = File(side);
     if (await kept.exists()) await kept.delete();
   }
 
