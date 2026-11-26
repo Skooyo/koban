@@ -79,13 +79,15 @@ class GroupsViewModel extends ChangeNotifier {
     unawaited(_reloadNow());
   }
 
-  /// Runs one group action. [onOk] runs when it worked; an error goes to [message].
+  /// Runs one group action. [onOk] runs when it worked; an error goes to [onError],
+  /// or to [message] when there is no [onError].
   /// Every action ends with a new read of the open group. While an action runs,
   /// a second call returns at once. A [silent] action does not set [busy].
   Future<void> run(
     Future<String?> Function(GroupRepository r) action, {
     bool silent = false,
     VoidCallback? onOk,
+    ValueChanged<String>? onError,
   }) async {
     if (_busy) return;
     if (!silent) {
@@ -107,6 +109,8 @@ class GroupsViewModel extends ChangeNotifier {
     if (_disposed) return;
     if (error == null) {
       onOk?.call();
+    } else if (onError != null) {
+      onError(error);
     } else {
       _message = error;
       _notify();

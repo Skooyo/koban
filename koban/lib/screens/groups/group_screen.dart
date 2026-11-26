@@ -56,9 +56,13 @@ Color _categoryColor(BuildContext context, String name) {
 
 /// The page of one group. A port of the 0.1.1 `GroupsScreen.kt` `GroupScreen` and `GroupBody`.
 class GroupScreen extends StatefulWidget {
-  const GroupScreen(this.groupId, {super.key});
+  const GroupScreen(this.groupId, {this.madeName, super.key});
 
   final String groupId;
+
+  /// Set when the person just made this group: the page shows the group code
+  /// and Share code first, and a snackbar says "[madeName] made".
+  final String? madeName;
 
   @override
   State<GroupScreen> createState() => _GroupScreenState();
@@ -78,6 +82,19 @@ class _GroupScreenState extends State<GroupScreen> {
 
   /// The name of the category that ranks the members. Null is all spending.
   String? _category;
+
+  @override
+  void initState() {
+    super.initState();
+    final made = widget.madeName;
+    if (made != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$made made')));
+      });
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -170,6 +187,7 @@ class _GroupScreenState extends State<GroupScreen> {
       title: 'Leave ${g.name}?',
       body: 'Members stop seeing your totals. To come back, ask the owner again with the group code.',
       confirm: 'Leave group',
+      destructive: true,
       action: (r) => r.leave(g.id),
       onOk: _close,
     ),
@@ -183,6 +201,7 @@ class _GroupScreenState extends State<GroupScreen> {
       body:
           "${m.alias} stops seeing this group, and the members stop seeing ${m.alias}'s totals.",
       confirm: 'Remove',
+      destructive: true,
       action: (r) => r.remove(g.id, m.userId),
     ),
   );
@@ -203,7 +222,7 @@ class _GroupScreenState extends State<GroupScreen> {
     final device = AppScope.of(context).device;
     try {
       await device.shareText(
-        'Join my Koban group "${g.name}" with the code ${g.code}.',
+        'Join my Koban group ${g.name}. In Koban, open Groups, tap Join with a group code, and type ${g.code}. No Koban yet? Ask me for an invite code.',
         chooserTitle: 'Share group code',
       );
     } catch (e) {
@@ -230,7 +249,7 @@ class _GroupScreenState extends State<GroupScreen> {
     return (sums.keys.toList()..sort((a, b) => sums[b]!.compareTo(sums[a]!)));
   }
 
-  /// Mon's line: who spent least in the shown category.
+  /// Mon's line: a plain fact, never praise for spending less.
   ({MonFace face, String line, String? detail}) _monSay(
     GroupDetail? d,
     String? category,
@@ -246,26 +265,17 @@ class _GroupScreenState extends State<GroupScreen> {
             )
           : (face: MonFace.idle, line: 'One moment.', detail: null);
     }
-    // A member with nothing in this category has no spot to keep warm.
-    final ranked = [
-      for (final m in d.members)
-        if (_amount(m, category) > Decimal.zero) m,
-    ]..sort((a, b) => _amount(a, category).compareTo(_amount(b, category)));
-    if (ranked.isEmpty) {
+    if (d.members.every((m) => _amount(m, category) <= Decimal.zero)) {
       return (
         face: MonFace.idle,
         line: 'Nothing to rank yet.',
         detail: 'Totals show after members send them.',
       );
     }
-    final least = ranked.first;
-    final isMe = least.userId == me;
     return (
-      face: isMe ? MonFace.happy : MonFace.idle,
-      line:
-          '${isMe ? 'You' : least.alias} spent least '
-          '${category == null ? 'overall' : 'on ${category.toLowerCase()}'}.',
-      detail: isMe ? 'I am proud, quietly.' : 'I am keeping the spot warm.',
+      face: MonFace.idle,
+      line: 'Members are listed by most spent.',
+      detail: 'A higher total is not a win.',
     );
   }
 
@@ -400,8 +410,29 @@ class _GroupScreenState extends State<GroupScreen> {
       ),
       child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
+    final made = widget.madeName != null;
     final periodText = period == Period.week ? 'this week' : 'this month';
+    final codeCard = card(
+      Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Group code',
+                  style: theme.textTheme.bodySmall!.copyWith(color: muted),
+                ),
+                Text(d.group.code, style: theme.textTheme.headlineSmall),
+              ],
+            ),
+          ),
+          TonalButton('Share code', () => _share(d.group), icon: Icons.share),
+        ],
+      ),
+    );
     final items = <Widget>[
+      if (made) codeCard,
       card(
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -521,7 +552,7 @@ class _GroupScreenState extends State<GroupScreen> {
                   builder: (_) {
                     final days = GroupPeriodMath.daysLeft(period, today: today);
                     return Text(
-                      '${ordinal(d.members.indexOf(mine) + 1)} of ${d.members.length} in ${d.group.name}. '
+                      '${ordinal(d.members.indexOf(mine) + 1)} most spent of ${d.members.length} in ${d.group.name}. '
                       'Resets in $days ${days == 1 ? 'day' : 'days'}.',
                       style: theme.textTheme.bodyMedium,
                     );
@@ -575,28 +606,7 @@ class _GroupScreenState extends State<GroupScreen> {
           ),
           border: Border.all(color: scheme.primary),
         ),
-      card(
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Group code',
-                    style: theme.textTheme.bodySmall!.copyWith(color: muted),
-                  ),
-                  Text(
-                    d.group.code,
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                ],
-              ),
-            ),
-            TonalButton('Share code', () => _share(d.group), icon: Icons.share),
-          ],
-        ),
-      ),
+      if (!made) codeCard,
       card(
         Row(
           spacing: 12,
@@ -860,10 +870,14 @@ class _MemberRow extends StatelessWidget {
                         padding: const EdgeInsets.only(left: 12),
                         child: Text(
                           name,
-                          style: (isMe
-                                  ? weighted(theme.textTheme.bodyLarge!, 600)
-                                  : theme.textTheme.bodyLarge!)
-                              .copyWith(color: scheme.onSurface),
+                          style:
+                              (isMe
+                                      ? weighted(
+                                          theme.textTheme.bodyLarge!,
+                                          600,
+                                        )
+                                      : theme.textTheme.bodyLarge!)
+                                  .copyWith(color: scheme.onSurface),
                         ),
                       ),
                     ),

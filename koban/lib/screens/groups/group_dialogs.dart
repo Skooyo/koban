@@ -10,33 +10,52 @@ void _close<T>(BuildContext context, T result) {
   Navigator.pop(context, result);
 }
 
-/// Asks for a name of 1 to [max] characters. Gives the trimmed name, or null for Cancel.
-/// A port of the 0.1.1 `NameDialog`.
-Future<String?> showNameDialog(
+/// What [showTextDialog] gets back from its submit: [worked] closes the dialog,
+/// an [error] shows under the field.
+typedef TextSubmit = Future<({bool worked, String? error})> Function(
+  String text,
+);
+
+/// Asks for a text of 1 to [max] characters and runs [submit] with it. The dialog
+/// stays open until [submit] works; its error shows under the field. Gives true when it worked.
+/// [transform] changes each typed value (for example to capitals). Without [helper],
+/// the field shows a counter.
+Future<bool> showTextDialog(
   BuildContext context, {
   required String title,
   required String label,
   required String start,
   required String confirm,
   required int max,
-}) => showDialog<String>(
-  context: context,
-  builder: (_) => _NameDialog(
-    title: title,
-    label: label,
-    start: start,
-    confirm: confirm,
-    max: max,
-  ),
-);
+  required TextSubmit submit,
+  String? helper,
+  String Function(String)? transform,
+}) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => _TextDialog(
+        title: title,
+        label: label,
+        start: start,
+        confirm: confirm,
+        max: max,
+        submit: submit,
+        helper: helper,
+        transform: transform,
+      ),
+    ) ??
+    false;
 
-class _NameDialog extends StatefulWidget {
-  const _NameDialog({
+class _TextDialog extends StatefulWidget {
+  const _TextDialog({
     required this.title,
     required this.label,
     required this.start,
     required this.confirm,
     required this.max,
+    required this.submit,
+    this.helper,
+    this.transform,
   });
 
   final String title;
@@ -44,13 +63,35 @@ class _NameDialog extends StatefulWidget {
   final String start;
   final String confirm;
   final int max;
+  final TextSubmit submit;
+  final String? helper;
+  final String Function(String)? transform;
 
   @override
-  State<_NameDialog> createState() => _NameDialogState();
+  State<_TextDialog> createState() => _TextDialogState();
 }
 
-class _NameDialogState extends State<_NameDialog> {
+class _TextDialogState extends State<_TextDialog> {
   late String _text = widget.start;
+  String? _error;
+  var _busy = false;
+
+  Future<void> _submit() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final r = await widget.submit(_text.trim());
+    if (!mounted) return;
+    if (r.worked) {
+      _close<bool>(context, true);
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _error = r.error;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,20 +102,25 @@ class _NameDialogState extends State<_NameDialog> {
       content: DialogTextField(
         value: _text,
         // As the 0.1.1 `take(max)`: UTF-16 code units.
-        onChanged: (v) =>
-            setState(() => _text = v.length > max ? v.substring(0, max) : v),
+        onChanged: (v) {
+          final t = widget.transform?.call(v) ?? v;
+          setState(() {
+            _text = t.length > max ? t.substring(0, max) : t;
+            _error = null;
+          });
+        },
         label: widget.label,
-        supportingText: '${_text.trim().length} of $max',
+        isError: _error != null,
+        supportingText:
+            _error ?? widget.helper ?? '${_text.trim().length} of $max',
       ),
       actions: [
         TextButton(
-          onPressed: () => _close<String?>(context, null),
+          onPressed: () => _close<bool>(context, false),
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: _text.trim().isEmpty
-              ? null
-              : () => _close(context, _text.trim()),
+          onPressed: _text.trim().isEmpty || _busy ? null : _submit,
           child: Text(widget.confirm),
         ),
       ],
@@ -83,12 +129,14 @@ class _NameDialogState extends State<_NameDialog> {
 }
 
 /// Asks before an action. Gives true for [confirm], false for Cancel.
+/// [destructive] paints [confirm] red: use it only when the action deletes something.
 /// A port of the 0.1.1 `ConfirmDialog`.
 Future<bool> showConfirmDialog(
   BuildContext context, {
   required String title,
   required String body,
   required String confirm,
+  bool destructive = false,
 }) async =>
     await showDialog<bool>(
       context: context,
@@ -105,7 +153,9 @@ Future<bool> showConfirmDialog(
             ),
             TextButton(
               onPressed: () => _close(context, true),
-              style: TextButton.styleFrom(foregroundColor: scheme.error),
+              style: destructive
+                  ? TextButton.styleFrom(foregroundColor: scheme.error)
+                  : null,
               child: Text(confirm),
             ),
           ],
@@ -114,8 +164,8 @@ Future<bool> showConfirmDialog(
     ) ??
     false;
 
-/// Asks for a name and runs [action] with it. After a failed action the dialog
-/// opens again with the typed text, as the 0.1.1 dialog stayed open until the action worked.
+/// Asks for a name and runs [action] with it. The dialog stays open until the
+/// action works, and its error shows under the field. [onOk] runs after the dialog closes.
 Future<void> askNameAndRun(
   BuildContext context,
   GroupsViewModel vm, {
@@ -126,33 +176,30 @@ Future<void> askNameAndRun(
   required int max,
   required Future<String?> Function(GroupRepository r, String text) action,
   VoidCallback? onOk,
+  String? helper,
+  String Function(String)? transform,
 }) async {
-  var text = start;
-  while (true) {
-    final typed = await showNameDialog(
-      context,
-      title: title,
-      label: label,
-      start: text,
-      confirm: confirm,
-      max: max,
-    );
-    if (typed == null) return;
-    text = typed;
-    var worked = false;
-    await vm.run(
-      (r) => action(r, typed),
-      onOk: () {
-        worked = true;
-        onOk?.call();
-      },
-    );
-    if (worked ||
-        !context.mounted ||
-        ModalRoute.of(context)?.isCurrent != true) {
-      return;
-    }
-  }
+  final worked = await showTextDialog(
+    context,
+    title: title,
+    label: label,
+    start: start,
+    confirm: confirm,
+    max: max,
+    helper: helper,
+    transform: transform,
+    submit: (text) async {
+      var ok = false;
+      String? error;
+      await vm.run(
+        (r) => action(r, text),
+        onOk: () => ok = true,
+        onError: (e) => error = e,
+      );
+      return (worked: ok, error: error);
+    },
+  );
+  if (worked) onOk?.call();
 }
 
 /// Asks before [action] and runs it. After a failed action the question
@@ -165,6 +212,7 @@ Future<void> askConfirmAndRun(
   required String confirm,
   required Future<String?> Function(GroupRepository r) action,
   VoidCallback? onOk,
+  bool destructive = false,
 }) async {
   while (true) {
     final ok = await showConfirmDialog(
@@ -172,6 +220,7 @@ Future<void> askConfirmAndRun(
       title: title,
       body: body,
       confirm: confirm,
+      destructive: destructive,
     );
     if (!ok) return;
     var worked = false;

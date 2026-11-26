@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:koban/app/app_services.dart';
 import 'package:koban/app/home_shell.dart';
+import 'package:koban/app/routes.dart' as routes_;
 import 'package:koban/screens/groups/group_screen.dart';
 import 'package:koban/theme/mon.dart';
 import 'package:material_ui/material_ui.dart';
@@ -161,7 +162,7 @@ void main() {
     expect(onPageText('You spent in November'), findsOneWidget);
     expect(onPageText('RM 30.00'), findsWidgets);
     expect(
-      onPageText('2nd of 3 in Makan Group. Resets in 18 days.'),
+      onPageText('2nd most spent of 3 in Makan Group. Resets in 18 days.'),
       findsOneWidget,
     );
     expect(
@@ -169,6 +170,28 @@ void main() {
       'eq.2026-11-01',
     );
   });
+
+  testWidgets(
+    'a group that was just made shows its code and Share code first',
+    (tester) async {
+      final s = await open();
+      routes();
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pumpKoban(tester, s);
+      final context = tester.element(find.byType(IndexedStack));
+      routes_.openGroup(context, 'g1', madeName: 'Lunch');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Lunch made'), findsOneWidget);
+      expect(
+        tester.getTopLeft(onPageText('GRP-7KQ2')).dy,
+        lessThan(tester.getTopLeft(onPageText('Week')).dy),
+      );
+      expect(onPageText('Share code'), findsOneWidget);
+    },
+  );
 
   testWidgets('the week view resets on Monday', (tester) async {
     final s = await open();
@@ -181,7 +204,7 @@ void main() {
     expect(onPageText('You spent this week'), findsOneWidget);
     expect(onPageText('RM 35.00'), findsWidgets);
     expect(
-      onPageText('2nd of 3 in Makan Group. Resets in 3 days.'),
+      onPageText('2nd most spent of 3 in Makan Group. Resets in 3 days.'),
       findsOneWidget,
     );
     final q = sent('/rest/v1/shared_totals').last.url.queryParameters;
@@ -259,41 +282,43 @@ void main() {
     },
   );
 
-  testWidgets('a failed rename opens the dialog again with the typed name', (
-    tester,
-  ) async {
-    final s = await open();
-    routes();
-    var answer = 'not_owner';
-    backend.on('POST', '/rest/v1/rpc/rename_group', (r) => jsonReply(answer));
-    await openGroup(tester, s);
+  testWidgets(
+    'a failed rename keeps the dialog open with the error under the field',
+    (tester) async {
+      final s = await open();
+      routes();
+      var answer = 'not_owner';
+      backend.on('POST', '/rest/v1/rpc/rename_group', (r) => jsonReply(answer));
+      await openGroup(tester, s);
 
-    await tester.tap(find.byTooltip('Group actions'));
-    await tester.pumpAndSettle();
-    expect(find.text('Make a new code'), findsOneWidget);
-    await tester.tap(find.text('Rename group'));
-    await tester.pumpAndSettle();
-    expect(inDialog('Rename group'), findsOneWidget);
-    expect(inDialog('11 of 40'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'Lunch Club');
-    await tester.pump();
-    await tester.tap(inDialog('Save'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Group actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Make a new code'), findsOneWidget);
+      await tester.tap(find.text('Rename group'));
+      await tester.pumpAndSettle();
+      expect(inDialog('Rename group'), findsOneWidget);
+      expect(inDialog('11 of 40'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'Lunch Club');
+      await tester.pump();
+      await tester.tap(inDialog('Save'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Only the group owner can do this.'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Lunch Club'), findsOneWidget);
+      expect(inDialog('Only the group owner can do this.'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.widgetWithText(TextField, 'Lunch Club'), findsOneWidget);
 
-    answer = 'ok';
-    await tester.tap(inDialog('Save'));
-    await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsNothing);
-    expect(sent('/rest/v1/rpc/rename_group').map((r) => jsonDecode(r.body)), [
-      {'p_group': 'g1', 'p_name': 'Lunch Club'},
-      {'p_group': 'g1', 'p_name': 'Lunch Club'},
-    ]);
-  });
+      answer = 'ok';
+      await tester.tap(inDialog('Save'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(sent('/rest/v1/rpc/rename_group').map((r) => jsonDecode(r.body)), [
+        {'p_group': 'g1', 'p_name': 'Lunch Club'},
+        {'p_group': 'g1', 'p_name': 'Lunch Club'},
+      ]);
+    },
+  );
 
-  testWidgets('Share code sends the 0.1.1 text', (tester) async {
+  testWidgets('Share code sends the text with the next steps', (tester) async {
     final s = await open();
     routes();
     await openGroup(tester, s);
@@ -305,7 +330,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(device.calls.singleWhere((c) => c.method == 'shareText').arguments, {
-      'text': 'Join my Koban group "Makan Group" with the code GRP-7KQ2.',
+      'text': 'Join my Koban group Makan Group. In Koban, open Groups, tap Join with a group code, and type GRP-7KQ2. No Koban yet? Ask me for an invite code.',
       'chooserTitle': 'Share group code',
     });
   });

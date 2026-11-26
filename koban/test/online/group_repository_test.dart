@@ -111,6 +111,7 @@ void main() {
         {
           'group_id': 'g9',
           'user_id': 'user-1',
+          'created_at': '2026-11-10T01:00:00+00:00',
           'profiles': {'alias': 'Ali'},
         },
       ]),
@@ -226,6 +227,9 @@ void main() {
       expect(st.requests.map((r) => (r.groupId, r.userId, r.alias)), [
         ('g1', 'user-2', 'Mei'),
       ]);
+      expect(st.waiting.map((r) => (r.groupId, r.sentAt)), [
+        ('g9', DateTime.utc(2026, 11, 10, 1)),
+      ]);
       expect(st.removedFrom, [(7, 'Kedai Group')]);
       expect((st.loading, st.message), (false, null));
       expect(repo.inGroups.value, true);
@@ -337,7 +341,9 @@ void main() {
       backend.requests.first.url.queryParameters['grant_type'],
       'id_token',
     );
-    final link = backend.requests[1];
+    // The profile check comes first: a profile that exists is not a first sign-in.
+    expect(backend.requests[1].url.path, '/rest/v1/profiles');
+    final link = backend.requests[2];
     expect(link.url.path, '/rest/v1/rpc/link_account');
     expect(jsonDecode(link.body), {
       'p_device_token': 'test-device-token',
@@ -345,10 +351,37 @@ void main() {
     });
     expect(repo.state.value.userId, 'user-1');
     expect(repo.state.value.groups, hasLength(2));
+    expect(repo.state.value.namePending, false);
+  });
+
+  test('the first sign-in asks for the name until nameDone', () async {
+    await open(signedIn: false);
+    readRoutes();
+    var profileReads = 0;
+    backend.on('GET', '/rest/v1/profiles', (r) {
+      // The account has no profile before link_account, and one after it.
+      profileReads++;
+      return jsonReply(
+        profileReads == 1
+            ? []
+            : [
+                {'alias': 'Ali'},
+              ],
+      );
+    });
+    rpc('link_account', '"ok"');
+
+    expect(await repo.signIn(), isNull);
+    expect(repo.state.value.namePending, true);
+    expect(repo.state.value.alias, 'Ali');
+
+    repo.nameDone();
+    expect(repo.state.value.namePending, false);
   });
 
   test('sign-in without an accepted invite signs out again', () async {
     await open(signedIn: false);
+    backend.on('GET', '/rest/v1/profiles', (r) => jsonReply([]));
     rpc('link_account', '"no_invite"');
     backend.on('POST', '/auth/v1/logout', empty);
 

@@ -259,6 +259,10 @@ Future<void> openSplitEdit(BuildContext context, String billId) =>
 Future<void> openPerson(BuildContext context, String personId) =>
     pushPage<void>(context, PersonScreen(personId));
 
-/// Opens the page of the group [groupId].
-Future<void> openGroup(BuildContext context, String groupId) =>
-    pushPage<void>(context, GroupScreen(groupId));
+/// Opens the page of the group [groupId]. [madeName] is set for a group that the
+/// person just made: the page then shows its code first.
+Future<void> openGroup(
+  BuildContext context,
+  String groupId, {
+  String? madeName,
+}) => pushPage<void>(context, GroupScreen(groupId, madeName: madeName));

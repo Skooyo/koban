@@ -34,12 +34,14 @@ class GroupSummary {
 }
 
 /// A request to join a group. [alias] is the name of the person who asks.
+/// [sentAt] is when the person sent it.
 class JoinRequest {
-  const JoinRequest(this.groupId, this.userId, this.alias);
+  const JoinRequest(this.groupId, this.userId, this.alias, [this.sentAt]);
 
   final String groupId;
   final String userId;
   final String alias;
+  final DateTime? sentAt;
 }
 
 /// A group member with the shared totals of the shown period.
@@ -81,8 +83,10 @@ class GroupsState {
     this.alias = '',
     this.groups = const [],
     this.requests = const [],
+    this.waiting = const [],
     this.removedFrom = const [],
     this.loading = false,
+    this.namePending = false,
     this.message,
   });
 
@@ -92,9 +96,15 @@ class GroupsState {
   final List<GroupSummary> groups;
   final List<JoinRequest> requests;
 
+  /// The requests that this person sent and the group owners did not answer yet.
+  final List<JoinRequest> waiting;
+
   /// The notices of groups that removed this person: (notice id, group name).
   final List<(int, String)> removedFrom;
   final bool loading;
+
+  /// True after the first sign-in, until the person picks the name for groups.
+  final bool namePending;
   final String? message;
 
   static const _keep = Object();
@@ -106,8 +116,10 @@ class GroupsState {
     String? alias,
     List<GroupSummary>? groups,
     List<JoinRequest>? requests,
+    List<JoinRequest>? waiting,
     List<(int, String)>? removedFrom,
     bool? loading,
+    bool? namePending,
     Object? message = _keep,
   }) => GroupsState(
     online: online ?? this.online,
@@ -115,8 +127,10 @@ class GroupsState {
     alias: alias ?? this.alias,
     groups: groups ?? this.groups,
     requests: requests ?? this.requests,
+    waiting: waiting ?? this.waiting,
     removedFrom: removedFrom ?? this.removedFrom,
     loading: loading ?? this.loading,
+    namePending: namePending ?? this.namePending,
     message: identical(message, _keep) ? this.message : message as String?,
   );
 }
@@ -223,6 +237,7 @@ class GroupRepository {
     if (google == null) return null;
     try {
       await _session.signInWithIdToken(google);
+      final firstSignIn = await _isNewAccount();
       final linked = await _online.supabase.rpc(
         'link_account',
         params: {
@@ -235,12 +250,31 @@ class GroupRepository {
         return 'Groups need online access. Enter your invite code in Settings first.';
       }
       await refresh();
+      if (firstSignIn) _set(_state.value.copyWith(namePending: true));
       return null;
     } catch (e) {
       await _session.signOut();
       return _unreachable(e) ? _unreachableText : 'Sign-in failed. Try again.';
     }
   }
+
+  /// True when the signed-in account has no profile yet, so this is its first sign-in.
+  Future<bool> _isNewAccount() async {
+    try {
+      final rows = await _online.supabase.rest
+          .from('profiles')
+          .select('alias')
+          .eq('user_id', _session.userId!);
+      return rows.isEmpty;
+    } catch (e) {
+      // ONLINE LOGS rule R1: the type only.
+      debugPrint('Koban: profile check failed (${e.runtimeType})');
+      return false;
+    }
+  }
+
+  /// The person picked a name, or kept the Google name.
+  void nameDone() => _set(_state.value.copyWith(namePending: false));
 
   Future<void> signOut() async {
     await _session.signOut();
@@ -293,13 +327,16 @@ class GroupRepository {
         for (final r
             in await sb.rest
                 .from('join_requests')
-                .select('group_id,user_id,profiles(alias)'))
-          if (r['user_id'] != uid)
-            JoinRequest(
-              r['group_id']! as String,
-              r['user_id']! as String,
-              _alias(r['profiles']),
-            ),
+                .select('group_id,user_id,created_at,profiles(alias)'))
+          JoinRequest(
+            r['group_id']! as String,
+            r['user_id']! as String,
+            _alias(r['profiles']),
+            switch (r['created_at']) {
+              final String t => DateTime.tryParse(t),
+              _ => null,
+            },
+          ),
       ];
       final groups = [
         for (final g
@@ -316,7 +353,7 @@ class GroupRepository {
               _ => null,
             },
             (g['group_members'] as List?)?.length ?? 0,
-            reqs.where((r) => r.groupId == g['id']).length,
+            reqs.where((r) => r.userId != uid && r.groupId == g['id']).length,
           ),
       ];
       final removed = [
@@ -328,7 +365,14 @@ class GroupRepository {
         _state.value.copyWith(
           alias: alias,
           groups: groups,
-          requests: reqs,
+          requests: [
+            for (final r in reqs)
+              if (r.userId != uid) r,
+          ],
+          waiting: [
+            for (final r in reqs)
+              if (r.userId == uid) r,
+          ],
           removedFrom: removed,
           loading: false,
           message: null,
@@ -404,18 +448,23 @@ class GroupRepository {
 
   // ---- Actions: each returns an error message, or null when it worked ----
 
-  Future<String?> makeGroup(String name) => _act(() async {
-    final r = await (await _client()).rpc(
-      'make_group',
-      params: {'p_name': name},
-    );
-    return switch ((r as Map)['status']) {
-      'ok' => null,
-      'too_many_groups' => 'You are in 5 groups, the most allowed.',
-      'bad_name' => 'Give the group a name of 1 to 40 characters.',
-      _ => 'Groups need online access. Enter your invite code in Settings.',
-    };
-  });
+  /// Makes a group. [onMade] gets the id of the new group.
+  Future<String?> makeGroup(String name, {void Function(String id)? onMade}) =>
+      _act(() async {
+        final r = await (await _client()).rpc(
+          'make_group',
+          params: {'p_name': name},
+        );
+        return switch ((r as Map)['status']) {
+          'ok' => () {
+            onMade?.call('${r['id']}');
+            return null;
+          }(),
+          'too_many_groups' => 'You are in 5 groups, the most allowed.',
+          'bad_name' => 'Give the group a name of 1 to 40 characters.',
+          _ => 'Groups need online access. Enter your invite code in Settings.',
+        };
+      });
 
   Future<String?> askToJoin(String code) => _act(() async {
     return switch (await _rpc('ask_to_join', {'p_code': code})) {
