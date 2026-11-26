@@ -120,8 +120,17 @@ class PersonScreenState extends State<PersonScreen> {
         context,
         name: d.person.name,
         balance: d.balance,
-        splits: [for (final v in d.owedToMe) v.billMerchant ?? 'Split'],
-        items: [for (final i in d.iOwe) i.description],
+        splits: [
+          for (final v in d.owedToMe)
+            if (!v.manual)
+              '${v.billMerchant ?? 'Split'}, ${personDate(v.billTime)}',
+        ],
+        items: [
+          for (final v in d.owedToMe)
+            if (v.manual)
+              '${v.billMerchant ?? 'Item'}, ${personDate(v.billTime)}',
+          for (final i in d.iOwe) '${i.description}, ${personDate(i.itemDate)}',
+        ],
       ),
     );
     if (ok == true) _vm!.settleUp();
@@ -248,7 +257,7 @@ class PersonScreenState extends State<PersonScreen> {
           if (d.settleSuggestion case final receive?) ...[
             const SizedBox(height: 16),
             _RepaymentCard(
-              title: 'Settles up in full',
+              title: 'Settle up?',
               text: receiveText(receive),
               onConfirm: vm.confirmSettle,
               onDismiss: vm.dismissSettle,
@@ -736,7 +745,7 @@ class _DebtRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: _RepaymentCard(
-              title: 'Pays this split',
+              title: 'Mark paid?',
               text: receiveText(suggested),
               onConfirm: onConfirm,
               onDismiss: onDismiss,

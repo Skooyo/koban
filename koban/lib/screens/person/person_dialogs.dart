@@ -31,10 +31,15 @@ String receiveText(Expense e) =>
 
 String _count(int n, String one, String many) => '$n ${n == 1 ? one : many}';
 
-/// "a", "a and b", "a, b and c".
-String _names(List<String> names) => names.length < 2
-    ? names.join()
-    : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+/// "a", "a and b", "a, b and c", "a, b, c and 2 more".
+String _names(List<String> names) {
+  if (names.length > 3) {
+    return '${names.take(3).join(', ')} and ${names.length - 3} more';
+  }
+  return names.length < 2
+      ? names.join()
+      : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+}
 
 /// Runs [save]. It returns null when the save worked, or else the message for the dialog.
 Future<String?> _attempt(Future<void> Function() save) async {
@@ -105,6 +110,15 @@ class _EditPersonSheetState extends State<_EditPersonSheet> {
       _saving = false;
     });
     if (error == null) Navigator.pop(context, EditPersonResult.saved);
+  }
+
+  /// Delete person drops a typed name, so it asks first.
+  Future<void> _delete() async {
+    final current = widget.vm.detail?.person.name;
+    if (_name.trim() != current && !await showDiscardChangesDialog(context)) {
+      return;
+    }
+    if (mounted) Navigator.pop(context, EditPersonResult.delete);
   }
 
   /// Why Delete person is off, or null when the person has nothing open.
@@ -200,10 +214,7 @@ class _EditPersonSheetState extends State<_EditPersonSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     TextButton(
-                      onPressed: why == null
-                          ? () =>
-                                Navigator.pop(context, EditPersonResult.delete)
-                          : null,
+                      onPressed: why == null ? _delete : null,
                       style: TextButton.styleFrom(
                         minimumSize: const Size(0, 48),
                         foregroundColor: scheme.error,
@@ -455,7 +466,8 @@ class _OwedItemDialogState extends State<_OwedItemDialog> {
   }
 }
 
-/// Asks to settle up. It shows who pays whom and how much, and which splits and items it closes.
+/// Asks to settle up. It shows who pays whom and how much, and what it closes.
+/// [splits] and [items] are labels with a date, so two of them never read the same.
 /// It returns true for Settle up.
 Future<bool> showSettleUpDialog(
   BuildContext context, {
@@ -468,7 +480,7 @@ Future<bool> showSettleUpDialog(
     if (splits.isNotEmpty)
       '${_count(splits.length, 'split', 'splits')}: ${_names(splits)}',
     if (items.isNotEmpty)
-      '${_count(items.length, 'item you owe', 'items you owe')}: ${_names(items)}',
+      '${_count(items.length, 'item', 'items')}: ${_names(items)}',
   ].join('; ');
   final (figure, who) = switch (balance) {
     PaysYou(:final amount) => (

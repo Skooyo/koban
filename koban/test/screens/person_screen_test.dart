@@ -5,6 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/app/routes.dart';
 import 'package:koban/data/user_error.dart';
+import 'package:koban/data/database.dart';
+import 'package:koban/data/split_repository.dart';
+import 'package:koban/rules/split_math.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/person/person_screen.dart';
 import 'package:koban/screens/person/person_view_model.dart';
@@ -221,8 +224,9 @@ void main() {
     expect(
       inDialog(
         find.text(
-          'Ali pays you RM 30.00. This closes 2 splits: Kedai Contoh and Cash; '
-          '1 item you owe: Parking. You cannot change their items after this.',
+          'Ali pays you RM 30.00. This closes 1 split: Kedai Contoh, 13 Nov; '
+          '2 items: Cash, 13 Nov and Parking, 13 Nov. '
+          'You cannot change their items after this.',
         ),
       ),
       findsOneWidget,
@@ -457,6 +461,71 @@ void main() {
     expect(opener.closed, isTrue);
     expect(find.text('Ali deleted'), findsOneWidget);
     expect(find.text('Undo'), findsOneWidget);
+    expect((await s.db.person(ali).getSingle()).archived, isTrue);
+  });
+
+  testWidgets('Settle up tells splits with no shop apart', (tester) async {
+    final s = await testServices();
+    final ali = await s.people.addPerson('Ali');
+    Future<void> bill(int time) => s.splits.saveSplit(
+      SplitDraft(
+        billId: null,
+        merchant: null,
+        billTime: time,
+        currency: 'MYR',
+        printedTotal: null,
+        items: [
+          DraftItem(
+            name: 'Nasi',
+            quantity: 1,
+            price: d('10.00'),
+            sharedBy: {meId, 'a'},
+          ),
+        ],
+        charges: SplitCharges(),
+        people: const [
+          SplitPeopleData(id: 'a', name: 'Ali', lastUsedAt: 0, archived: false),
+        ],
+        linkedExpenseId: null,
+      ),
+    );
+    await bill(day);
+    await bill(day + 86400000);
+    await s.people.addOwedToMe(ali, 'Cash', d('3'), day);
+    await openPage(tester, s, ali);
+
+    await tapIn(tester, find.widgetWithText(OutlinedButton, 'Settle up'));
+    expect(
+      inDialog(
+        find.text(
+          'Ali pays you RM 13.00. This closes 2 splits: Split, 13 Nov and '
+          'Split, 14 Nov; 1 item: Cash, 13 Nov. '
+          'You cannot change their items after this.',
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Delete person asks before it drops an unsaved name', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final ali = await seedAli(s);
+    await s.people.settleUp(ali);
+    await openPage(tester, s, ali);
+
+    await tapIn(tester, find.byTooltip('Edit Ali'));
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), 'Alia');
+    await tapIn(tester, find.text('Delete person'));
+    expect(find.text('Discard changes?'), findsOneWidget);
+    await tapIn(tester, find.text('Keep editing'));
+    expect(find.text('Edit Ali'), findsOneWidget);
+    expect((await s.db.person(ali).getSingle()).archived, isFalse);
+
+    await tapIn(tester, find.text('Delete person'));
+    await tapIn(tester, find.text('Discard'));
+    expect(find.byType(PersonScreen), findsNothing);
     expect((await s.db.person(ali).getSingle()).archived, isTrue);
   });
 
