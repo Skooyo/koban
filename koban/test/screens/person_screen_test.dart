@@ -282,7 +282,7 @@ void main() {
       await tapIn(tester, inDialog(find.text('Cancel')));
 
       await tapIn(tester, find.text('Kedai Contoh'));
-      expect(find.text('Split done'), findsOneWidget);
+      expect(find.text('Split'), findsOneWidget);
     },
   );
 

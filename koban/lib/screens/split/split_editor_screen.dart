@@ -126,6 +126,7 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
             body: Column(
               children: [
                 _band(context, state),
+                if (!state.loading && state.billId == null) _StepBar(state.step),
                 _stepLine(context, state),
                 Expanded(child: _content(state, vm)),
                 ?_bottomBar(context, state, vm),
@@ -139,18 +140,16 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
 
   Widget _band(BuildContext context, SplitEditorState s) {
     final shop = SplitEditorViewModel.shopOf(s);
-    final (title, number) = switch (s.step) {
-      _ when s.loading => ('Split a bill', null),
-      SplitStep.people => ('Split a bill', 1),
-      SplitStep.start || SplitStep.reading => (shop ?? 'Split a bill', 2),
-      SplitStep.items => (shop ?? 'Items', 2),
-      SplitStep.link => ('Payment', 3),
-      SplitStep.summary => ('Split done', 3),
+    final viewed = s.billId != null && !s.editing;
+    final title = switch (s.step) {
+      _ when s.loading => 'Split a bill',
+      SplitStep.people => 'Split a bill',
+      SplitStep.start || SplitStep.reading => shop ?? 'Split a bill',
+      SplitStep.items => shop ?? 'Items',
+      SplitStep.link => 'Payment',
+      SplitStep.summary => viewed ? 'Split' : 'Check and save',
     };
-    return TaskHeader(
-      title: title,
-      action: number == null || s.billId != null ? null : _StepPill(number),
-    );
+    return TaskHeader(title: title);
   }
 
   Widget _stepLine(BuildContext context, SplitEditorState s) {
@@ -180,7 +179,7 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
     switch (s.step) {
       case SplitStep.people:
         if (s.error != null) return ('That did not open.', null);
-        return ('Who ate with you?', 'Tap names. No typing.');
+        return ('Who ate with you?', null);
       case SplitStep.start:
         return ('Got the receipt?', 'I can read it for you.');
       case SplitStep.reading:
@@ -192,15 +191,12 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
           return ('What did you have?', 'Add the items. I do the sums.');
         }
         if (rest != null && rest.sign > 0) {
-          return (
-            '${splitRm(rest)} is on no one yet.',
-            'Shared food? Split it evenly.',
-          );
+          return ('${splitRm(rest)} is on no one yet.', null);
         }
         if (missing > 0) {
           return (
             missing == 1 ? '1 item has no one.' : '$missing items have no one.',
-            'Tap the faces on each item.',
+            'Tap the names on each item.',
           );
         }
         if (SplitEditorViewModel.difference(s) != null) {
@@ -210,7 +206,7 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
       case SplitStep.link:
         return (
           'Which payment was this?',
-          'Link the card payment, so your spending counts only your share.',
+          'Pick the payment, so your spending counts only your share.',
         );
       case SplitStep.summary:
         final owing = owingNames(s);
@@ -312,7 +308,7 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
                 enabled: true,
                 onPressed: vm.saveLockedPayment,
               )
-            : (label: 'Next', enabled: true, onPressed: vm.next);
+            : (label: 'Done', enabled: true, onPressed: vm.next);
       case SplitStep.summary:
         final viewed = s.billId != null && !s.editing && s.amounts == null;
         second = OutlinedButton.icon(
@@ -401,27 +397,59 @@ class SplitEditorScreenState extends State<SplitEditorScreen> {
   }
 }
 
-/// "2 of 3" in the title row of the band.
-class _StepPill extends StatelessWidget {
-  const _StepPill(this.number);
+/// The 3 steps of a new split: People, Items, Save. The bars up to the current step are filled.
+class _StepBar extends StatelessWidget {
+  const _StepBar(this.step);
 
-  final int number;
+  final SplitStep step;
+
+  static const _names = ['People', 'Items', 'Save'];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Semantics(
-      label: 'Step $number of 3',
-      excludeSemantics: true,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: ShapeDecoration(
-          color: theme.colorScheme.surfaceContainer,
-          shape: const StadiumBorder(),
-        ),
-        child: Text(
-          '$number of 3',
-          style: tabular(theme.textTheme.labelLarge!),
+    final scheme = theme.colorScheme;
+    final current = switch (step) {
+      SplitStep.people => 0,
+      SplitStep.start || SplitStep.reading || SplitStep.items => 1,
+      SplitStep.link || SplitStep.summary => 2,
+    };
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Semantics(
+        label: 'Step ${current + 1} of 3, ${_names[current]}',
+        excludeSemantics: true,
+        child: Row(
+          children: [
+            for (final (i, name) in _names.indexed) ...[
+              if (i > 0) const SizedBox(width: KobanSpace.s4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DecoratedBox(
+                      decoration: ShapeDecoration(
+                        color: i <= current
+                            ? scheme.primary
+                            : scheme.outlineVariant,
+                        shape: const StadiumBorder(),
+                      ),
+                      child: const SizedBox(height: 4, width: double.infinity),
+                    ),
+                    const SizedBox(height: KobanSpace.s4),
+                    Text(
+                      name,
+                      style: theme.textTheme.labelMedium!.copyWith(
+                        color: i == current
+                            ? scheme.onSurface
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -445,18 +473,24 @@ class _StartStep extends StatefulWidget {
 
 class _StartStepState extends State<_StartStep> {
   bool _picking = false;
+  bool _failed = false;
 
   /// Opens a photo source and reads the photo it gives. A cancel gives null and changes nothing.
-  /// As in 0.1.1, a failed photo shows nothing: the editor stays on the start step.
+  /// A photo that fails to open keeps the editor on the start step and says so.
   Future<void> _pick(Future<String?> Function() source) async {
     if (_picking) return;
     // Read before the await: a closed editor has no context.
     final cacheDir = AppScope.of(context).cacheDir;
-    setState(() => _picking = true);
+    setState(() {
+      _picking = true;
+      _failed = false;
+    });
     String? path;
+    var failed = false;
     try {
       path = await source();
     } catch (e) {
+      failed = true;
       developer.log(
         'Photo source failed: ${e.runtimeType}',
         name: 'SplitEditorScreen',
@@ -467,7 +501,10 @@ class _StartStepState extends State<_StartStep> {
       if (path != null) unawaited(_deleteCached(path, cacheDir));
       return;
     }
-    setState(() => _picking = false);
+    setState(() {
+      _picking = false;
+      _failed = failed;
+    });
     if (path != null) unawaited(widget.vm.readReceipt(path));
   }
 
@@ -525,6 +562,22 @@ class _StartStepState extends State<_StartStep> {
       children: [
         if (payment != null) ...[
           PaymentCard(payment),
+          const SizedBox(height: KobanSpace.s12),
+        ],
+        if (_failed) ...[
+          SplitCard(
+            side: BorderSide(color: MoneyColors.of(context).review),
+            children: [
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  'Could not read this photo.',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              Text('Try another photo, or type the items.', style: muted),
+            ],
+          ),
           const SizedBox(height: KobanSpace.s12),
         ],
         SplitCard(
@@ -948,7 +1001,7 @@ class _ItemsStep extends StatelessWidget {
         ],
         if (SplitEditorViewModel.targetTotal(state) != null) ...[
           gap,
-          _Meter(state: state, vm: vm),
+          _Meter(state: state),
         ],
         gap,
         SplitCard(
@@ -966,6 +1019,11 @@ class _ItemsStep extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text('No items yet.', style: muted),
+              )
+            else
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TonalButton('Split evenly', vm.splitEverythingEvenly),
               ),
             for (final row in state.items)
               _ItemLine(
@@ -980,12 +1038,6 @@ class _ItemsStep extends StatelessWidget {
               spacing: 8,
               runSpacing: 4,
               children: [
-                if (state.items.isNotEmpty)
-                  TextButton(
-                    onPressed: vm.splitEverythingEvenly,
-                    style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
-                    child: const Text('Split everything evenly'),
-                  ),
                 TextButton.icon(
                   onPressed: () => _showPeopleSheet(context, vm),
                   style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
@@ -1003,12 +1055,11 @@ class _ItemsStep extends StatelessWidget {
   }
 }
 
-/// How much of the receipt or payment the items cover, and one tap for the rest.
+/// How much of the receipt or payment the items cover.
 class _Meter extends StatelessWidget {
-  const _Meter({required this.state, required this.vm});
+  const _Meter({required this.state});
 
   final SplitEditorState state;
-  final SplitEditorViewModel vm;
 
   @override
   Widget build(BuildContext context) {
@@ -1018,7 +1069,6 @@ class _Meter extends StatelessWidget {
     final rest = SplitEditorViewModel.missingItemsOf(state);
     if (sum == null || rest == null) return const SizedBox.shrink();
     final target = sum + rest;
-    final parts = SplitEditorViewModel.everyone(state).length;
     final fill = target.sign <= 0
         ? 1.0
         : (sum.toDouble() / target.toDouble()).clamp(0.0, 1.0);
@@ -1050,14 +1100,9 @@ class _Meter extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        if (rest.sign > 0) ...[
-          Text('${splitRm(rest)} left, on no one yet', style: muted),
-          const SizedBox(height: 8),
-          TonalButton(
-            'Split the rest evenly · ${splitRm(eachOf(rest, parts))} each',
-            vm.splitTheRest,
-          ),
-        ] else if (rest.sign < 0)
+        if (rest.sign > 0)
+          Text('${splitRm(rest)} left, on no one yet', style: muted)
+        else if (rest.sign < 0)
           Text(
             '${splitRm(-rest)} more than the ${state.printedTotal == null ? 'payment' : 'receipt'}',
             style: theme.textTheme.bodyMedium!.copyWith(
@@ -1071,7 +1116,7 @@ class _Meter extends StatelessWidget {
   }
 }
 
-/// One item: name, quantity and line price, and a face for each person. A tap edits it.
+/// One item: name, quantity and line price, and a name chip for each person. A tap on the name edits it.
 class _ItemLine extends StatelessWidget {
   const _ItemLine({
     super.key,
@@ -1120,16 +1165,29 @@ class _ItemLine extends StatelessWidget {
           ),
         ),
         Wrap(
+          spacing: 8,
+          runSpacing: 4,
           children: [
-            PersonToggle(
+            if (state.people.isNotEmpty)
+              PersonChip(
+                'Everyone',
+                avatar: false,
+                selected:
+                    row.sharedBy.length ==
+                    SplitEditorViewModel.everyone(state).length,
+                onTap: () => vm.toggleEveryone(row.key),
+              ),
+            PersonChip(
               'Me',
-              on: row.sharedBy.contains(meId),
+              avatar: false,
+              selected: row.sharedBy.contains(meId),
               onTap: () => vm.toggleShare(row.key, meId),
             ),
             for (final p in state.people)
-              PersonToggle(
-                p.name,
-                on: row.sharedBy.contains(p.id),
+              PersonChip(
+                chipNameOf(state, p.name),
+                avatar: false,
+                selected: row.sharedBy.contains(p.id),
                 onTap: () => vm.toggleShare(row.key, p.id),
               ),
           ],

@@ -34,6 +34,20 @@ String nameOf(SplitEditorState s, String id) => id == meId
     ? 'Me'
     : s.people.where((p) => p.id == id).firstOrNull?.name ?? id;
 
+/// The name on an item chip: the first name, and the first letter of the next word
+/// when another person of the split has the same first name ("Ali H.").
+String chipNameOf(SplitEditorState s, String name) {
+  String first(String n) => n.trim().split(RegExp(r'\s+')).first;
+  final words = name.trim().split(RegExp(r'\s+'));
+  final clash = [
+    'Me',
+    for (final p in s.people) p.name,
+  ].where((n) => first(n).toLowerCase() == words.first.toLowerCase()).length > 1;
+  return clash && words.length > 1
+      ? '${words.first} ${words[1].characters.first}.'
+      : words.first;
+}
+
 /// A white card with radius 24 on the ground of the screen.
 class SplitCard extends StatelessWidget {
   const SplitCard({super.key, required this.children, this.side});
@@ -83,66 +97,6 @@ class CardHeading extends StatelessWidget {
         ),
         ?trailing,
       ],
-    );
-  }
-}
-
-/// One face of who had an item: a 48 dp target with initials. On: a gold-soft fill.
-/// The tooltip is the name, so screen readers and tests read it.
-class PersonToggle extends StatelessWidget {
-  const PersonToggle(
-    this.name, {
-    super.key,
-    required this.on,
-    required this.onTap,
-  });
-
-  final String name;
-  final bool on;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Semantics(
-      button: true,
-      selected: on,
-      child: Tooltip(
-        message: name,
-        child: InkResponse(
-          onTap: onTap,
-          radius: 24,
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: Center(
-              child: Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: on ? scheme.primaryContainer : scheme.surface,
-                  border: Border.all(
-                    color: on ? scheme.primary : scheme.outlineVariant,
-                    width: on ? 2 : 1,
-                  ),
-                ),
-                child: ExcludeSemantics(
-                  child: Text(
-                    initialsOf(name),
-                    style: Theme.of(context).textTheme.labelMedium!.copyWith(
-                      color: on
-                          ? scheme.onPrimaryContainer
-                          : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -345,41 +299,19 @@ class _PeopleStepState extends State<PeopleStep> {
             ),
           ],
         ),
-        if (!widget.inSheet) ...[
-          const SizedBox(height: KobanSpace.s12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'You mark who had each item as you add it. There is no second pass.',
-                  style: theme.textTheme.bodyMedium!.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
       ],
     );
   }
 }
 
-/// Which card payment the bill was. Radio rows, and "Not paid by card".
+/// Which payment the bill was. Radio rows, and "Paid another way".
 class LinkStep extends StatelessWidget {
   const LinkStep({super.key, required this.state, required this.vm});
 
   final SplitEditorState state;
   final SplitEditorViewModel vm;
 
-  // The radio group has no null value, so the empty text stands for "Not paid by card".
+  // The radio group has no null value, so the empty text stands for "Paid another way".
   static const _none = '';
 
   @override
@@ -406,7 +338,7 @@ class LinkStep extends StatelessWidget {
                   onTap: () => vm.selectExpense(e.id),
                 ),
               KobanRow(
-                title: 'Not paid by card',
+                title: 'Paid another way',
                 leading: const Radio<String>(value: _none),
                 onTap: () => vm.selectExpense(null),
               ),
@@ -527,9 +459,11 @@ class SummaryStep extends StatelessWidget {
     final note = paymentNote(state);
     final saved = state.billId != null;
     final check = total == null ? null : _check(total);
-    final edit = state.locked
-        ? ('Change payment', vm.changePayment)
-        : ('Edit items', vm.editItems);
+    final payment = state.linkedPayment;
+    // A split of a payment keeps that payment. A viewed split has nothing to save.
+    final canPick =
+        state.locked ||
+        (!state.skipLink && (state.billId == null || state.editing));
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
@@ -595,6 +529,19 @@ class SummaryStep extends StatelessWidget {
             ],
           ),
         ],
+        const SizedBox(height: KobanSpace.s12),
+        ListGroup(
+          children: [
+            KobanRow(
+              title: 'Payment',
+              subtitle: payment == null
+                  ? 'Paid another way'
+                  : '${payment.merchant ?? 'Payment'} · ${splitRm(payment.amount)}',
+              showChevron: canPick,
+              onTap: canPick && !state.saving ? vm.changePayment : null,
+            ),
+          ],
+        ),
         if (check != null) ...[
           const SizedBox(height: 8),
           Row(
@@ -644,12 +591,12 @@ class SummaryStep extends StatelessWidget {
                   amounts == null ? 'Change amounts' : 'Split evenly',
                 ),
               ),
-            if (saved)
+            if (saved && !state.locked)
               TextButton.icon(
-                onPressed: state.saving ? null : edit.$2,
+                onPressed: state.saving ? null : vm.editItems,
                 style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
                 icon: const Icon(Icons.edit, size: 18),
-                label: Text(edit.$1),
+                label: const Text('Edit items'),
               ),
           ],
         ),

@@ -202,15 +202,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(shop);
     await settle(tester);
-    expect(find.text('Split done'), findsOneWidget);
+    expect(find.text('Split'), findsOneWidget);
     await tester.pageBack();
     await settle(tester);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Split a bill'));
     await settle(tester);
     expect(find.text('Who ate with you?'), findsOneWidget);
-    expect(find.text('1 of 3'), findsOneWidget);
-    expect(find.text('Split done'), findsNothing);
+    expect(find.text('People'), findsOneWidget);
+    expect(find.text('Check and save'), findsNothing);
   });
 
   test('jvmHash gives the Java String.hashCode', () {

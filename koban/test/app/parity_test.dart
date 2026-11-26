@@ -117,7 +117,7 @@ void main() {
 
     await visit(tester, (c) => openPerson(c, ali), 'Ali');
     await visit(tester, (c) => openSplitNew(c), 'Split a bill');
-    await visit(tester, (c) => openSplitEdit(c, billId), 'Split done');
+    await visit(tester, (c) => openSplitEdit(c, billId), 'Split');
     await visit(tester, (c) => openPaymentNew(c), 'Save payment');
     await visit(tester, (c) => openPaymentEdit(c, expenseId), 'Payment');
     await visit(tester, openCheckPayments, 'Check payments');
