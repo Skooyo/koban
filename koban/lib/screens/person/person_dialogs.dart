@@ -6,6 +6,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
 import '../../data/database.dart';
+import '../../data/qr_store.dart';
+import '../../data/undoable.dart';
 import '../../data/user_error.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/people_math.dart';
@@ -15,6 +17,7 @@ import '../../ui/money.dart';
 import '../../ui/sheets.dart';
 import '../../theme/koban_theme.dart';
 import 'person_view_model.dart';
+import 'qr_widgets.dart';
 
 final _shortDate = DateFormat('d MMM', 'en_US');
 final _dayDate = DateFormat('EEE, d MMM', 'en_US');
@@ -95,6 +98,44 @@ class _EditPersonSheetState extends State<_EditPersonSheet> {
   late String _name = widget.vm.detail?.person.name ?? '';
   String? _error;
   bool _saving = false;
+  // The Undo snackbar of the page sits behind this sheet, so a replace shows its Undo here.
+  String? _qrNote;
+  Undoable? _qrUndo;
+
+  Future<void> _replaceQr(String name) async {
+    final vm = widget.vm;
+    final path = await chooseQrPicture(
+      context,
+      name: name,
+      pick: vm.pickQr,
+      discard: vm.discardPick,
+    );
+    if (path == null) return;
+    final (:saved, :undo) = await vm.replaceQr(path);
+    if (!mounted || !saved) return;
+    setState(() {
+      _qrNote = undo == null ? 'QR added.' : 'QR replaced.';
+      _qrUndo = undo;
+    });
+  }
+
+  Future<void> _undoQr() async {
+    final undo = _qrUndo;
+    if (undo == null) return;
+    setState(() => _qrUndo = null);
+    try {
+      await undo.undo();
+      if (mounted) setState(() => _qrNote = 'Old QR put back.');
+    } catch (e, s) {
+      developer.log(
+        'Undo failed',
+        name: 'PersonDialogs',
+        error: e,
+        stackTrace: s,
+      );
+      if (mounted) setState(() => _qrNote = 'Could not put the old QR back.');
+    }
+  }
 
   Future<void> _save() async {
     final current = widget.vm.detail?.person.name;
@@ -171,44 +212,90 @@ class _EditPersonSheetState extends State<_EditPersonSheet> {
                   supportingText: _error,
                   textCapitalization: TextCapitalization.words,
                 ),
-                Container(
-                  constraints: const BoxConstraints(minHeight: 56),
-                  padding: const EdgeInsets.only(left: 12, right: 4),
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    spacing: 12,
-                    children: [
-                      Icon(Icons.qr_code_2, color: scheme.onSurfaceVariant),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Payment QR',
-                              style: weighted(theme.textTheme.titleSmall!, 700),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 4,
+                  children: [
+                    Container(
+                      constraints: const BoxConstraints(minHeight: 56),
+                      padding: const EdgeInsets.only(left: 12, right: 4),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        spacing: 12,
+                        children: [
+                          if (hasQr)
+                            QrThumb(
+                              image: qrImage(detail.person.qrPath!),
+                              version: widget.vm.qrVersion,
+                            )
+                          else
+                            Icon(
+                              Icons.qr_code_2,
+                              color: scheme.onSurfaceVariant,
                             ),
-                            Text(
-                              hasQr ? 'Added' : 'Not added yet',
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Payment QR',
+                                  style: weighted(
+                                    theme.textTheme.titleSmall!,
+                                    700,
+                                  ),
+                                ),
+                                Text(
+                                  hasQr
+                                      ? qrAddedText(
+                                          widget.vm.qrAddedAt,
+                                          AppScope.of(context).now(),
+                                        )
+                                      : 'Not added yet',
+                                  style: theme.textTheme.bodyMedium!.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => _replaceQr(name),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(0, 48),
+                              foregroundColor: scheme.onSurface,
+                            ),
+                            child: Text(hasQr ? 'Replace QR' : 'Add QR'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.vm.qrError case final error?)
+                      Text(error, style: TextStyle(color: scheme.error))
+                    else if (_qrNote case final note?)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              note,
                               style: theme.textTheme.bodyMedium!.copyWith(
                                 color: scheme.onSurfaceVariant,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          if (_qrUndo != null)
+                            TextButton(
+                              onPressed: _undoQr,
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(0, 48),
+                              ),
+                              child: const Text('Undo'),
+                            ),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: widget.vm.pickQr,
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                          foregroundColor: scheme.onSurface,
-                        ),
-                        child: Text(hasQr ? 'Replace QR' : 'Add QR'),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

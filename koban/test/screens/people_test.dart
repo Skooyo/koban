@@ -112,7 +112,14 @@ void main() {
 
   testWidgets('Add person can save a QR with the name', (tester) async {
     final files = Directory.systemTemp.createTempSync('koban_files');
-    addTearDown(() => files.deleteSync(recursive: true));
+    // Windows may still hold the picture that the sheet was reading.
+    addTearDown(() {
+      try {
+        files.deleteSync(recursive: true);
+      } on FileSystemException {
+        // ignore
+      }
+    });
     final picked = File(p.join(files.path, 'picked.png'))
       ..writeAsBytesSync(pngBytes);
     final s = await testServices(
@@ -129,8 +136,14 @@ void main() {
     );
     await tester.pump();
     await tester.tap(inSheet(find.text("Add Mei Ling's payment QR")));
-    await tester.pump();
-    await tester.pump();
+    await settleReal(
+      tester,
+      () => find.text('Use this picture?').evaluate().isNotEmpty,
+    );
+    // The picture is checked first and is not saved yet.
+    expect(Directory(p.join(files.path, 'qr')).existsSync(), isFalse);
+    await tester.tap(find.text("Use as Mei Ling's QR"));
+    await tester.pumpAndSettle();
     expect(inSheet(find.text('Picture chosen.')), findsOneWidget);
     await tester.tap(inSheet(find.widgetWithText(FilledButton, 'Add person')));
     final qr = Directory(p.join(files.path, 'qr'));
@@ -145,6 +158,46 @@ void main() {
     expect(person.name, 'Mei Ling');
     expect(person.qrPath, p.join(qr.path, '${person.id}.img'));
     expect(File(person.qrPath!).readAsBytesSync(), pngBytes);
+  });
+
+  testWidgets('closing Add person deletes the picked copy in the cache', (
+    tester,
+  ) async {
+    final cache = Directory.systemTemp.createTempSync('koban_cache');
+    addTearDown(() {
+      try {
+        cache.deleteSync(recursive: true);
+      } on FileSystemException {
+        // Windows may still hold the picture: leave it for the system.
+      }
+    });
+    final picked = File(p.join(cache.path, 'picked.png'))
+      ..writeAsBytesSync(pngBytes);
+    final s = await testServices(
+      cacheDir: cache,
+      pickImage: () async => picked.path,
+    );
+    await openPeople(tester, s);
+
+    await tester.tap(find.byTooltip('Add person'));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet(find.text('Add their payment QR')));
+    await settleReal(
+      tester,
+      () => find.text('Use this picture?').evaluate().isNotEmpty,
+    );
+    await tester.tap(find.text('Use as their QR'));
+    await tester.pumpAndSettle();
+    expect(inSheet(find.text('Picture chosen.')), findsOneWidget);
+    expect(picked.existsSync(), isTrue);
+
+    // Close the sheet without adding the person.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    await settleReal(tester, () => !picked.existsSync());
+
+    expect(await s.db.allPeople().get(), isEmpty);
   });
 
   testWidgets('search ignores case and extra spaces', (tester) async {

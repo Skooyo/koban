@@ -96,6 +96,20 @@ class PeopleViewModel extends ChangeNotifier {
   /// Opens the photo picker. It returns the path of the picked picture, or null on a cancel.
   Future<String?> pickQr() => _s.pickImage();
 
+  /// Deletes the cached copy of a picked picture that the owner did not use.
+  Future<void> discardPick(String path) async {
+    try {
+      await deleteCachedPick(await _s.cacheDir(), path);
+    } catch (e, st) {
+      developer.log(
+        'Delete of the picked copy failed',
+        name: 'People',
+        error: e,
+        stackTrace: st,
+      );
+    }
+  }
+
   /// Adds the person, and saves [qrPath] as the QR when it is given.
   /// Returns the id of the person. Throws a user error for a blank name.
   /// A QR that cannot be saved does not undo the add: [qrError] says why.

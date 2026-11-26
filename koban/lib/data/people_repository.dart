@@ -232,6 +232,51 @@ class PeopleRepository {
     });
   }
 
+  /// When the QR file at [path] was added (epoch ms), or null when there is none.
+  Future<int?> qrAddedAt(String? path) async =>
+      (await _qr.addedAt(path))?.millisecondsSinceEpoch;
+
+  /// Copies the picture at [sourcePath] as the QR, and keeps the old picture for Undo.
+  /// Returns null when there was no QR before: nothing to take back.
+  Future<Undoable?> replaceQr(String personId, String sourcePath) async {
+    final old = (await _db.person(personId).getSingleOrNull())?.qrPath;
+    final bytes = await _qr.read(old);
+    final added = await _qr.addedAt(old);
+    await setQr(personId, sourcePath);
+    if (old == null || bytes == null) return null;
+    return Undoable(
+      undo: () async {
+        final person = await _db.person(personId).getSingleOrNull();
+        // Removed or deleted since: do not bring a file back that nothing points to.
+        if (person == null || person.qrPath != old) return;
+        await _qr.put(old, bytes, added);
+        // The file changed, not the row: write the row so the page reads the date again.
+        await _upsertPerson(person);
+      },
+    );
+  }
+
+  /// Removes the QR: the row stops pointing at it and the file goes. Undo brings both back.
+  /// Returns null when there is no QR.
+  Future<Undoable?> removeQr(String personId) async {
+    final person = await _db.person(personId).getSingleOrNull();
+    final path = person?.qrPath;
+    if (person == null || path == null) return null;
+    final bytes = await _qr.read(path);
+    final added = await _qr.addedAt(path);
+    await _upsertPerson(person.copyWith(qrPath: const Value(null)));
+    await _qr.delete(path);
+    return Undoable(
+      undo: () async {
+        final now = await _db.person(personId).getSingleOrNull();
+        // A new QR in the meantime stays.
+        if (now == null || now.qrPath != null || bytes == null) return;
+        await _qr.put(path, bytes, added);
+        await _upsertPerson(now.copyWith(qrPath: Value(path)));
+      },
+    );
+  }
+
   Future<void> saveQrToGallery(String personId) async {
     final person = await _db.person(personId).getSingleOrNull();
     final path = person?.qrPath;

@@ -22,6 +22,7 @@ Future<void> deleteCachedPick(Directory cache, String path) async {
   if (!p.isWithin(cache.path, path)) return;
   final file = File(path);
   if (file.existsSync()) await file.delete();
+  await qrImage(path).evict();
 }
 
 /// Payment QR pictures in app storage, and copies of them in the gallery.
@@ -57,6 +58,8 @@ class QrStore {
     } finally {
       if (await temp.exists()) await temp.delete();
     }
+    // The day the QR was added: a copy may keep the date of the picked file.
+    await target.setLastModified(DateTime.now());
     // The picture of this path changed: the next paint must read the new file.
     final path = target.absolute.path;
     await qrImage(path).evict();
@@ -76,6 +79,22 @@ class QrStore {
     if (path == null) return null;
     final file = File(path);
     return await file.exists() ? file.readAsBytes() : null;
+  }
+
+  /// The day the picture at [path] was added, or null when there is no file.
+  Future<DateTime?> addedAt(String? path) async {
+    if (path == null) return null;
+    final file = File(path);
+    return await file.exists() ? file.lastModified() : null;
+  }
+
+  /// Writes [bytes] to [path] over any file there, and sets the day it was added. Undo uses it.
+  Future<void> put(String path, Uint8List bytes, DateTime? addedAt) async {
+    final file = File(path);
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(bytes);
+    if (addedAt != null) await file.setLastModified(addedAt);
+    await qrImage(path).evict();
   }
 
   /// Writes [bytes] back to [path]. A file that is already there stays.

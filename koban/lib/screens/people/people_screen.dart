@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
 import '../../app/routes.dart';
 import '../../data/people_repository.dart';
+import '../../data/qr_store.dart';
 import '../../data/user_error.dart';
 import '../../rules/people_math.dart';
 import '../../theme/koban_theme.dart';
@@ -13,6 +16,7 @@ import '../../ui/money.dart';
 import '../../ui/scene_band.dart';
 import '../../ui/sheets.dart';
 import '../person/person_dialogs.dart' show personDate;
+import '../person/qr_widgets.dart';
 import 'people_view_model.dart';
 
 String _groupTitle(PeopleGroup group) => switch (group) {
@@ -378,13 +382,35 @@ class _AddPersonSheetState extends State<_AddPersonSheet> {
   String? _error;
   var _saving = false;
   var _picking = false;
+  var _added = false;
+
+  @override
+  void dispose() {
+    // A sheet closed with a picked picture leaves a copy in the cache. Delete it.
+    final path = _qrPath;
+    if (path != null && !_added) unawaited(widget.vm.discardPick(path));
+    super.dispose();
+  }
 
   Future<void> _pick() async {
     if (_picking) return;
     _picking = true;
     try {
-      final path = await widget.vm.pickQr();
-      if (path != null && mounted) setState(() => _qrPath = path);
+      final path = await chooseQrPicture(
+        context,
+        name: _name.trim(),
+        pick: widget.vm.pickQr,
+        discard: widget.vm.discardPick,
+      );
+      if (path == null) return;
+      final old = _qrPath;
+      if (!mounted) {
+        await widget.vm.discardPick(path);
+      } else {
+        setState(() => _qrPath = path);
+      }
+      // A second picture replaces the first: delete the copy of the first.
+      if (old != null) await widget.vm.discardPick(old);
     } catch (e, s) {
       FlutterError.reportError(
         FlutterErrorDetails(exception: e, stack: s, library: 'PeopleScreen'),
@@ -415,7 +441,10 @@ class _AddPersonSheetState extends State<_AddPersonSheet> {
       _error = error;
       _saving = false;
     });
-    if (added != null) Navigator.pop(context, added);
+    if (added != null) {
+      _added = true;
+      Navigator.pop(context, added);
+    }
   }
 
   @override
@@ -470,7 +499,10 @@ class _AddPersonSheetState extends State<_AddPersonSheet> {
                     child: Row(
                       spacing: 12,
                       children: [
-                        Icon(Icons.qr_code_2, color: scheme.onSurfaceVariant),
+                        if (hasQr)
+                          QrThumb(image: qrImage(_qrPath!))
+                        else
+                          Icon(Icons.qr_code_2, color: scheme.onSurfaceVariant),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

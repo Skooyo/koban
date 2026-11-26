@@ -7,12 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/data/database.dart';
 import 'package:koban/data/split_repository.dart';
+import 'package:koban/data/undoable.dart';
 import 'package:koban/rules/split_math.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/person/person_view_model.dart';
 import 'package:path/path.dart' as p;
 
-import '../data/qr_store_test.dart' show pngBytes;
+import '../data/qr_store_test.dart' show pngBytes, wideBytes;
 import '../support/harness.dart';
 
 Decimal d(String v) => Decimal.parse(v);
@@ -250,7 +251,7 @@ void main() {
     expect((await personRow(s, ali)).suggestedSettleExpenseId, isNull);
   });
 
-  test('a refused storage permission says how to save the QR', () async {
+  test('a refused storage permission is shown with Open settings', () async {
     final device = FakeChannel(deviceChannelName, {
       'storageAllowed': false,
       'requestStoragePermission': false,
@@ -267,7 +268,8 @@ void main() {
     vm.saveQrToGallery();
     await idle(vm);
 
-    expect(messages, ['Allow storage access to save the QR.']);
+    expect(messages, ['Koban cannot save to the gallery.']);
+    expect(vm.storageDenied, isTrue);
     expect(device.calls.map((c) => c.method), [
       'storageAllowed',
       'requestStoragePermission',
@@ -360,9 +362,7 @@ void main() {
     final ali = await seedAli(s);
     final (vm, messages) = await open(s, ali);
 
-    vm.pickQr();
-    await until(() => !vm.picking);
-    await idle(vm);
+    expect(await vm.pickQr(), isNull);
 
     expect(vm.qrVersion, 0);
     expect(messages, isEmpty);
@@ -383,10 +383,10 @@ void main() {
     Directory(p.join(files.path, 'qr', '$ali.tmp')).createSync(recursive: true);
     final (vm, messages) = await open(s, ali);
 
-    vm.pickQr();
-    await until(() => messages.isNotEmpty);
+    await vm.replaceQr((await vm.pickQr())!);
 
     expect(messages, ['Could not save the change. Try again.']);
+    expect(vm.qrError, 'Could not save the change. Try again.');
     expect(vm.qrVersion, 0);
     expect((await personRow(s, ali)).qrPath, isNull);
     expect(File(p.join(files.path, 'qr', '$ali.img')).existsSync(), isFalse);
@@ -411,15 +411,13 @@ void main() {
     final ali = await seedAli(s);
     final (vm, _) = await open(s, ali);
 
-    vm.pickQr();
-    await until(() => vm.qrVersion == 1);
-    await idle(vm);
+    await vm.replaceQr((await vm.pickQr())!);
+    expect(vm.qrVersion, 1);
     expect(inside.existsSync(), isFalse);
 
     next = outside;
-    vm.pickQr();
-    await until(() => vm.qrVersion == 2);
-    await idle(vm);
+    await vm.replaceQr((await vm.pickQr())!);
+    expect(vm.qrVersion, 2);
     expect(outside.existsSync(), isTrue);
   });
 
@@ -437,10 +435,75 @@ void main() {
     Directory(p.join(files.path, 'qr', '$ali.tmp')).createSync(recursive: true);
     final (vm, messages) = await open(s, ali);
 
-    vm.pickQr();
-    await until(() => messages.isNotEmpty);
-    await idle(vm);
+    await vm.replaceQr((await vm.pickQr())!);
 
+    expect(messages, isNotEmpty);
     expect(picked.existsSync(), isFalse);
+  });
+
+  group('QR remove and replace with Undo', () {
+    test(
+      'Remove QR deletes the file, and Undo brings back the file and the day',
+      () async {
+        final files = Directory.systemTemp.createTempSync('koban_files');
+        addTearDown(() => files.deleteSync(recursive: true));
+        final s = await testServices(filesDir: files);
+        final ali = await seedAli(s);
+        final qr = File(p.join(files.path, 'qr', '$ali.img'))
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(pngBytes);
+        final added = DateTime(2026, 11, 13, 9);
+        qr.setLastModifiedSync(added);
+        await s.db.customStatement(
+          'UPDATE split_people SET qrPath = ? WHERE id = ?',
+          [qr.path, ali],
+        );
+        final (vm, _) = await open(s, ali);
+        await until(() => vm.qrAddedAt == added.millisecondsSinceEpoch);
+        Undoable? undo;
+        vm.onUndo = (message, u) {
+          expect(message, 'QR removed');
+          undo = u;
+        };
+
+        vm.removeQr();
+        await until(() => undo != null);
+
+        expect((await personRow(s, ali)).qrPath, isNull);
+        expect(qr.existsSync(), isFalse);
+        await undo!.undo();
+        expect((await personRow(s, ali)).qrPath, qr.path);
+        expect(qr.readAsBytesSync(), pngBytes);
+        expect(qr.lastModifiedSync(), added);
+      },
+    );
+
+    test('Replace QR keeps the old picture for Undo', () async {
+      final files = Directory.systemTemp.createTempSync('koban_files');
+      addTearDown(() => files.deleteSync(recursive: true));
+      final picked = File(p.join(files.path, 'picked.png'))
+        ..writeAsBytesSync(wideBytes);
+      final s = await testServices(
+        filesDir: files,
+        cacheDir: Directory(p.join(files.path, 'cache')),
+        pickImage: () async => picked.path,
+      );
+      final ali = await seedAli(s);
+      final qr = File(p.join(files.path, 'qr', '$ali.img'))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(pngBytes);
+      await s.db.customStatement(
+        'UPDATE split_people SET qrPath = ? WHERE id = ?',
+        [qr.path, ali],
+      );
+      final (vm, _) = await open(s, ali);
+
+      final result = await vm.replaceQr((await vm.pickQr())!);
+
+      expect(result.saved, isTrue);
+      expect(qr.readAsBytesSync(), wideBytes);
+      await result.undo!.undo();
+      expect(qr.readAsBytesSync(), pngBytes);
+    });
   });
 }

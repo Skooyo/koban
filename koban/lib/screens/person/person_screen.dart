@@ -21,6 +21,7 @@ import '../../ui/sheets.dart';
 import '../../ui/undo_snack_bar.dart';
 import 'person_dialogs.dart';
 import 'person_view_model.dart';
+import 'qr_widgets.dart';
 
 /// The page of one person: the payment QR, what each side owes, and settle up.
 /// A port of `PersonScreen.kt` and `PersonDialogs.kt`.
@@ -307,15 +308,22 @@ class PersonScreenState extends State<PersonScreen> {
             children: [
               KobanRow(
                 title: "$name's payment QR",
-                subtitle: qrPath == null ? 'Not added yet.' : null,
-                leading: const Icon(Icons.qr_code_2),
+                subtitle: qrPath == null
+                    ? 'Not added yet.'
+                    : qrAddedText(vm.qrAddedAt, AppScope.of(context).now()),
+                leading: qrPath == null
+                    ? const Icon(Icons.qr_code_2)
+                    : QrThumb(image: qrImage(qrPath), version: vm.qrVersion),
                 showChevron: true,
                 onTap: qrPath == null
-                    ? vm.pickQr
+                    ? () => replaceQrOnPage(context, _messenger, vm, name)
                     : () => _showQr(vm, name, qrPath),
                 onTapLabel: qrPath == null ? 'Add QR' : 'Open QR',
               ),
-              _RowButton(qrPath == null ? 'Add QR' : 'Replace QR', vm.pickQr),
+              _RowButton(
+                qrPath == null ? 'Add QR' : 'Replace QR',
+                () => replaceQrOnPage(context, _messenger, vm, name),
+              ),
             ],
           ),
         ],
@@ -352,121 +360,136 @@ class PersonScreenState extends State<PersonScreen> {
     }
   }
 
-  /// The QR big, with Save QR to gallery. A tap on the QR itself replaces it.
+  /// The QR big, with the 2 steps to pay, Save QR to gallery, Replace QR and Remove QR.
+  /// Replace and Remove close the sheet first, so their snackbar with Undo shows on the page.
   Future<void> _showQr(PersonViewModel vm, String name, String path) =>
       showKobanSheet<void>(
         context: context,
-        builder: (context) => ListenableBuilder(
-          listenable: vm,
-          builder: (context, _) => Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: _QrFrame(
-                      name: name,
-                      path: path,
-                      version: vm.qrVersion,
-                      onTap: vm.pickQr,
+        builder: (sheet) {
+          final theme = Theme.of(sheet);
+          return ListenableBuilder(
+            listenable: vm,
+            builder: (context, _) => Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        'Pay $name',
+                        style: weighted(theme.textTheme.titleLarge!, 800),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  TonalButton(
-                    'Save QR to gallery',
-                    vm.saveQrToGallery,
-                    icon: Icons.download,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Then open your bank app and pick it from the gallery',
-                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    const SizedBox(height: 16),
+                    Center(
+                      child: QrFrame(
+                        image: qrImage(path),
+                        label: "$name's payment QR",
+                        version: vm.qrVersion,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    const _Step(1, 'Save the QR to your gallery.'),
+                    const _Step(
+                      2,
+                      'In your bank app, tap Scan, then pick the QR from the gallery.',
+                    ),
+                    const SizedBox(height: 12),
+                    TonalButton(
+                      'Save QR to gallery',
+                      vm.saveQrToGallery,
+                      icon: Icons.download,
+                    ),
+                    if (vm.storageDenied)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              storageRefused,
+                              style: theme.textTheme.bodyMedium!.copyWith(
+                                color: theme.colorScheme.error,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => unawaited(
+                              AppScope.of(sheet).device.openAppInfo(),
+                            ),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(0, 48),
+                            ),
+                            child: const Text('Open settings'),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(sheet);
+                        unawaited(
+                          replaceQrOnPage(this.context, _messenger, vm, name),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                        foregroundColor: theme.colorScheme.onSurface,
+                      ),
+                      child: const Text('Replace QR'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(sheet);
+                        vm.removeQr();
+                      },
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                        foregroundColor: theme.colorScheme.error,
+                      ),
+                      child: const Text('Remove QR'),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       );
 }
 
-/// The QR on a white box with a gold frame. A tap adds or replaces it.
-/// White stays white in the dark theme, so the QR scans.
-class _QrFrame extends StatelessWidget {
-  const _QrFrame({
-    required this.name,
-    required this.path,
-    required this.version,
-    required this.onTap,
-  });
+/// One numbered step: a number in a gold disc, then the text.
+class _Step extends StatelessWidget {
+  const _Step(this.number, this.text);
 
-  final String name;
-  final String? path;
-  final int version;
-  final VoidCallback onTap;
-
-  Widget _square(String? text) => AspectRatio(
-    aspectRatio: 1,
-    child: text == null
-        ? null
-        : Center(
-            child: Builder(
-              builder: (context) => Text(
-                text,
-                style: Theme.of(context).textTheme.titleSmall!
-                    .copyWith(color: Colors.black),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-  );
+  final int number;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    final path = this.path;
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(28),
-      side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 6),
-    );
-    return SizedBox(
-      width: 240,
-      child: MergeSemantics(
-        child: Semantics(
-          button: true,
-          onTapHint: path != null ? 'Replace QR' : 'Add QR',
-          child: Material(
-            color: Colors.white,
-            shape: shape,
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onTap,
-              customBorder: shape,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: path == null
-                    ? _square('Add their payment QR')
-                    : Image(
-                        image: qrImage(path),
-                        key: ValueKey(version),
-                        semanticLabel: "$name's payment QR",
-                        width: double.infinity,
-                        fit: BoxFit.fitWidth,
-                        // Still loading: keep the square so the layout does not jump.
-                        frameBuilder: (context, child, frame, sync) =>
-                            frame == null && !sync
-                            ? Stack(children: [_square(null), child])
-                            : child,
-                        errorBuilder: (context, error, stack) => _square(
-                          "Couldn't load the QR. Tap to pick it again.",
-                        ),
-                      ),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      label: 'Step $number: $text',
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 12,
+          children: [
+            CircleAvatar(
+              radius: 12,
+              backgroundColor: scheme.primaryContainer,
+              child: Text(
+                '$number',
+                style: theme.textTheme.labelMedium!.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
               ),
             ),
-          ),
+            Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
+          ],
         ),
       ),
     );

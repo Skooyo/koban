@@ -10,6 +10,7 @@ import 'package:koban/data/split_repository.dart';
 import 'package:koban/rules/split_math.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/person/person_screen.dart';
+import 'package:koban/screens/person/qr_widgets.dart';
 import 'package:koban/screens/person/person_view_model.dart';
 import 'package:koban/theme/koban_theme.dart';
 import 'package:koban/ui/kit.dart';
@@ -388,16 +389,26 @@ void main() {
     },
   );
 
-  // Review Focus 1
-  testWidgets('an imported QR shows and a replace shows the new picture', (
-    tester,
-  ) async {
+  /// Ali with a QR file added on 5 Nov. The picker gives a picture in the cache.
+  Future<(AppServices, String, File, File)> seedQr({
+    FakeChannel? device,
+  }) async {
     final files = Directory.systemTemp.createTempSync('koban_files');
-    addTearDown(() => files.deleteSync(recursive: true));
-    final picked = File(p.join(files.path, 'picked.png'))
+    // Windows may still hold a picture that the page was reading: leave it for the system.
+    addTearDown(() {
+      try {
+        files.deleteSync(recursive: true);
+      } on FileSystemException {
+        // ignore
+      }
+    });
+    final picked = File(p.join(files.path, 'cache', 'picked.png'))
+      ..createSync(recursive: true)
       ..writeAsBytesSync(wideBytes);
     final s = await testServices(
       filesDir: files,
+      cacheDir: Directory(p.join(files.path, 'cache')),
+      device: device,
       pickImage: () async => picked.path,
     );
     final ali = await seedAli(s);
@@ -405,43 +416,186 @@ void main() {
     final qr = File(p.join(files.path, 'qr', '$ali.img'))
       ..createSync(recursive: true)
       ..writeAsBytesSync(pngBytes);
+    qr.setLastModifiedSync(DateTime(2026, 11, 5, 9));
     await s.db.customStatement(
       'UPDATE split_people SET qrPath = ? WHERE id = ?',
       [qr.path, ali],
     );
+    return (s, ali, qr, picked);
+  }
+
+  Future<void> waitForPreview(WidgetTester tester) => settleReal(
+    tester,
+    () => find.text('Use this picture?').evaluate().isNotEmpty,
+  );
+
+  testWidgets(
+    'the QR row shows the picture and the day, and the sheet has the steps',
+    (tester) async {
+      final (s, ali, qr, _) = await seedQr();
+      await openPage(tester, s, ali);
+
+      // The day loads after the page, because it reads the file.
+      await settleReal(tester, () => vmOf(tester).qrAddedAt != null);
+      await seek(tester, find.text("Ali's payment QR"));
+      expect(find.text('Added Thu, 5 Nov'), findsOneWidget);
+      expect(find.byType(QrThumb), findsOneWidget);
+      await tapIn(tester, find.text("Ali's payment QR"));
+
+      expect(find.text('Pay Ali'), findsOneWidget);
+      expect(find.text('Save the QR to your gallery.'), findsOneWidget);
+      expect(
+        find.text(
+          'In your bank app, tap Scan, then pick the QR from the gallery.',
+        ),
+        findsOneWidget,
+      );
+      final frame = find.byType(QrFrame);
+      expect(frame, findsOneWidget);
+      // The QR is a picture, not a button.
+      expect(
+        find.descendant(of: frame, matching: find.byType(InkWell)),
+        findsNothing,
+      );
+      final picture = tester.widget<Image>(
+        find.descendant(of: frame, matching: find.byType(Image)),
+      );
+      expect(picture.semanticLabel, "Ali's payment QR");
+      expect(picture.key, const ValueKey(0));
+      final provider = picture.image as ResizeImage;
+      expect((provider.imageProvider as FileImage).file.path, qr.path);
+      expect((provider.width, provider.height), (1024, 1024));
+      expect(find.text('Save QR to gallery'), findsOneWidget);
+      expect(find.text('Remove QR'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Replace QR checks the picture first, then Undo brings the old one back',
+    (tester) async {
+      final (s, ali, qr, picked) = await seedQr();
+      await openPage(tester, s, ali);
+      await tapIn(tester, find.text("Ali's payment QR"));
+
+      await tester.tap(find.widgetWithText(TextButton, 'Replace QR').last);
+      await waitForPreview(tester);
+
+      // Nothing is saved before the owner agrees.
+      expect(qr.readAsBytesSync(), pngBytes);
+      await tester.tap(find.text("Use as Ali's QR"));
+      await settleReal(tester, () => vmOf(tester).qrVersion == 1);
+
+      expect(qr.readAsBytesSync(), wideBytes);
+      expect(picked.existsSync(), isFalse);
+      await settleReal(
+        tester,
+        () => find.text('QR replaced').evaluate().isNotEmpty,
+      );
+      await tester.tap(find.text('Undo'));
+      await settleReal(tester, () => vmOf(tester).qrVersion == 2);
+      expect(qr.readAsBytesSync(), pngBytes);
+      await tester.pump(const Duration(seconds: 7));
+    },
+  );
+
+  testWidgets('Pick another opens the picker again before anything is saved', (
+    tester,
+  ) async {
+    final (s, ali, qr, _) = await seedQr();
     await openPage(tester, s, ali);
 
-    expect(find.byType(Image), findsNothing);
-    expect(find.text('Save QR to gallery'), findsNothing);
-    await tapIn(tester, find.text("Ali's payment QR"));
-    expect(
-      tester.widget<Image>(find.byType(Image)).semanticLabel,
-      "Ali's payment QR",
+    await tapIn(tester, find.widgetWithText(TextButton, 'Replace QR'));
+    await waitForPreview(tester);
+    expect(find.text('Use this picture?'), findsOneWidget);
+    await tester.tap(find.text('Pick another'));
+    // The first check closes, then the picker runs again and a new check opens.
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
     );
-    final image = find.byType(Image);
-    expect(image, findsOneWidget);
-    expect(tester.widget<Image>(image).key, const ValueKey(0));
-    final provider = tester.widget<Image>(image).image as ResizeImage;
-    expect((provider.imageProvider as FileImage).file.path, qr.path);
-    expect((provider.width, provider.height), (1024, 1024));
-    expect(find.text('Save QR to gallery'), findsOneWidget);
-    expect(
-      find.text('Then open your bank app and pick it from the gallery'),
-      findsOneWidget,
-    );
+    await tester.pumpAndSettle();
+    expect(find.text('Use this picture?'), findsOneWidget);
 
-    // A tap on the QR in the sheet replaces it.
-    await tapIn(tester, find.byType(Image));
-    final vm = vmOf(tester);
-    await settleReal(tester, () => vm.qrVersion == 1);
-
-    expect(tester.widget<Image>(find.byType(Image)).key, const ValueKey(1));
+    // The picker ran a second time and the owner did not agree yet.
+    expect(qr.readAsBytesSync(), pngBytes);
+    expect(vmOf(tester).qrVersion, 0);
+    await tester.tap(find.text("Use as Ali's QR"));
+    await settleReal(tester, () => vmOf(tester).qrVersion == 1);
     expect(qr.readAsBytesSync(), wideBytes);
-    expect(
-      tester.widget<Image>(find.byType(Image)).semanticLabel,
-      "Ali's payment QR",
-    );
+    await tester.pump(const Duration(seconds: 7));
   });
+
+  testWidgets('Remove QR shows Undo and Undo puts the QR back', (tester) async {
+    final (s, ali, qr, _) = await seedQr();
+    await openPage(tester, s, ali);
+    await tapIn(tester, find.text("Ali's payment QR"));
+
+    await tester.tap(find.text('Remove QR'));
+    await settleReal(tester, () => !qr.existsSync());
+    await settle(tester);
+
+    expect(find.text('QR removed'), findsOneWidget);
+    await seek(tester, find.text('Not added yet.'));
+    expect((await s.db.person(ali).getSingle()).qrPath, isNull);
+    await tester.tap(find.text('Undo'));
+    await settleReal(tester, qr.existsSync);
+    await settleReal(tester, () => vmOf(tester).qrAddedAt != null);
+
+    expect(qr.readAsBytesSync(), pngBytes);
+    expect((await s.db.person(ali).getSingle()).qrPath, qr.path);
+    await seek(tester, find.text('Added Thu, 5 Nov'));
+    expect(find.text('Added Thu, 5 Nov'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 7));
+  });
+
+  testWidgets('a refused storage permission shows Open settings on the sheet', (
+    tester,
+  ) async {
+    final device = FakeChannel(deviceChannelName, {
+      'storageAllowed': false,
+      'requestStoragePermission': false,
+      'openAppInfo': null,
+    });
+    final (s, ali, _, _) = await seedQr(device: device);
+    await openPage(tester, s, ali);
+    await tapIn(tester, find.text("Ali's payment QR"));
+
+    await tester.tap(find.text('Save QR to gallery'));
+    await settle(tester);
+
+    expect(find.text('Koban cannot save to the gallery.'), findsWidgets);
+    await tester.tap(find.widgetWithText(TextButton, 'Open settings'));
+    await settle(tester);
+    expect(device.calls.last.method, 'openAppInfo');
+  });
+
+  testWidgets(
+    'the Edit sheet shows the QR day, and a replace shows Undo on the sheet',
+    (tester) async {
+      final (s, ali, qr, _) = await seedQr();
+      await openPage(tester, s, ali);
+
+      await settleReal(tester, () => vmOf(tester).qrAddedAt != null);
+      await tester.tap(find.byTooltip('Edit Ali'));
+      await settle(tester);
+      expect(find.text('Added Thu, 5 Nov'), findsWidgets);
+      await tester.tap(find.widgetWithText(TextButton, 'Replace QR').last);
+      await waitForPreview(tester);
+      await tester.tap(find.text("Use as Ali's QR"));
+      await settleReal(tester, () => vmOf(tester).qrVersion == 1);
+
+      await settleReal(
+        tester,
+        () => find.text('QR replaced.').evaluate().isNotEmpty,
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'Undo'));
+      await settleReal(
+        tester,
+        () => find.text('Old QR put back.').evaluate().isNotEmpty,
+      );
+      expect(qr.readAsBytesSync(), pngBytes);
+    },
+  );
 
   testWidgets('Delete person closes the page at once and shows Undo', (
     tester,
@@ -597,33 +751,6 @@ void main() {
     final back = await s.db.owedItem(item.id).getSingle();
     expect((back.status, back.paidAt), (DebtStatus.open, null));
     await tester.pump(const Duration(seconds: 7));
-  });
-
-  testWidgets('a visible Replace QR button picks a new picture', (
-    tester,
-  ) async {
-    final files = Directory.systemTemp.createTempSync('koban_files');
-    addTearDown(() => files.deleteSync(recursive: true));
-    final picked = File(p.join(files.path, 'picked.png'))
-      ..writeAsBytesSync(wideBytes);
-    final s = await testServices(
-      filesDir: files,
-      pickImage: () async => picked.path,
-    );
-    final ali = await seedAli(s);
-    final qr = File(p.join(files.path, 'qr', '$ali.img'))
-      ..createSync(recursive: true)
-      ..writeAsBytesSync(pngBytes);
-    await s.db.customStatement(
-      'UPDATE split_people SET qrPath = ? WHERE id = ?',
-      [qr.path, ali],
-    );
-    await openPage(tester, s, ali);
-
-    await tapIn(tester, find.widgetWithText(TextButton, 'Replace QR'));
-    await settleReal(tester, () => vmOf(tester).qrVersion == 1);
-
-    expect(qr.readAsBytesSync(), wideBytes);
   });
 
   testWidgets('a person that cannot load shows the message, not Loading', (
