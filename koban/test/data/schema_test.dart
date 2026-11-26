@@ -61,8 +61,11 @@ void main() {
     await newDb.close();
   });
 
-  test('the new database has exactly the 11 Room tables', () {
-    expect(userTables(fresh), userTables(fixture));
+  test('the new database has the 11 Room tables and budget_limits', () {
+    expect(
+      userTables(fresh),
+      [...userTables(fixture), 'budget_limits']..sort(),
+    );
     expect(userTables(fixture).length, 11);
   });
 

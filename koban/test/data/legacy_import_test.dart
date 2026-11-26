@@ -175,7 +175,9 @@ void main() {
     expect(await run(), isA<ImportDone>());
     final old = sqlite3.open('$oldPath.pre-flutter', mode: OpenMode.readOnly);
     addTearDown(old.close);
-    for (final table in newDb.allTables) {
+    for (final table in newDb.allTables.where(
+      (t) => legacyTableOrder.contains(t.actualTableName),
+    )) {
       final name = table.actualTableName;
       final sql = quotedSelect(table);
       final oldRows = old.select(sql).rows;
@@ -320,7 +322,9 @@ void main() {
     File('test/fixtures/room_v11.db').copySync('$dir/original.db');
     final original = sqlite3.open('$dir/original.db', mode: OpenMode.readOnly);
     addTearDown(original.close);
-    for (final table in newDb.allTables) {
+    for (final table in newDb.allTables.where(
+      (t) => legacyTableOrder.contains(t.actualTableName),
+    )) {
       final sql = quotedSelect(table);
       final newRows = [
         for (final row in await newDb.customSelect(sql).get())
