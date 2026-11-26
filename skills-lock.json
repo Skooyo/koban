@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "skills": {
+    "unslop": {
+      "source": "heydamir/unslop",
+      "commit": "620163eedb3529d9cd23a3994ed8d287d06f760d",
+      "sourceType": "github",
+      "skillPath": "skills/unslop/SKILL.md",
+      "computedHash": "34b16270083f9892424a0b41dec4d5f25a73709c9cffa7702e57c723000e6df5",
+      "installMode": "copy"
+    },
+    "unslop-ui": {
+      "source": "felipebasurto/unslop-ui",
+      "commit": "78cf65d311da128c7f0a9ea25f62731056834251",
+      "sourceType": "github",
+      "skillPath": "skills/unslop-ui/SKILL.md",
+      "computedHash": "bca7d731d5dda09a73724c8dd65e4826f14686d28a5a981f61a938fc78ae5b97",
+      "installMode": "copy"
+    }
+  }
+}
