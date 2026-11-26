@@ -37,7 +37,8 @@ class PeriodCalculator {
     return (start.millisecondsSinceEpoch, end.millisecondsSinceEpoch);
   }
 
-  /// Monday-to-Sunday weeks that touch the month. [month] is 0-based.
+  /// The Monday-to-Sunday weeks that touch the month, cut to the days of the month. [month] is 0-based.
+  /// The first week starts on the 1st and the last week ends with the month.
   static List<(int, int)> weeksInMonth(int year, int month) {
     final (monthStart, monthEnd) = rangeForMonth(year, month);
     final weeks = <(int, int)>[];
@@ -49,7 +50,10 @@ class PeriodCalculator {
       final next = DateTime(cursor.year, cursor.month, cursor.day + 7);
       final weekEnd = next.millisecondsSinceEpoch;
       if (weekEnd > monthStart && weekStart < monthEnd) {
-        weeks.add((weekStart, weekEnd));
+        weeks.add((
+          weekStart < monthStart ? monthStart : weekStart,
+          weekEnd > monthEnd ? monthEnd : weekEnd,
+        ));
       }
       cursor = next;
     }
@@ -60,6 +64,17 @@ class PeriodCalculator {
       'Mon ${_shortDate.format(DateTime.fromMillisecondsSinceEpoch(startMs))}'
       ' – '
       'Sun ${_shortDate.format(DateTime.fromMillisecondsSinceEpoch(endMs - 1))}';
+
+  /// "30 Nov" for one day, "2 Nov – 8 Nov" for more. The end is exclusive.
+  static String daysLabel(int startMs, int endMs) {
+    final first = _shortDate.format(
+      DateTime.fromMillisecondsSinceEpoch(startMs),
+    );
+    final last = _shortDate.format(
+      DateTime.fromMillisecondsSinceEpoch(endMs - 1),
+    );
+    return first == last ? first : '$first – $last';
+  }
 
   /// Label such as "October 2026". [month] is 0-based.
   static String monthLabel(int year, int month) =>

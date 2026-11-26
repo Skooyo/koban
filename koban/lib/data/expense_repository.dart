@@ -75,7 +75,7 @@ class ExpenseRepository {
     );
   }
 
-  /// The Monday-to-Sunday weeks of a month with their totals. [month0] is 0-based.
+  /// The weeks of a month with their totals, cut to the days of the month. [month0] is 0-based.
   Future<List<WeekSummary>> weekSummariesForMonth(int year, int month0) async {
     final weeks = <WeekSummary>[];
     for (final (start, end) in PeriodCalculator.weeksInMonth(year, month0)) {
@@ -83,7 +83,7 @@ class ExpenseRepository {
         WeekSummary(
           startMs: start,
           endMs: end,
-          label: PeriodCalculator.weekLabel(start, end),
+          label: PeriodCalculator.daysLabel(start, end),
           total: await _db.totalForRangeOnce(start, end).getSingle(),
         ),
       );

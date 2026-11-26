@@ -491,12 +491,15 @@ class _Segment extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Center(
-              child: Text(
-                label,
-                style: weighted(theme.textTheme.titleSmall!, 600).copyWith(
-                  color: on
-                      ? scheme.onPrimaryContainer
-                      : scheme.onSurfaceVariant,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  label,
+                  style: weighted(theme.textTheme.titleSmall!, 600).copyWith(
+                    color: on
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),

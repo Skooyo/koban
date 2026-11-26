@@ -133,4 +133,17 @@ void main() {
       expect(v.weekStart, isNull);
     },
   );
+
+  test('a week that began last month opens on the 1st', () async {
+    // Wednesday 2 Dec 2026: the week began on Monday 30 Nov.
+    final s = await testServices(now: DateTime(2026, 12, 2, 12));
+    final vm = HomeViewModel(s);
+    addTearDown(vm.dispose);
+    vm.selectActivity(withWeek: true);
+    expect(s.activitySelection.value.month, const YearMonth(2026, 12));
+    expect(
+      s.activitySelection.value.weekStart,
+      DateTime(2026, 12, 1).millisecondsSinceEpoch,
+    );
+  });
 }

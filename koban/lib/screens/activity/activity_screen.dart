@@ -1,9 +1,9 @@
 import 'package:decimal/decimal.dart';
-import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
 import '../../app/routes.dart';
+import '../../data/budget_repository.dart';
 import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../data/summaries.dart';
@@ -20,13 +20,6 @@ import '../payment/payment_view_model.dart';
 import 'activity_mon.dart';
 import 'activity_sheets.dart';
 import 'activity_view_model.dart';
-
-final _dayFormat = DateFormat('d MMM', 'en_US');
-
-String _weekLabel(WeekSummary w) =>
-    '${_dayFormat.format(DateTime.fromMillisecondsSinceEpoch(w.startMs))}'
-    ' – '
-    '${_dayFormat.format(DateTime.fromMillisecondsSinceEpoch(w.endMs - 1))}';
 
 /// The Activity tab: a month with its category bar, weeks and payments, or all payments by month.
 class ActivityScreen extends StatefulWidget {
@@ -102,7 +95,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
         final selected = state.weeks
             .where((w) => w.startMs == state.selectedWeek)
             .firstOrNull;
-        final selectedLabel = selected == null ? null : _weekLabel(selected);
+        final selectedLabel = selected?.label;
         final filter = state.categoryFilter;
         final filterName = filter == null
             ? null
@@ -127,6 +120,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           filtered: filter != null,
           monthLabel: monthLabel,
           breakdown: state.breakdown,
+          overBudget: vm.overBudget,
         );
 
         final slivers = <Widget>[
@@ -140,9 +134,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   face: say.face,
                   line: say.line,
                   detail: say.detail,
-                  action: _FilterButton(
-                    onOpen: _openFilter,
-                    active: filter == null ? 0 : 1,
+                  action: IntrinsicWidth(
+                    child: SegmentedControl(
+                      labels: const ['Month', 'All'],
+                      selectedIndex: state.showAll ? 1 : 0,
+                      onPick: (i) => vm.setShowAll(i == 1),
+                    ),
                   ),
                 ),
                 Padding(
@@ -151,25 +148,58 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _MonthCard(
-                        showAll: state.showAll,
-                        onShowAll: vm.setShowAll,
-                        monthBar: _MonthBar(
-                          label: monthLabel,
-                          canGoNext: state.canGoNext,
-                          onPrevious: vm.previousMonth,
-                          onNext: vm.nextMonth,
-                          onPick: _openMonths,
-                        ),
-                        chart: _ChartBody(
-                          slices: state.slices,
-                          label: selectedLabel == null
-                              ? 'Spent'
-                              : 'Spent, $selectedLabel',
-                          total: state.monthTotal,
-                          received: state.monthReceived,
-                          onBarTap: _openFilter,
-                        ),
+                        monthBar: state.showAll
+                            ? null
+                            : _MonthBar(
+                                label: monthLabel,
+                                canGoNext: state.canGoNext,
+                                onPrevious: vm.previousMonth,
+                                onNext: vm.nextMonth,
+                                onPick: _openMonths,
+                              ),
+                        chart: state.showAll
+                            ? null
+                            : _ChartBody(
+                                slices: state.slices,
+                                label: selectedLabel == null
+                                    ? 'Spent'
+                                    : 'Spent, $selectedLabel',
+                                total: state.monthTotal,
+                                received: state.monthReceived,
+                                onBarTap: _openFilter,
+                              ),
+                        categories:
+                            state.showAll ||
+                                !state.breakdown.any(
+                                  (b) => b.total > Decimal.zero,
+                                )
+                            ? null
+                            : _ByCategory(
+                                breakdown: state.breakdown,
+                                budgets: vm.budgets,
+                                onPick: vm.setCategoryFilter,
+                              ),
+                        filter: filter == null
+                            ? _FilterButton(onOpen: _openFilter)
+                            : _FilterChip(
+                                name: filterName!,
+                                color: sliceColor(
+                                  context,
+                                  filter == uncategorizedFilter ? null : filter,
+                                ),
+                                onOpen: _openFilter,
+                                onClear: () => vm.setCategoryFilter(null),
+                              ),
                       ),
+                      if (!state.showAll)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: _WeekStrip(
+                            weeks: state.weeks,
+                            selected: state.selectedWeek,
+                            onToggle: vm.toggleWeek,
+                          ),
+                        ),
                       const SizedBox(height: 12),
                       _SearchField(controller: _search, onChanged: vm.setQuery),
                       if (vm.loadError case final error?)
@@ -201,25 +231,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                   ),
                           ),
                         ),
-                      if (!state.showAll) ...[
-                        if (state.breakdown.any((b) => b.total > Decimal.zero))
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: _ByCategory(
-                              breakdown: state.breakdown,
-                              onPick: vm.setCategoryFilter,
-                              onOther: _openFilter,
-                            ),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: _WeekStrip(
-                            weeks: state.weeks,
-                            selected: state.selectedWeek,
-                            onToggle: vm.toggleWeek,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -354,30 +365,23 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 }
 
-/// The outlined Filter button. It opens the category sheet.
+/// The Filter button. It opens the category sheet.
 class _FilterButton extends StatelessWidget {
-  const _FilterButton({required this.onOpen, required this.active});
+  const _FilterButton({required this.onOpen});
 
   final VoidCallback onOpen;
-
-  /// How many filters are on. Above 0 the button shows the count and a gold-soft fill.
-  final int active;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final on = active > 0;
-    final color = on ? scheme.onPrimaryContainer : scheme.onSurface;
     return Semantics(
-      label: on ? 'Filter by category, $active on' : 'Filter by category',
+      label: 'Filter by category',
       button: true,
       excludeSemantics: true,
       onTap: onOpen,
       child: Material(
-        color: on
-            ? scheme.primaryContainer
-            : scheme.surfaceContainer.withValues(alpha: 0.7),
+        color: scheme.surfaceContainerHigh,
         shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -389,17 +393,86 @@ class _FilterButton extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.filter_list, size: 18, color: color),
+                  Icon(Icons.filter_list, size: 18, color: scheme.onSurface),
                   const SizedBox(width: 6),
                   Text(
-                    on ? 'Filter · $active' : 'Filter',
-                    style: theme.textTheme.labelLarge!.copyWith(color: color),
+                    'Filter',
+                    style: theme.textTheme.labelLarge!.copyWith(
+                      color: scheme.onSurface,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The chosen category as a chip. A tap on the name opens the sheet. The cross clears the filter.
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.name,
+    required this.color,
+    required this.onOpen,
+    required this.onClear,
+  });
+
+  final String name;
+  final Color color;
+  final VoidCallback onOpen;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Material(
+      color: scheme.primaryContainer,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Semantics(
+              onTapHint: 'Change the category filter',
+              child: InkWell(
+                onTap: onOpen,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CategoryDot(color, size: 12),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            name,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge!.copyWith(
+                              color: scheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: onClear,
+            tooltip: 'Clear filter',
+            color: scheme.onPrimaryContainer,
+            icon: const Icon(Icons.close, size: 18),
+          ),
+        ],
       ),
     );
   }
@@ -482,24 +555,24 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-/// The card under the band: the Month | All switch and, for one month, the month bar and chart.
+/// The card under the band: for one month the month bar, the total, the category bar and the category list. The filter is at the end.
 class _MonthCard extends StatelessWidget {
   const _MonthCard({
-    required this.showAll,
-    required this.onShowAll,
     required this.monthBar,
     required this.chart,
+    required this.categories,
+    required this.filter,
   });
 
-  final bool showAll;
-  final ValueChanged<bool> onShowAll;
-  final Widget monthBar;
-  final Widget chart;
+  final Widget? monthBar;
+  final Widget? chart;
+  final Widget? categories;
+  final Widget filter;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(KobanRadius.r24),
@@ -507,18 +580,10 @@ class _MonthCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: SizedBox(
-              width: 200,
-              child: SegmentedControl(
-                labels: const ['Month', 'All'],
-                selectedIndex: showAll ? 1 : 0,
-                onPick: (i) => onShowAll(i == 1),
-              ),
-            ),
-          ),
-          if (!showAll) ...[monthBar, chart],
+          ?monthBar,
+          ?chart,
+          ?categories,
+          Align(alignment: Alignment.centerLeft, child: filter),
         ],
       ),
     );
@@ -585,64 +650,198 @@ const _byCategoryRows = 4;
 
 String _paymentsCount(int n) => n == 1 ? '1 payment' : '$n payments';
 
-/// The top categories by amount, each a tap to filter. The rest fold into one row that opens the filter sheet.
-class _ByCategory extends StatelessWidget {
+/// The top categories by amount with their share and budget bar, each a tap to filter.
+/// The rest fold into one row that opens in place.
+class _ByCategory extends StatefulWidget {
   const _ByCategory({
     required this.breakdown,
+    required this.budgets,
     required this.onPick,
-    required this.onOther,
   });
 
   final List<CategoryBreakdown> breakdown;
+  final Map<String, CategoryBudget> budgets;
   final ValueChanged<String> onPick;
-  final VoidCallback onOther;
+
+  @override
+  State<_ByCategory> createState() => _ByCategoryState();
+}
+
+class _ByCategoryState extends State<_ByCategory> {
+  var _open = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final all = breakdown.where((b) => b.total > Decimal.zero).toList()
+    final scheme = theme.colorScheme;
+    final all = widget.breakdown.where((b) => b.total > Decimal.zero).toList()
       ..sort((a, b) => b.total.compareTo(a.total));
-    final top = all.take(_byCategoryRows).toList();
     final rest = all.skip(_byCategoryRows).toList();
-    Widget amount(Decimal v) => MoneyAmount(
-      amount: v,
-      style: theme.textTheme.titleMedium!,
-      color: theme.colorScheme.onSurface,
-    );
+    final shown = _open ? all : all.take(_byCategoryRows).toList();
+    final restTotal = rest.fold(Decimal.zero, (sum, b) => sum + b.total);
+    final restName = rest.length == 1
+        ? '1 more category'
+        : '${rest.length} more categories';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeading('By category'),
-        ListGroup(
-          children: [
-            for (final b in top)
-              KobanRow(
-                title: b.name,
-                subtitle: _paymentsCount(b.count),
-                leading: CategoryDot(
-                  sliceColor(context, b.categoryId),
-                  size: 12,
+        for (final b in shown) ...[
+          Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
+          _CategoryRow(
+            item: b,
+            budget: widget.budgets[b.categoryId],
+            onTap: () => widget.onPick(b.categoryId ?? uncategorizedFilter),
+          ),
+        ],
+        if (rest.isNotEmpty) ...[
+          Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
+          Semantics(
+            button: true,
+            expanded: _open,
+            child: InkWell(
+              onTap: () => setState(() => _open = !_open),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _open ? 'Show fewer' : restName,
+                        style: theme.textTheme.labelLarge!.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    if (!_open) ...[
+                      MoneyAmount(
+                        amount: restTotal,
+                        style: theme.textTheme.bodyMedium!,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Icon(
+                      _open ? Icons.expand_less : Icons.expand_more,
+                      size: 20,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
-                trailing: amount(b.total),
-                onTap: () => onPick(b.categoryId ?? uncategorizedFilter),
-                onTapLabel: 'Show ${b.name} payments only',
               ),
-            if (rest.isNotEmpty)
-              KobanRow(
-                title: 'Other categories',
-                subtitle: _paymentsCount(
-                  rest.fold(0, (sum, b) => sum + b.count),
-                ),
-                leading: CategoryDot(MoneyColors.of(context).other, size: 12),
-                trailing: amount(
-                  rest.fold(Decimal.zero, (sum, b) => sum + b.total),
-                ),
-                onTap: onOther,
-                onTapLabel: 'Choose a category',
-              ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// A category: dot, name, share and amount. With a [budget]: a bar and "RM 452.80 of RM 500.00".
+class _CategoryRow extends StatelessWidget {
+  const _CategoryRow({
+    required this.item,
+    required this.budget,
+    required this.onTap,
+  });
+
+  final CategoryBreakdown item;
+  final CategoryBudget? budget;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = theme.textTheme.bodyMedium!.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    final dotColor = sliceColor(context, item.categoryId);
+    final percent = '${(item.fraction * 100).round()}%';
+    final b = budget;
+    Widget? budgetLines;
+    if (b != null) {
+      final colors = MoneyColors.of(context);
+      final (barColor, note, noteColor) = switch (b.state) {
+        BudgetState.under => (
+          dotColor,
+          '${rm(b.limit - b.spent)} left',
+          scheme.onSurfaceVariant,
+        ),
+        BudgetState.warn => (
+          colors.warn,
+          '${rm(b.limit - b.spent)} left',
+          colors.warn,
+        ),
+        BudgetState.over => (scheme.error, '${rm(b.over)} over', scheme.error),
+      };
+      budgetLines = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: ExcludeSemantics(
+              child: RelativeBar(
+                total: b.spent,
+                max: b.limit,
+                color: barColor,
+                height: 6,
+              ),
+            ),
+          ),
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 8,
+            children: [
+              Text('${rm(b.spent)} of ${rm(b.limit)}', style: muted),
+              Text(
+                note,
+                style: weighted(
+                  theme.textTheme.bodyMedium!,
+                  b.state == BudgetState.under ? 500 : 800,
+                ).copyWith(color: noteColor),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+    return Semantics(
+      onTapHint: 'Show ${item.name} payments only',
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    CategoryDot(dotColor, size: 12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        item.name,
+                        style: theme.textTheme.titleMedium!.copyWith(
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(percent, style: tabular(muted)),
+                    const SizedBox(width: 12),
+                    MoneyAmount(
+                      amount: item.total,
+                      style: theme.textTheme.titleMedium!,
+                    ),
+                  ],
+                ),
+                ?budgetLines,
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -786,7 +985,7 @@ class _WeekStripState extends State<_WeekStrip> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _weekLabel(week),
+                        week.label,
                         style: theme.textTheme.labelMedium!.copyWith(
                           color: color,
                         ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
@@ -195,8 +196,12 @@ class HomeViewModel extends ChangeNotifier with LoadErrors {
   /// Points the Activity tab at the current month, with the current week when [withWeek].
   void selectActivity({required bool withWeek}) {
     final n = _s.now();
+    // A week chip starts on the 1st when the week began in the month before.
     final weekStart = withWeek
-        ? PeriodCalculator.range(SpendingPeriod.week, anchor: n).$1
+        ? math.max(
+            PeriodCalculator.range(SpendingPeriod.week, anchor: n).$1,
+            PeriodCalculator.rangeForMonth(n.year, n.month - 1).$1,
+          )
         : null;
     _s.activitySelection.show(YearMonth(n.year, n.month), weekStart: weekStart);
   }

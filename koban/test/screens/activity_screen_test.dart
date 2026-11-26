@@ -7,7 +7,9 @@ import 'package:koban/screens/activity/activity_view_model.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/activity/activity_screen.dart';
 import 'package:koban/theme/mon.dart';
+import 'package:koban/theme/koban_theme.dart';
 import 'package:koban/ui/kit.dart';
+import 'package:koban/ui/money.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
@@ -76,9 +78,10 @@ void main() {
     final card = find
         .ancestor(of: find.text('Spent'), matching: find.byType(Container))
         .first;
+    // The big total, and the Food row of the category list.
     expect(
       find.descendant(of: card, matching: find.text('RM 15.00')),
-      findsOneWidget,
+      findsNWidgets(2),
     );
   });
 
@@ -134,7 +137,7 @@ void main() {
   });
 
   testWidgets(
-    'By category lists the top four by amount, folds the rest, and a tap filters',
+    'the category list shows the share, folds the rest in place, and a tap filters',
     (tester) async {
       final s = await testServices();
       final at = DateTime(2026, 11, 10, 9);
@@ -151,20 +154,33 @@ void main() {
       await pay(s, '99.00', at, merchant: 'Ali', type: TransactionType.receive);
       await pumpActivity(tester, s);
 
-      expect(find.text('By category'), findsOneWidget);
-      Finder row(String name) => find.widgetWithText(KobanRow, name);
+      Finder row(String name) => find
+          .ancestor(of: find.text(name), matching: find.byType(InkWell))
+          .first;
       Finder inRow(String name, String text) =>
           find.descendant(of: row(name), matching: find.text(text));
-      expect(inRow('Food & Dining', '3 payments'), findsOneWidget);
+      expect(find.text('By category'), findsNothing);
+      // Of RM 128.00: 50.00 is 39%, 30.00 is 23%, 20.00 is 16%, 15.00 is 12%.
+      expect(inRow('Food & Dining', '39%'), findsOneWidget);
       expect(inRow('Food & Dining', 'RM 50.00'), findsOneWidget);
-      expect(inRow('Transport', '2 payments'), findsOneWidget);
+      expect(inRow('Transport', '23%'), findsOneWidget);
       expect(inRow('Transport', 'RM 30.00'), findsOneWidget);
-      expect(inRow('Shopping', '1 payment'), findsOneWidget);
+      expect(inRow('Shopping', '16%'), findsOneWidget);
+      expect(inRow('Bills & Utilities', '12%'), findsOneWidget);
       expect(inRow('Bills & Utilities', 'RM 15.00'), findsOneWidget);
-      // Health (8.00) and Other (5.00) fold into one row.
-      expect(row('Health'), findsNothing);
-      expect(inRow('Other categories', '2 payments'), findsOneWidget);
-      expect(inRow('Other categories', 'RM 13.00'), findsOneWidget);
+      // Health (8.00) and Other (5.00) fold into one row that opens in place.
+      expect(find.text('Health'), findsNothing);
+      expect(find.text('Other categories'), findsNothing);
+      expect(find.text('2 more categories'), findsOneWidget);
+      expect(find.text('RM 13.00'), findsOneWidget);
+      await tester.tap(find.text('2 more categories'));
+      await tester.pumpAndSettle();
+      expect(inRow('Health', 'RM 8.00'), findsOneWidget);
+      expect(inRow('Other', 'RM 5.00'), findsOneWidget);
+      expect(find.text('Show fewer'), findsOneWidget);
+      await tester.tap(find.text('Show fewer'));
+      await tester.pumpAndSettle();
+      expect(find.text('Health'), findsNothing);
 
       await tester.tap(row('Transport'));
       await tester.pumpAndSettle();
@@ -172,15 +188,76 @@ void main() {
       expect(find.text('Grab 2'), findsOneWidget);
       expect(find.text('Kedai A'), findsNothing);
       expect(find.text('Mall'), findsNothing);
+      // The filter is a chip with a clear button in the month card.
+      expect(find.text('Filter'), findsNothing);
+      await tester.tap(find.byTooltip('Clear filter'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kedai A'), findsOneWidget);
+      expect(find.text('Filter'), findsOneWidget);
     },
   );
 
-  testWidgets('By category does not show for a month with no payment', (
+  testWidgets('the category list does not show for a month with no payment', (
     tester,
   ) async {
     await pumpActivity(tester, await testServices());
-    expect(find.text('By category'), findsNothing);
+    expect(find.text('Food & Dining'), findsNothing);
+    expect(find.textContaining('more categor'), findsNothing);
   });
+
+  testWidgets(
+    'budget bars: category color under 80%, warn from 80%, error with the amount over at 100%',
+    (tester) async {
+      final s = await testServices();
+      final at = DateTime(2026, 11, 10, 9);
+      await pay(s, '85.00', at, merchant: 'Kedai A');
+      await pay(s, '56.70', at, category: 'transport', merchant: 'Grab');
+      await pay(s, '10.00', at, category: 'shopping', merchant: 'Mall');
+      await pay(s, '5.00', at, category: 'bills', merchant: 'Telco');
+      await s.budgets.setLimit('food', Decimal.parse('100'));
+      await s.budgets.setLimit('transport', Decimal.parse('20'));
+      await s.budgets.setLimit('shopping', Decimal.parse('100'));
+      await pumpActivity(tester, s);
+
+      expect(find.text('RM 85.00 of RM 100.00'), findsOneWidget);
+      expect(find.text('RM 15.00 left'), findsOneWidget);
+      expect(find.text('RM 56.70 of RM 20.00'), findsOneWidget);
+      expect(find.text('RM 36.70 over'), findsOneWidget);
+      expect(find.text('RM 10.00 of RM 100.00'), findsOneWidget);
+      expect(find.text('RM 90.00 left'), findsOneWidget);
+      // Bills has no limit: no bar.
+      expect(find.textContaining('of RM'), findsNWidgets(3));
+      // The bars sit in the order of the rows: Food, Transport, Shopping (by amount).
+      final bars = tester.widgetList<RelativeBar>(find.byType(RelativeBar));
+      final context = tester.element(find.byType(ActivityScreen));
+      final colors = MoneyColors.of(context);
+      expect(bars.map((b) => b.color).toList(), <Color?>[
+        colors.warn,
+        Theme.of(context).colorScheme.error,
+        colors.purple,
+      ]);
+      expect(find.text('Transport is over its limit.'), findsOneWidget);
+
+      // A week has no budget bar: the limit is for the month.
+      await tester.tap(find.text('9 Nov – 15 Nov'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('of RM'), findsNothing);
+      await tester.ensureVisible(find.text('Whole month'));
+      await tester.tap(find.text('Whole month'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('of RM'), findsNWidgets(3));
+
+      // October has no limit and no bar.
+      await pay(s, '30.00', DateTime(2026, 10, 10, 9), merchant: 'Kedai B');
+      await tester.tap(find.byTooltip('Previous month'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kedai B'), findsOneWidget);
+      expect(find.textContaining('of RM'), findsNothing);
+      await tester.tap(find.byTooltip('Next month'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('of RM'), findsNWidgets(3));
+    },
+  );
 
   testWidgets('Next month is off at the current month', (tester) async {
     await pumpActivity(tester, await testServices());
@@ -216,7 +293,7 @@ void main() {
   });
 
   testWidgets(
-    'the category sheet filters the list and All categories clears it',
+    'the category sheet filters the list and the chip cross clears it',
     (tester) async {
       final s = await testServices();
       await pay(s, '5.00', DateTime(2026, 11, 13, 9));
@@ -242,10 +319,9 @@ void main() {
       expect(find.text('Kedai Contoh'), findsNothing);
       // The summary row shows the category, the count and the spent total of the month.
       expect(find.text('1 payment, November 2026'), findsOneWidget);
-      expect(find.text('Filter \u00b7 1'), findsOneWidget);
-      await tester.tap(find.text('Filter \u00b7 1'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('All categories'));
+      // The filter shows as a chip with the name. The cross clears it.
+      expect(find.text('Filter'), findsNothing);
+      await tester.tap(find.byTooltip('Clear filter'));
       await tester.pumpAndSettle();
       expect(find.text('1 payment, November 2026'), findsNothing);
       expect(find.text('Filter'), findsOneWidget);
@@ -333,16 +409,9 @@ void main() {
     await tester.tap(find.text('Transport').last);
     await tester.pumpAndSettle();
 
-    // The Filter button counts the category filter. The 7-Eleven note match is Food.
-    expect(find.text('Filter \u00b7 1'), findsOneWidget);
-    final button = find.ancestor(
-      of: find.text('Filter \u00b7 1'),
-      matching: find.byType(Material),
-    );
-    expect(
-      tester.widget<Material>(button.first).color,
-      Theme.of(tester.element(button.first)).colorScheme.primaryContainer,
-    );
+    // The chip shows the category filter. The 7-Eleven note match is Food.
+    expect(find.text('Filter'), findsNothing);
+    expect(find.byTooltip('Clear filter'), findsOneWidget);
     expect(find.text('Transport, "grab"'), findsOneWidget);
     expect(find.text('2 payments, November 2026'), findsOneWidget);
     final summary = find.widgetWithText(KobanRow, 'Transport, "grab"');
@@ -481,8 +550,10 @@ void main() {
     final s = await testServices();
     await pay(s, '5.00', DateTime(2026, 11, 13, 9));
     await pay(s, '50.00', DateTime(2026, 10, 13, 9), merchant: 'Kedai Ali');
+    await s.budgets.setLimit('food', Decimal.parse('4.5'));
     await pumpActivity(tester, s);
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await tester.tap(find.text('All'));
     await tester.pumpAndSettle();
@@ -493,7 +564,9 @@ void main() {
   testWidgets('Activity works at text scale 1.3', (tester) async {
     final s = await testServices();
     await pay(s, '5.00', DateTime(2026, 11, 13, 9));
+    await s.budgets.setLimit('food', Decimal.parse('4'));
     await pumpActivity(tester, s, textScale: 1.3);
+    expect(find.text('RM 1.00 over'), findsOneWidget);
     await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Food & Dining').last);
@@ -503,27 +576,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a week over the month edge shows its dates and its total', (
-    tester,
-  ) async {
+  testWidgets('week chips count only the days of the month', (tester) async {
     final s = await testServices();
     await pay(s, '9.00', DateTime(2026, 10, 30, 9), merchant: 'Kedai Ali');
     await pay(s, '2.00', DateTime(2026, 11, 1, 9));
+    await pay(s, '4.00', DateTime(2026, 11, 30, 9), merchant: 'Kedai Bob');
     await pumpActivity(tester, s);
-    await tester.tap(find.text('26 Oct – 1 Nov'));
+    expect(find.text('26 Oct – 1 Nov'), findsNothing);
+    expect(find.text('30 Nov – 6 Dec'), findsNothing);
+    expect(find.text('30 Nov'), findsOneWidget);
+    await tester.ensureVisible(find.text('1 Nov'));
+    await tester.tap(find.text('1 Nov'));
     await tester.pumpAndSettle();
-    expect(find.text('Spent, 26 Oct – 1 Nov'), findsOneWidget);
+    expect(find.text('Spent, 1 Nov'), findsOneWidget);
     final card = find
         .ancestor(
-          of: find.text('Spent, 26 Oct – 1 Nov'),
+          of: find.text('Spent, 1 Nov'),
           matching: find.byType(Container),
         )
         .first;
+    // The big total, and the Food row of the category list.
     expect(
-      find.descendant(of: card, matching: find.text('RM 11.00')),
-      findsOneWidget,
+      find.descendant(of: card, matching: find.text('RM 2.00')),
+      findsNWidgets(2),
     );
-    expect(find.text('Kedai Ali'), findsOneWidget);
+    expect(find.text('Kedai Ali'), findsNothing);
+    expect(find.text('Kedai Bob'), findsNothing);
   });
 
   testWidgets('the day labels follow the clock after midnight', (tester) async {
