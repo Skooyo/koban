@@ -11,6 +11,7 @@ import '../../theme/tokens.dart';
 import '../../ui/kit.dart';
 import '../../ui/money.dart';
 import '../../ui/scene_band.dart';
+import '../../ui/sheets.dart';
 import '../person/person_dialogs.dart' show personDate;
 import 'people_view_model.dart';
 
@@ -55,11 +56,18 @@ class _PeopleScreenState extends State<PeopleScreen> {
   }
 
   Future<void> _add() async {
-    final id = await showDialog<String>(
+    final messenger = ScaffoldMessenger.of(context);
+    final added = await showKobanSheet<({String id, String? qrError})>(
       context: context,
-      builder: (_) => _AddPersonDialog(onAdd: _vm!.add),
+      builder: (_) => _AddPersonSheet(vm: _vm!),
     );
-    if (id != null && mounted) await openPerson(context, id);
+    if (added == null || !mounted) return;
+    if (added.qrError case final error?) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('$error Add the QR on the person page.')),
+      );
+    }
+    await openPerson(context, added.id);
   }
 
   @override
@@ -96,11 +104,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
               face: say.face,
               line: say.line,
               detail: say.detail,
-              stats: [
-                if (totals.owedCount > 0)
-                  '${totals.owedCount} ${totals.owedCount == 1 ? 'owes' : 'owe'} you',
-                if (totals.oweCount > 0) 'You owe ${totals.oweCount}',
-              ],
+              compact: true,
               action: SceneIconButton(
                 icon: Icons.person_add,
                 tooltip: 'Add person',
@@ -162,7 +166,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                         for (final bill in bills)
                           KobanRow(
                             key: ValueKey(bill.id),
-                            title: bill.merchant ?? 'Split bill',
+                            title: bill.merchant ?? 'Split',
                             trailing: Text(
                               personDate(bill.billTime),
                               style: theme.textTheme.bodyMedium!.copyWith(
@@ -240,6 +244,12 @@ class _BalanceCard extends StatelessWidget {
     );
     final owed = totals.owedCount > 0;
     final owe = totals.oweCount > 0;
+    final net = totals.owed - totals.owe;
+    final label = switch (net.sign) {
+      1 => owe ? 'Owed to you, after what you owe' : 'Owed to you',
+      -1 => owed ? 'You owe, after what is owed to you' : 'You owe',
+      _ => 'Even',
+    };
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -255,24 +265,26 @@ class _BalanceCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(label, style: muted),
                   MoneyText(
-                    owed ? '+ ${rm(totals.owed)}' : rm(totals.owe),
+                    net.sign > 0 ? '+ ${rm(net)}' : rm(net.abs()),
                     style: theme.textTheme.displayMedium,
-                    color: owed
+                    color: net.sign > 0
                         ? MoneyColors.of(context).received
                         : scheme.onSurface,
                   ),
-                  Text(owed ? 'owed to you' : 'you owe', style: muted),
+                  Text(
+                    '${rm(totals.owed)} owed to you, ${rm(totals.owe)} you owe',
+                    style: muted,
+                  ),
                 ],
               ),
             ),
-            if (owed && owe)
-              Text('You owe ${rm(totals.owe)} in return.', style: muted),
             const SizedBox(height: 8),
           ],
           FilledButton.icon(
             onPressed: onSplit,
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 56)),
             icon: const Icon(Icons.receipt, size: 18),
             label: const Text('Split a bill'),
           ),
@@ -349,29 +361,47 @@ class _PersonRow extends StatelessWidget {
   }
 }
 
-/// Asks for a name. It closes with the id of the person.
+/// Asks for a name, and a QR if the owner has one. It closes with the id of the person.
 /// It stays open with the message when the repository refuses the name.
-class _AddPersonDialog extends StatefulWidget {
-  const _AddPersonDialog({required this.onAdd});
+class _AddPersonSheet extends StatefulWidget {
+  const _AddPersonSheet({required this.vm});
 
-  final Future<String> Function(String name) onAdd;
+  final PeopleViewModel vm;
 
   @override
-  State<_AddPersonDialog> createState() => _AddPersonDialogState();
+  State<_AddPersonSheet> createState() => _AddPersonSheetState();
 }
 
-class _AddPersonDialogState extends State<_AddPersonDialog> {
+class _AddPersonSheetState extends State<_AddPersonSheet> {
   var _name = '';
+  String? _qrPath;
   String? _error;
   var _saving = false;
+  var _picking = false;
+
+  Future<void> _pick() async {
+    if (_picking) return;
+    _picking = true;
+    try {
+      final path = await widget.vm.pickQr();
+      if (path != null && mounted) setState(() => _qrPath = path);
+    } catch (e, s) {
+      FlutterError.reportError(
+        FlutterErrorDetails(exception: e, stack: s, library: 'PeopleScreen'),
+      );
+      if (mounted) setState(() => _error = 'Could not open your pictures.');
+    } finally {
+      _picking = false;
+    }
+  }
 
   Future<void> _save() async {
     if (_saving) return;
     setState(() => _saving = true);
-    String? id;
+    ({String id, String? qrError})? added;
     String? error;
     try {
-      id = await widget.onAdd(_name);
+      added = await widget.vm.add(_name, qrPath: _qrPath);
     } on KobanUserError catch (e) {
       error = e.message;
     } catch (e, s) {
@@ -385,30 +415,112 @@ class _AddPersonDialogState extends State<_AddPersonDialog> {
       _error = error;
       _saving = false;
     });
-    if (id != null) Navigator.pop(context, id);
+    if (added != null) Navigator.pop(context, added);
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-    title: const Text('Add person'),
-    content: DialogTextField(
-      value: _name,
-      onChanged: (v) => setState(() {
-        _name = v;
-        _error = null;
-      }),
-      label: 'Name',
-      isError: _error != null,
-      supportingText: _error,
-      textCapitalization: TextCapitalization.words,
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final name = _name.trim();
+    final hasQr = _qrPath != null;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        16 + MediaQuery.viewInsetsOf(context).bottom,
       ),
-      TextButton(onPressed: _saving ? null : _save, child: const Text('Add')),
-    ],
-  );
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 16,
+          children: [
+            Semantics(
+              header: true,
+              child: Text(
+                'Add person',
+                style: weighted(theme.textTheme.titleLarge!, 800),
+              ),
+            ),
+            DialogTextField(
+              value: _name,
+              onChanged: (v) => setState(() {
+                _name = v;
+                _error = null;
+              }),
+              label: 'Name',
+              isError: _error != null,
+              supportingText: _error,
+              textCapitalization: TextCapitalization.words,
+            ),
+            Material(
+              color: scheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: _pick,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 56),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      spacing: 12,
+                      children: [
+                        Icon(Icons.qr_code_2, color: scheme.onSurfaceVariant),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                hasQr
+                                    ? 'Payment QR'
+                                    : name.isEmpty
+                                    ? 'Add their payment QR'
+                                    : "Add $name's payment QR",
+                                style: weighted(
+                                  theme.textTheme.titleSmall!,
+                                  700,
+                                ),
+                              ),
+                              Text(
+                                hasQr
+                                    ? 'Picture chosen.'
+                                    : 'Optional. A picture from your gallery.',
+                                style: theme.textTheme.bodyMedium!.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (hasQr)
+                          Text(
+                            'Replace',
+                            style: weighted(
+                              theme.textTheme.labelLarge!,
+                              800,
+                            ).copyWith(color: scheme.onSurface),
+                          )
+                        else
+                          Icon(Icons.add, color: scheme.onSurfaceVariant),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 56)),
+              child: const Text('Add person'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

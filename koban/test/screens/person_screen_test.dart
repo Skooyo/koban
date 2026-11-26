@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/app/routes.dart';
+import 'package:koban/data/user_error.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/person/person_screen.dart';
 import 'package:koban/screens/person/person_view_model.dart';
@@ -140,13 +142,14 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Kedai Contoh')).dy),
     );
     expect(find.text('Ali owes you'), findsNWidgets(2));
-    expect(find.text('From 2 split bills. Oldest: Today.'), findsOneWidget);
+    expect(find.text('From 2 splits. Oldest: Today.'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Send reminder'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Settle up'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Settle up'), findsNothing);
     // The QR is a row, not a box on top of the page.
     await seek(tester, find.text("Ali's payment QR"));
-    expect(find.text('Not added yet. Tap to add it.'), findsOneWidget);
+    expect(find.text('Not added yet.'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Add QR'), findsOneWidget);
     expect(find.text('Add their payment QR'), findsNothing);
     for (final text in ['Kedai Contoh', 'Cash', 'You owe Ali', 'Parking']) {
       await seek(tester, find.text(text));
@@ -182,10 +185,7 @@ void main() {
     for (final w in tester.widgetList<Text>(amount)) {
       expect(w.style?.color ?? w.textSpan?.style?.color, ink);
     }
-    expect(
-      find.text('From 1 split bill. Oldest: Sat, 31 Oct.'),
-      findsOneWidget,
-    );
+    expect(find.text('From 1 split. Oldest: Sat, 31 Oct.'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Settle up'), findsOneWidget);
     expect(find.text('Send reminder'), findsNothing);
     expect(find.byType(FilledButton), findsOneWidget);
@@ -203,12 +203,12 @@ void main() {
 
     expect(device.calls.single.method, 'shareText');
     expect(device.calls.single.arguments, {
-      'text': 'Hi Ali, you owe me RM 30.00 for 2 bills (Koban).',
+      'text': 'Hi Ali, you owe me RM 30.00 for 2 splits (Koban).',
       'chooserTitle': 'Send reminder',
     });
   });
 
-  testWidgets('Settle up asks with the counts and closes everything', (
+  testWidgets('Settle up says who pays whom and closes everything', (
     tester,
   ) async {
     final s = await testServices();
@@ -217,10 +217,12 @@ void main() {
 
     await tapIn(tester, find.widgetWithText(OutlinedButton, 'Settle up'));
     expect(inDialog(find.text('Settle up with Ali?')), findsOneWidget);
+    expect(inDialog(find.text('+ RM 30.00')), findsOneWidget);
     expect(
       inDialog(
         find.text(
-          "Closes 2 split bill debts and 1 item you owe. Split bills it touches can't be edited after this.",
+          'Ali pays you RM 30.00. This closes 2 splits: Kedai Contoh and Cash; '
+          '1 item you owe: Parking. You cannot change their items after this.',
         ),
       ),
       findsOneWidget,
@@ -235,7 +237,9 @@ void main() {
     expect(debts.map((x) => x.status), [DebtStatus.paid, DebtStatus.paid]);
   });
 
-  testWidgets('add what I owe checks the fields in the dialog', (tester) async {
+  testWidgets('add what I owe keeps Save off until the amount is above zero', (
+    tester,
+  ) async {
     final s = await testServices();
     final ali = await seedAli(s);
     await openPage(tester, s, ali);
@@ -243,7 +247,18 @@ void main() {
     await tapIn(tester, find.widgetWithText(TextButton, 'Add what I owe'));
     expect(inDialog(find.text('Add what I owe')), findsOneWidget);
     expect(inDialog(find.text('Fri, 13 Nov 2026')), findsOneWidget);
-    await tapIn(tester, inDialog(find.text('Save')));
+    expect(inDialog(find.text('RM ')), findsOneWidget);
+    final save = inDialog(find.widgetWithText(TextButton, 'Save'));
+    expect(tester.widget<TextButton>(save).onPressed, isNull);
+
+    final amount = inDialog(find.widgetWithText(TextField, 'Amount'));
+    await tester.enterText(amount, '0');
+    await tester.pump();
+    expect(tester.widget<TextButton>(save).onPressed, isNull);
+    await tester.enterText(amount, '3.50');
+    await tester.pump();
+    expect(tester.widget<TextButton>(save).onPressed, isNotNull);
+    await tapIn(tester, save);
     expect(inDialog(find.text('Enter what it was for.')), findsOneWidget);
 
     await tester.enterText(
@@ -252,14 +267,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Enter what it was for.'), findsNothing);
-    await tapIn(tester, inDialog(find.text('Save')));
-    expect(inDialog(find.text('Enter an amount above zero.')), findsOneWidget);
-
-    await tester.enterText(
-      inDialog(find.widgetWithText(TextField, 'Amount')),
-      '3.50',
-    );
-    await tapIn(tester, inDialog(find.text('Save')));
+    await tapIn(tester, save);
 
     expect(find.byType(AlertDialog), findsNothing);
     await seek(tester, find.text('Teh'));
@@ -276,9 +284,14 @@ void main() {
       await openPage(tester, s, ali);
 
       await tapIn(tester, find.text('Cash'));
-      expect(inDialog(find.text('Edit what Ali owes me')), findsOneWidget);
+      expect(inDialog(find.text('Edit what Ali owes you')), findsOneWidget);
       expect(inDialog(find.text('20.00')), findsOneWidget);
-      expect(inDialog(find.text('Delete')), findsOneWidget);
+      // Delete sits at the left end of the button row, apart from Save.
+      final delete = tester.getTopLeft(inDialog(find.text('Delete'))).dx;
+      expect(
+        delete,
+        lessThan(tester.getTopLeft(inDialog(find.text('Cancel'))).dx),
+      );
       await tapIn(tester, inDialog(find.text('Cancel')));
 
       await tapIn(tester, find.text('Kedai Contoh'));
@@ -307,10 +320,20 @@ void main() {
         matching: find.widgetWithText(TextButton, 'Mark paid'),
       ),
     );
-    expect(inDialog(find.text('Mark paid')), findsOneWidget);
-    expect(inDialog(find.text('RM 14.00 from Ali, 13 Nov')), findsOneWidget);
+    expect(inDialog(find.text('Mark RM 14.00 paid')), findsOneWidget);
+    expect(
+      inDialog(find.text('Kedai Contoh, Fri, 13 Nov. How did Ali pay?')),
+      findsOneWidget,
+    );
+    expect(inDialog(find.text('RM 14.00 received')), findsOneWidget);
+    expect(inDialog(find.text('Fri, 13 Nov · Ali')), findsOneWidget);
     expect(inDialog(find.text('Paid in cash')), findsOneWidget);
-    await tapIn(tester, inDialog(find.text('RM 14.00 from Ali, 13 Nov')));
+    // One tap on a choice marks nothing. Mark paid does.
+    await tapIn(tester, inDialog(find.text('Paid in cash')));
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect((await s.db.debt(splitDebt).getSingle()).status, DebtStatus.open);
+    await tapIn(tester, inDialog(find.text('RM 14.00 received')));
+    await tapIn(tester, inDialog(find.widgetWithText(TextButton, 'Mark paid')));
 
     expect(find.byType(AlertDialog), findsNothing);
     final debt = await s.db.debt(splitDebt).getSingle();
@@ -336,17 +359,26 @@ void main() {
       );
       final vm = vmOf(tester);
 
-      vm.markItemPaid(vm.detail!.iOwe.single.id);
+      // An open transaction queues every other query: the first action stays busy.
+      final release = Completer<void>();
+      unawaited(s.db.transaction(() => release.future));
+      vm.markItemPaid(vm.detail!.iOwe.single.id, 'Marked paid');
       await tester.tap(inDialog(find.text('Paid in cash')));
-      await tester.pumpAndSettle();
-      expect(inDialog(find.text('Mark paid')), findsOneWidget);
+      await tester.tap(inDialog(find.widgetWithText(TextButton, 'Mark paid')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Try again in a moment.'), findsOneWidget);
+      expect(inDialog(find.text('Mark RM 20.00 paid')), findsOneWidget);
+      release.complete();
       await settle(tester);
 
       expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.text('Try again in a moment.'), findsOneWidget);
       expect((await s.db.debt(cashDebt).getSingle()).status, DebtStatus.open);
 
-      await tapIn(tester, inDialog(find.text('Paid in cash')));
+      await tapIn(
+        tester,
+        inDialog(find.widgetWithText(TextButton, 'Mark paid')),
+      );
       expect(find.byType(AlertDialog), findsNothing);
       expect((await s.db.debt(cashDebt).getSingle()).status, DebtStatus.paid);
     },
@@ -415,7 +447,8 @@ void main() {
     await s.people.settleUp(ali);
     final opener = await openPage(tester, s, ali);
 
-    await tapIn(tester, find.byTooltip('More options'));
+    await tapIn(tester, find.byTooltip('Edit Ali'));
+    expect(find.text('Edit Ali'), findsOneWidget);
     await tapIn(tester, find.text('Delete person'));
     await settle(tester);
 
@@ -425,6 +458,138 @@ void main() {
     expect(find.text('Ali deleted'), findsOneWidget);
     expect(find.text('Undo'), findsOneWidget);
     expect((await s.db.person(ali).getSingle()).archived, isTrue);
+  });
+
+  testWidgets('Edit sheet renames, and Delete person says why it is off', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final ali = await seedAli(s);
+    await openPage(tester, s, ali);
+
+    await tapIn(tester, find.byTooltip('Edit Ali'));
+    expect(find.text('Edit Ali'), findsOneWidget);
+    expect(find.text('Payment QR'), findsOneWidget);
+    expect(find.text('Not added yet'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, 'Delete person'))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      find.text('Settle up first. Ali owes you RM 30.00.'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Name'),
+      'Ali Hassan',
+    );
+    await tapIn(tester, find.text('Save changes'));
+
+    expect(find.text('Save changes'), findsNothing);
+    expect((await s.db.person(ali).getSingle()).name, 'Ali Hassan');
+    expect(find.text('Ali Hassan owes you'), findsWidgets);
+  });
+
+  testWidgets('an even balance has no Settle up button', (tester) async {
+    final s = await testServices();
+    final ali = await s.people.addPerson('Ali');
+    await s.people.addOwedToMe(ali, 'Cash', d('5'), day);
+    await s.people.addOwedItem(ali, 'Parking', d('5'), day);
+    await openPage(tester, s, ali);
+
+    expect(find.text("You're even"), findsOneWidget);
+    expect(find.text('Settle up'), findsNothing);
+    expect(find.text('Send reminder'), findsNothing);
+  });
+
+  testWidgets('Mark paid on what I owe shows Undo, and Undo puts it back', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final ali = await seedAli(s);
+    await openPage(tester, s, ali);
+
+    final item = await s.db.select(s.db.owedItems).getSingle();
+    await tapIn(
+      tester,
+      find.descendant(
+        of: find.byKey(ValueKey(item.id)),
+        matching: find.widgetWithText(TextButton, 'Mark paid'),
+      ),
+    );
+    expect(find.text('Marked paid: Parking'), findsOneWidget);
+    expect((await s.db.owedItem(item.id).getSingle()).status, DebtStatus.paid);
+
+    await tester.tap(find.text('Undo'));
+    await settle(tester);
+    final back = await s.db.owedItem(item.id).getSingle();
+    expect((back.status, back.paidAt), (DebtStatus.open, null));
+    await tester.pump(const Duration(seconds: 7));
+  });
+
+  testWidgets('a visible Replace QR button picks a new picture', (
+    tester,
+  ) async {
+    final files = Directory.systemTemp.createTempSync('koban_files');
+    addTearDown(() => files.deleteSync(recursive: true));
+    final picked = File(p.join(files.path, 'picked.png'))
+      ..writeAsBytesSync(wideBytes);
+    final s = await testServices(
+      filesDir: files,
+      pickImage: () async => picked.path,
+    );
+    final ali = await seedAli(s);
+    final qr = File(p.join(files.path, 'qr', '$ali.img'))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(pngBytes);
+    await s.db.customStatement(
+      'UPDATE split_people SET qrPath = ? WHERE id = ?',
+      [qr.path, ali],
+    );
+    await openPage(tester, s, ali);
+
+    await tapIn(tester, find.widgetWithText(TextButton, 'Replace QR'));
+    await settleReal(tester, () => vmOf(tester).qrVersion == 1);
+
+    expect(qr.readAsBytesSync(), wideBytes);
+  });
+
+  testWidgets('a person that cannot load shows the message, not Loading', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final ali = await seedAli(s);
+    await s.db.customStatement('DROP TABLE owed_items');
+    await openPage(tester, s, ali);
+
+    expect(find.text(loadFailedMessage), findsOneWidget);
+    expect(find.text('Loading'), findsNothing);
+  });
+
+  testWidgets('the new sheet and dialogs fit at text scale 1.3', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final ali = await seedAli(s);
+    await openPage(tester, s, ali, textScale: 1.3);
+
+    await tapIn(tester, find.byTooltip('Edit Ali'));
+    expect(tester.takeException(), isNull);
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await tester.tapAt(const Offset(10, 10));
+    await settle(tester);
+
+    await tapIn(tester, find.widgetWithText(OutlinedButton, 'Settle up'));
+    expect(tester.takeException(), isNull);
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await tapIn(tester, inDialog(find.text('Cancel')));
+
+    await tapIn(tester, find.text('Cash'));
+    expect(tester.takeException(), isNull);
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
   });
 
   testWidgets(

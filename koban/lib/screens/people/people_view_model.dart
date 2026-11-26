@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import '../../app/app_services.dart';
 import '../../data/database.dart';
 import '../../data/people_repository.dart';
+import '../../data/qr_store.dart';
+import '../../data/user_error.dart';
 import '../../rules/people_math.dart';
 
 /// What people owe you and what you owe, and how many people stand on each side.
@@ -91,8 +93,40 @@ class PeopleViewModel extends ChangeNotifier {
 
   List<SplitBill> get bills => _bills;
 
+  /// Opens the photo picker. It returns the path of the picked picture, or null on a cancel.
+  Future<String?> pickQr() => _s.pickImage();
+
+  /// Adds the person, and saves [qrPath] as the QR when it is given.
   /// Returns the id of the person. Throws a user error for a blank name.
-  Future<String> add(String name) => _s.people.addPerson(name);
+  /// A QR that cannot be saved does not undo the add: [qrError] says why.
+  Future<({String id, String? qrError})> add(
+    String name, {
+    String? qrPath,
+  }) async {
+    final id = await _s.people.addPerson(name);
+    if (qrPath == null) return (id: id, qrError: null);
+    String? qrError;
+    try {
+      await _s.people.setQr(id, qrPath);
+    } on KobanUserError catch (e) {
+      qrError = e.message;
+    } catch (e, st) {
+      developer.log('QR save failed', name: 'People', error: e, stackTrace: st);
+      qrError = 'Could not save the QR.';
+    } finally {
+      try {
+        await deleteCachedPick(await _s.cacheDir(), qrPath);
+      } catch (e, st) {
+        developer.log(
+          'Delete of the picked copy failed',
+          name: 'People',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+    return (id: id, qrError: qrError);
+  }
 
   @override
   void dispose() {

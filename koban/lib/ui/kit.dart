@@ -616,11 +616,15 @@ class DialogTextField extends StatefulWidget {
     this.keyboardType,
     this.textCapitalization = TextCapitalization.none,
     this.inputFormatters,
+    this.prefixText,
   });
 
   final String value;
   final ValueChanged<String> onChanged;
   final String label;
+
+  /// Text in front of the typed value, such as "RM". It shows from the start.
+  final String? prefixText;
   final bool isError;
   final String? supportingText;
   final TextInputType? keyboardType;
@@ -666,6 +670,10 @@ class _DialogTextFieldState extends State<DialogTextField> {
       inputFormatters: widget.inputFormatters,
       decoration: InputDecoration(
         labelText: widget.label,
+        prefixText: widget.prefixText,
+        floatingLabelBehavior: widget.prefixText == null
+            ? null
+            : FloatingLabelBehavior.always,
         errorText: widget.isError ? (widget.supportingText ?? '') : null,
         helperText: widget.isError ? null : widget.supportingText,
         filled: true,

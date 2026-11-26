@@ -109,18 +109,19 @@ class PersonScreenState extends State<PersonScreen> {
     if (mounted && vm.paying != null) vm.cancelPaying();
   }
 
-  Future<void> _rename(String name) =>
-      _ask(() => showRenameDialog(context, name: name, onSave: _vm!.rename));
-
-  void _delete(String name) => _vm!.delete('$name deleted');
+  Future<void> _edit(String name) async {
+    final result = await _ask(() => showEditPersonSheet(context, vm: _vm!));
+    if (result == EditPersonResult.delete) _vm!.delete('$name deleted');
+  }
 
   Future<void> _settleUp(PersonDetail d) async {
     final ok = await _ask(
       () => showSettleUpDialog(
         context,
         name: d.person.name,
-        debtCount: d.owedToMe.length,
-        itemCount: d.iOwe.length,
+        balance: d.balance,
+        splits: [for (final v in d.owedToMe) v.billMerchant ?? 'Split'],
+        items: [for (final i in d.iOwe) i.description],
       ),
     );
     if (ok == true) _vm!.settleUp();
@@ -137,7 +138,7 @@ class PersonScreenState extends State<PersonScreen> {
   Future<void> _addOwedToMe(String name) => _ask(
     () => showOwedItemDialog(
       context,
-      title: 'Add what $name owes me',
+      title: 'Add what $name owes you',
       onSave: _vm!.addOwedToMe,
     ),
   );
@@ -150,7 +151,7 @@ class PersonScreenState extends State<PersonScreen> {
     final result = await _ask(
       () => showOwedItemDialog(
         context,
-        title: 'Edit what $name owes me',
+        title: 'Edit what $name owes you',
         description: view.billMerchant ?? '',
         amount: view.debt.amount,
         itemDate: view.billTime,
@@ -200,44 +201,25 @@ class PersonScreenState extends State<PersonScreen> {
       builder: (context, _) {
         final detail = vm.detail;
         final name = detail?.person.name ?? '';
-        final hasQr = detail?.person.qrPath != null;
-        final menu = detail == null
+        final edit = detail == null
             ? null
-            : PopupMenuButton<VoidCallback>(
-                tooltip: 'More options',
-                icon: const Icon(Icons.more_vert),
-                style: IconButton.styleFrom(
-                  backgroundColor: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainer
-                      .withValues(alpha: 0.7),
-                  foregroundColor: Theme.of(context).colorScheme.onSurface,
-                  minimumSize: const Size(48, 48),
-                ),
-                onSelected: (action) => action(),
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    value: () => _rename(name),
-                    child: const Text('Rename'),
-                  ),
-                  if (hasQr)
-                    PopupMenuItem(
-                      value: vm.pickQr,
-                      child: const Text('Replace QR'),
-                    ),
-                  PopupMenuItem(
-                    value: () => _delete(name),
-                    child: const Text('Delete person'),
-                  ),
-                ],
+            : SceneIconButton(
+                icon: Icons.edit,
+                tooltip: 'Edit $name',
+                onPressed: () => _edit(name),
               );
         return Scaffold(
           body: ListView(
             padding: EdgeInsets.zero,
             children: [
-              TaskHeader(title: name, action: menu),
+              TaskHeader(title: name, action: edit),
               if (detail != null)
                 _content(context, vm, detail)
+              else if (vm.loadError case final error?)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: WarningRow(error),
+                )
               else if (!vm.gone)
                 const LoadingLine(),
             ],
@@ -266,7 +248,7 @@ class PersonScreenState extends State<PersonScreen> {
           if (d.settleSuggestion case final receive?) ...[
             const SizedBox(height: 16),
             _RepaymentCard(
-              title: 'Possible settle up',
+              title: 'Settles up in full',
               text: receiveText(receive),
               onConfirm: vm.confirmSettle,
               onDismiss: vm.dismissSettle,
@@ -290,7 +272,7 @@ class PersonScreenState extends State<PersonScreen> {
                   ),
               ],
             ),
-          _AddButton('Add what $name owes me', () => _addOwedToMe(name)),
+          _AddButton('Add what $name owes you', () => _addOwedToMe(name)),
           const SizedBox(height: 16),
           SectionHeading('You owe $name'),
           if (d.iOwe.isEmpty)
@@ -303,7 +285,10 @@ class PersonScreenState extends State<PersonScreen> {
                     key: ValueKey(item.id),
                     item: item,
                     onEdit: () => _editItem(item),
-                    onMarkPaid: () => vm.markItemPaid(item.id),
+                    onMarkPaid: () => vm.markItemPaid(
+                      item.id,
+                      'Marked paid: ${item.description}',
+                    ),
                   ),
               ],
             ),
@@ -313,9 +298,7 @@ class PersonScreenState extends State<PersonScreen> {
             children: [
               KobanRow(
                 title: "$name's payment QR",
-                subtitle: qrPath == null
-                    ? 'Not added yet. Tap to add it.'
-                    : null,
+                subtitle: qrPath == null ? 'Not added yet.' : null,
                 leading: const Icon(Icons.qr_code_2),
                 showChevron: true,
                 onTap: qrPath == null
@@ -323,6 +306,7 @@ class PersonScreenState extends State<PersonScreen> {
                     : () => _showQr(vm, name, qrPath),
                 onTapLabel: qrPath == null ? 'Add QR' : 'Open QR',
               ),
+              _RowButton(qrPath == null ? 'Add QR' : 'Replace QR', vm.pickQr),
             ],
           ),
         ],
@@ -346,7 +330,7 @@ class PersonScreenState extends State<PersonScreen> {
       await AppScope.of(context).device.shareText(
         'Hi ${d.person.name}, you owe me RM '
         '${AmountFormatter.formatGrouped(balance.amount)} for '
-        '$n ${n == 1 ? 'bill' : 'bills'} (Koban).',
+        '$n ${n == 1 ? 'split' : 'splits'} (Koban).',
         chooserTitle: 'Send reminder',
       );
     } catch (e, s) {
@@ -538,12 +522,12 @@ class _BalanceCard extends StatelessWidget {
             ),
             if (oldest != null)
               Text(
-                'From $bills split ${bills == 1 ? 'bill' : 'bills'}. '
+                'From $bills ${bills == 1 ? 'split' : 'splits'}. '
                 'Oldest: ${dateLabel(oldest, now)}.',
                 style: muted,
               ),
           ],
-          if (balance is! AllPaid) ...[
+          if (balance is PaysYou || balance is YouPay) ...[
             const SizedBox(height: 4),
             if (balance is PaysYou) ...[
               FilledButton.icon(
@@ -639,7 +623,7 @@ class _RepaymentCard extends StatelessWidget {
                   vertical: 4,
                 ),
                 child: Text(
-                  'Suggested match',
+                  'Possible payment',
                   style: theme.textTheme.labelMedium!.copyWith(
                     color: scheme.onPrimary,
                   ),
@@ -693,9 +677,11 @@ class _RepaymentCard extends StatelessWidget {
   }
 }
 
-class _MarkPaidButton extends StatelessWidget {
-  const _MarkPaidButton(this.onPressed);
+/// A text button at the right end of a row, under what it acts on.
+class _RowButton extends StatelessWidget {
+  const _RowButton(this.label, this.onPressed);
 
+  final String label;
   final VoidCallback onPressed;
 
   @override
@@ -706,7 +692,7 @@ class _MarkPaidButton extends StatelessWidget {
       child: TextButton(
         onPressed: onPressed,
         style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
-        child: const Text('Mark paid'),
+        child: Text(label),
       ),
     ),
   );
@@ -735,7 +721,7 @@ class _DebtRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         KobanRow(
-          title: view.billMerchant ?? 'Split bill',
+          title: view.billMerchant ?? 'Split',
           subtitle: personDate(view.billTime),
           trailing: MoneyAmount(
             amount: view.debt.amount,
@@ -745,12 +731,12 @@ class _DebtRow extends StatelessWidget {
           onTap: onOpen,
           onTapLabel: view.manual ? 'Edit' : 'Open split',
         ),
-        _MarkPaidButton(onMarkPaid),
+        _RowButton('Mark paid', onMarkPaid),
         if (suggested != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: _RepaymentCard(
-              title: 'Possible repayment',
+              title: 'Pays this split',
               text: receiveText(suggested),
               onConfirm: onConfirm,
               onDismiss: onDismiss,
@@ -788,7 +774,7 @@ class _ItemRow extends StatelessWidget {
         onTap: onEdit,
         onTapLabel: 'Edit',
       ),
-      _MarkPaidButton(onMarkPaid),
+      _RowButton('Mark paid', onMarkPaid),
     ],
   );
 }

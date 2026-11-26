@@ -17,6 +17,13 @@ ResizeImage qrImage(String path) => ResizeImage(
   policy: ResizeImagePolicy.fit,
 );
 
+/// The picker copies each picture into the app cache. Delete that copy, and never a file outside the cache.
+Future<void> deleteCachedPick(Directory cache, String path) async {
+  if (!p.isWithin(cache.path, path)) return;
+  final file = File(path);
+  if (file.existsSync()) await file.delete();
+}
+
 /// Payment QR pictures in app storage, and copies of them in the gallery.
 /// A port of `QrStore.kt`. The picture of a person is `qr/<personId>.img`.
 class QrStore {

@@ -107,8 +107,8 @@ void main() {
         final parking = item('Parking');
         final teh = item('Teh');
 
-        vm.markItemPaid(parking.id);
-        vm.markItemPaid(teh.id);
+        vm.markItemPaid(parking.id, 'Marked paid');
+        vm.markItemPaid(teh.id, 'Marked paid');
         await idle(vm);
 
         expect(messages, ['Try again in a moment.']);
@@ -130,7 +130,7 @@ void main() {
 
       vm.settleUp();
       vm.settleUp();
-      vm.markItemPaid(vm.detail!.iOwe.single.id);
+      vm.markItemPaid(vm.detail!.iOwe.single.id, 'Marked paid');
       await idle(vm);
 
       expect(messages, ['Try again in a moment.', 'Try again in a moment.']);
@@ -340,7 +340,7 @@ void main() {
     vm.startPaying(cash);
     await idle(vm);
 
-    vm.markItemPaid(vm.detail!.iOwe.single.id);
+    vm.markItemPaid(vm.detail!.iOwe.single.id, 'Marked paid');
     expect(vm.markDebtPaid(null), isFalse);
     await idle(vm);
 

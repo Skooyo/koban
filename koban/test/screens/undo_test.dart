@@ -285,7 +285,7 @@ void main() {
       final before = await snapshot(s);
       final opener = await openPage(tester, s, ali);
 
-      await tapIn(tester, find.byTooltip('More options'));
+      await tapIn(tester, find.byTooltip('Edit Ali'));
       await tapIn(tester, find.text('Delete person'));
       await settle(tester);
 
@@ -308,7 +308,7 @@ void main() {
 
       await tester.tap(find.text('Open person'));
       await settle(tester);
-      await tapIn(tester, find.byTooltip('More options'));
+      await tapIn(tester, find.byTooltip('Edit Ali'));
       await tapIn(tester, find.text('Delete person'));
       await settle(tester);
       await settleReal(tester, () => find.text('Undo').evaluate().isNotEmpty);

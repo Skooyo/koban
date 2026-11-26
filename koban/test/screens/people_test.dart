@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:koban/app/app_services.dart';
 import 'package:koban/rules/split_math.dart';
 import 'package:koban/data/database.dart';
@@ -12,7 +15,8 @@ import 'package:koban/ui/kit.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
-import 'person_screen_test.dart' show inDialog, settle;
+import '../data/qr_store_test.dart' show pngBytes;
+import 'person_screen_test.dart' show settle, settleReal;
 import 'person_view_model_test.dart' show d, day;
 
 Future<void> openPeople(
@@ -61,6 +65,9 @@ Future<void> seedThree(AppServices s) async {
   await s.people.addOwedItem(mei, 'Parking', d('4'), day);
 }
 
+Finder inSheet(Finder f) =>
+    find.descendant(of: find.byType(BottomSheet), matching: f);
+
 Finder rowOf(String name) => find.widgetWithText(KobanRow, name);
 
 void main() {
@@ -87,6 +94,57 @@ void main() {
       );
     }
     expect(find.text('Past splits'), findsNothing);
+  });
+
+  testWidgets('the balance card shows one net figure and no pills', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await seedThree(s);
+    await openPeople(tester, s);
+
+    expect(find.text('Owed to you, after what you owe'), findsOneWidget);
+    expect(find.text('+ RM 10.00'), findsOneWidget);
+    expect(find.text('RM 14.00 owed to you, RM 4.00 you owe'), findsOneWidget);
+    expect(find.text('1 owes you'), findsNothing);
+    expect(find.text('You owe 1'), findsNothing);
+  });
+
+  testWidgets('Add person can save a QR with the name', (tester) async {
+    final files = Directory.systemTemp.createTempSync('koban_files');
+    addTearDown(() => files.deleteSync(recursive: true));
+    final picked = File(p.join(files.path, 'picked.png'))
+      ..writeAsBytesSync(pngBytes);
+    final s = await testServices(
+      filesDir: files,
+      pickImage: () async => picked.path,
+    );
+    await openPeople(tester, s);
+
+    await tester.tap(find.byTooltip('Add person'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      inSheet(find.widgetWithText(TextField, 'Name')),
+      'Mei Ling',
+    );
+    await tester.pump();
+    await tester.tap(inSheet(find.text("Add Mei Ling's payment QR")));
+    await tester.pump();
+    await tester.pump();
+    expect(inSheet(find.text('Picture chosen.')), findsOneWidget);
+    await tester.tap(inSheet(find.widgetWithText(FilledButton, 'Add person')));
+    final qr = Directory(p.join(files.path, 'qr'));
+    await settleReal(
+      tester,
+      () => find.byType(PersonScreen).evaluate().isNotEmpty,
+    );
+    await settle(tester);
+
+    expect(find.byType(PersonScreen), findsOneWidget);
+    final person = (await s.db.allPeople().get()).single;
+    expect(person.name, 'Mei Ling');
+    expect(person.qrPath, p.join(qr.path, '${person.id}.img'));
+    expect(File(person.qrPath!).readAsBytesSync(), pngBytes);
   });
 
   testWidgets('search ignores case and extra spaces', (tester) async {
@@ -139,15 +197,19 @@ void main() {
 
     await tester.tap(find.byTooltip('Add person'));
     await tester.pumpAndSettle();
-    expect(inDialog(find.text('Add person')), findsOneWidget);
+    expect(inSheet(find.text('Add person')), findsNWidgets(2));
+    expect(
+      inSheet(find.text('Optional. A picture from your gallery.')),
+      findsOneWidget,
+    );
     await tester.enterText(
-      inDialog(find.widgetWithText(TextField, 'Name')),
+      inSheet(find.widgetWithText(TextField, 'Name')),
       'Ali',
     );
-    await tester.tap(inDialog(find.text('Add')));
+    await tester.tap(inSheet(find.widgetWithText(FilledButton, 'Add person')));
     await settle(tester);
 
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
     expect(find.byType(PersonScreen), findsOneWidget);
     expect(
       find.descendant(
@@ -167,20 +229,17 @@ void main() {
 
     await tester.tap(find.byTooltip('Add person'));
     await tester.pumpAndSettle();
-    await tester.tap(inDialog(find.text('Add')));
+    await tester.tap(inSheet(find.widgetWithText(FilledButton, 'Add person')));
     await settle(tester);
 
-    expect(inDialog(find.text('Enter a name.')), findsOneWidget);
+    expect(inSheet(find.text('Enter a name.')), findsOneWidget);
     expect(find.byType(PersonScreen), findsNothing);
     await tester.enterText(
-      inDialog(find.widgetWithText(TextField, 'Name')),
+      inSheet(find.widgetWithText(TextField, 'Name')),
       'A',
     );
     await tester.pump();
     expect(find.text('Enter a name.'), findsNothing);
-    await tester.tap(inDialog(find.text('Cancel')));
-    await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsNothing);
   });
 
   testWidgets('Past splits open the split and Split a bill starts one', (
@@ -197,7 +256,7 @@ void main() {
       find.descendant(of: shop, matching: find.text('13 Nov')),
       findsOneWidget,
     );
-    expect(rowOf('Split bill'), findsOneWidget);
+    expect(rowOf('Split'), findsOneWidget);
     await tester.ensureVisible(shop);
     await tester.pumpAndSettle();
     await tester.tap(shop);
@@ -248,10 +307,10 @@ void main() {
     await tester.tap(find.byTooltip('Add person'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      inDialog(find.widgetWithText(TextField, 'Name')),
+      inSheet(find.widgetWithText(TextField, 'Name')),
       'Ali',
     );
-    final add = inDialog(find.text('Add'));
+    final add = inSheet(find.widgetWithText(FilledButton, 'Add person'));
     await tester.tap(add);
     await tester.tap(add, warnIfMissed: false);
     await settle(tester);

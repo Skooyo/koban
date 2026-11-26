@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:io';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path/path.dart' as p;
 
 import '../../app/app_services.dart';
 import '../../data/database.dart';
 import '../../data/people_repository.dart';
+import '../../data/qr_store.dart';
 import '../../data/split_repository.dart';
 import '../../data/undoable.dart';
 import '../../data/user_error.dart';
@@ -27,13 +26,13 @@ class DebtPayment {
 
 /// The state and the actions of the person page. A port of `PersonViewModel.kt`.
 /// It runs one action at a time. A tap during an action sends "Try again in a moment.".
-class PersonViewModel extends ChangeNotifier {
+class PersonViewModel extends ChangeNotifier with LoadErrors {
   PersonViewModel(this._s, this.personId) {
     _sub = _s.people.watchPerson(personId).listen((d) {
       _detail = d;
       _gone = d == null;
       notifyListeners();
-    }, onError: (Object e, StackTrace s) => _log('Load failed', e, s));
+    }, onError: onLoadError);
   }
 
   final AppServices _s;
@@ -97,7 +96,9 @@ class PersonViewModel extends ChangeNotifier {
   void deleteItem(String id, String message) =>
       _runUndo(message, () => _s.people.deleteOwedItem(id));
 
-  void markItemPaid(String id) => _run(() => _s.people.markOwedItemPaid(id));
+  /// The mark shows [message] with Undo on [undos].
+  void markItemPaid(String id, String message) =>
+      _runUndo(message, () => _s.people.markOwedItemPaid(id));
 
   void deleteOwedToMe(String debtId, String message) =>
       _runUndo(message, () => _s.people.deleteOwedToMe(debtId));
@@ -134,13 +135,9 @@ class PersonViewModel extends ChangeNotifier {
     });
   }
 
-  /// The picker copies each picture into the app cache. Delete that copy, and never a file outside the cache.
   Future<void> _deleteCachedCopy(String path) async {
     try {
-      final cache = await _s.cacheDir();
-      if (!p.isWithin(cache.path, path)) return;
-      final file = File(path);
-      if (file.existsSync()) await file.delete();
+      await deleteCachedPick(await _s.cacheDir(), path);
     } catch (e, s) {
       _log('Delete of the picked copy failed', e, s);
     }

@@ -309,13 +309,23 @@ class PeopleRepository {
     );
   });
 
-  Future<void> markOwedItemPaid(String id) => _db.transaction(() async {
+  /// Marks the item paid. Undo puts it back open, and the repayment suggestion that it cleared.
+  /// It returns null when the item is missing or paid already.
+  Future<Undoable?> markOwedItemPaid(String id) => _db.transaction(() async {
     final item = await _db.owedItem(id).getSingleOrNull();
-    if (item == null || item.status == DebtStatus.paid) return;
+    if (item == null || item.status == DebtStatus.paid) return null;
+    final suggested = (await _db.person(item.personId).getSingleOrNull())
+        ?.suggestedSettleExpenseId;
     await _db
         .update(_db.owedItems)
         .replace(item.copyWith(status: DebtStatus.paid, paidAt: Value(_now())));
     await _splits.clearSettleSuggestion(item.personId);
+    return Undoable(
+      undo: () => _db.transaction(() async {
+        await _db.update(_db.owedItems).replace(item);
+        await _splits.restoreSettleSuggestion(item.personId, suggested);
+      }),
+    );
   });
 
   /// Adds money that [personId] owes the owner without a bill, for example cash lent.
