@@ -170,9 +170,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
                               ),
                         categories:
                             state.showAll ||
-                                !state.breakdown.any(
-                                  (b) => b.total > Decimal.zero,
-                                )
+                                (vm.budgets.isEmpty &&
+                                    !state.breakdown.any(
+                                      (b) => b.total > Decimal.zero,
+                                    ))
                             ? null
                             : _ByCategory(
                                 breakdown: state.breakdown,
@@ -674,8 +675,21 @@ class _ByCategoryState extends State<_ByCategory> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final all = widget.breakdown.where((b) => b.total > Decimal.zero).toList()
+    final spent = widget.breakdown.where((b) => b.total > Decimal.zero).toList()
       ..sort((a, b) => b.total.compareTo(a.total));
+    // A limit with no spending yet still shows, after the spent categories.
+    final idle = [
+      for (final b in widget.budgets.values)
+        if (!spent.any((x) => x.categoryId == b.category.id))
+          CategoryBreakdown(
+            categoryId: b.category.id,
+            name: b.category.name,
+            colorHex: b.category.colorHex,
+            total: Decimal.zero,
+            fraction: 0,
+          ),
+    ];
+    final all = [...spent, ...idle];
     final rest = all.skip(_byCategoryRows).toList();
     final shown = _open ? all : all.take(_byCategoryRows).toList();
     final restTotal = rest.fold(Decimal.zero, (sum, b) => sum + b.total);

@@ -197,6 +197,31 @@ void main() {
     },
   );
 
+  testWidgets('a limit with no spending shows a row after the spent ones', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await pay(s, '30.00', DateTime(2026, 11, 10, 9), category: 'transport');
+    await s.budgets.setLimit('food', Decimal.parse('500'));
+    await pumpActivity(tester, s);
+    expect(find.text('RM 0.00 of RM 500.00'), findsOneWidget);
+    expect(find.text('RM 500.00 left'), findsOneWidget);
+    expect(find.text('0%'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Food & Dining')).dy,
+      greaterThan(tester.getTopLeft(find.text('Transport')).dy),
+    );
+  });
+
+  testWidgets('a limit shows the card when nothing was spent', (tester) async {
+    final s = await testServices();
+    await s.budgets.setLimit('food', Decimal.parse('500'));
+    await pumpActivity(tester, s);
+    expect(find.text('Food & Dining'), findsOneWidget);
+    expect(find.text('RM 0.00 of RM 500.00'), findsOneWidget);
+    expect(find.text('RM 500.00 left'), findsOneWidget);
+  });
+
   testWidgets('the category list does not show for a month with no payment', (
     tester,
   ) async {
