@@ -33,16 +33,19 @@ CategoryBreakdown cat(String id, String name, String total) =>
     );
 
 void main() {
-  test('the greeting follows the hour', () {
-    expect(greetingFor(DateTime(2026, 11, 13, 0)), 'Good morning');
-    expect(greetingFor(DateTime(2026, 11, 13, 11, 59)), 'Good morning');
-    expect(greetingFor(DateTime(2026, 11, 13, 12)), 'Good afternoon');
-    expect(greetingFor(DateTime(2026, 11, 13, 17, 59)), 'Good afternoon');
-    expect(greetingFor(DateTime(2026, 11, 13, 18)), 'Good evening');
+  test('the Home title is the date in Malaysia time', () {
+    expect(dateTitle(DateTime.utc(2026, 11, 26, 15, 59)), 'Thu, 26 Nov');
+    // 16:00 UTC is midnight in Malaysia.
+    expect(dateTitle(DateTime.utc(2026, 11, 26, 16)), 'Fri, 27 Nov');
   });
 
   test('Home Mon puts a problem before good news', () {
-    final off = home(trackingOn: false, waitingCount: 3, week: '1', lastWeek: '9');
+    final off = home(
+      trackingOn: false,
+      waitingCount: 3,
+      week: '1',
+      lastWeek: '9',
+    );
     expect(off.face, MonFace.worry);
     expect(off.line, 'I cannot see your payments.');
     final none = home(listensToNoApp: true, waitingCount: 3);

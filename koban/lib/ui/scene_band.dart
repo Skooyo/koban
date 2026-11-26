@@ -20,6 +20,7 @@ class SceneBand extends StatelessWidget {
     required this.face,
     required this.line,
     this.detail,
+    this.detailDot,
     this.stats = const [],
     this.back = false,
     this.action,
@@ -38,6 +39,9 @@ class SceneBand extends StatelessWidget {
 
   /// The second, quieter sentence of the bubble.
   final String? detail;
+
+  /// A small status dot before [detail], such as the green of "Tracking on".
+  final Color? detailDot;
 
   /// Short facts in small pills under the bubble, such as '0 to check'.
   final List<String> stats;
@@ -118,11 +122,29 @@ class SceneBand extends StatelessWidget {
             if (detail != null)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  detail!,
-                  style: text.bodyMedium!.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (detailDot != null) ...[
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: detailDot,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Flexible(
+                      child: Text(
+                        detail!,
+                        style: text.bodyMedium!.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
           ],

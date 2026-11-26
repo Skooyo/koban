@@ -102,7 +102,7 @@ void main() {
     Finder inTab<T extends Widget>(String text) =>
         find.descendant(of: find.byType(T), matching: find.text(text));
     final shell = tester.state<HomeShellState>(find.byType(HomeShell));
-    expect(inTab<HomeScreen>('Good afternoon'), findsWidgets);
+    expect(inTab<HomeScreen>('Fri, 13 Nov'), findsWidgets);
     shell.select(KobanTab.activity);
     await tester.pumpAndSettle();
     expect(inTab<ActivityScreen>('Activity'), findsWidgets);

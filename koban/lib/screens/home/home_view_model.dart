@@ -5,6 +5,7 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../app/app_services.dart';
+import '../../data/budget_repository.dart';
 import '../../data/database.dart';
 import '../../data/legacy_import.dart';
 import '../../data/summaries.dart';
@@ -57,6 +58,7 @@ class HomeViewModel extends ChangeNotifier with LoadErrors {
   PeriodSummary? _today;
   PeriodSummary? _week;
   PeriodSummary? _month;
+  BudgetMonth? _budget;
   List<Expense> _weekExpenses = const [];
   List<Expense> _lastWeekExpenses = const [];
   Map<String, String> _categoryNames = const {};
@@ -73,6 +75,12 @@ class HomeViewModel extends ChangeNotifier with LoadErrors {
   PeriodSummary? get today => _today;
   PeriodSummary? get week => _week;
   PeriodSummary? get month => _month;
+
+  /// The budget limits of this month. Null until the first read.
+  BudgetMonth? get budget => _budget;
+
+  /// The title of Home: today's date in Malaysia.
+  String get title => dateTitle(_s.now());
   Map<String, String> get categoryNames => _categoryNames;
 
   /// The Monday of this week, local midnight, for the day of the clock.
@@ -85,9 +93,6 @@ class HomeViewModel extends ChangeNotifier with LoadErrors {
 
   /// The spent total of each day of this week, Monday first.
   List<Decimal> get weekDays => spentPerDay(_weekExpenses, weekStart);
-
-  /// How many days of this week hold a payment.
-  int get daysSaved => daysWithPayments(_weekExpenses);
 
   /// What was spent last week from Monday to the same weekday as today.
   Decimal get lastWeekSoFar => spentPerDay(
@@ -127,7 +132,7 @@ class HomeViewModel extends ChangeNotifier with LoadErrors {
     return '${n.year}-${n.month}-${n.day}';
   }
 
-  /// Starts the 3 period streams for the day of the clock. A new day moves the ranges on.
+  /// Starts the 3 period streams and the budget stream for the day of the clock. A new day moves the ranges on.
   void _watchPeriods() {
     for (final sub in _periodSubs) {
       sub.cancel();
@@ -162,6 +167,11 @@ class HomeViewModel extends ChangeNotifier with LoadErrors {
       }, onError: onLoadError),
       _s.expenses.watchPeriodSummary(SpendingPeriod.month).listen((v) {
         _month = v;
+        notifyListeners();
+      }, onError: onLoadError),
+      // The budget stream does not re-emit at the turn of the month. A new day starts it again.
+      _s.budgets.watchMonth().listen((v) {
+        _budget = v;
         notifyListeners();
       }, onError: onLoadError),
     ];

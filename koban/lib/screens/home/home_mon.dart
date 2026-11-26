@@ -1,6 +1,8 @@
 import 'package:decimal/decimal.dart';
+import 'package:intl/intl.dart';
 
 import '../../data/database.dart';
+import '../../rules/periods.dart';
 import '../../rules/types.dart';
 import '../../theme/mon.dart';
 
@@ -13,12 +15,9 @@ class MonSay {
   final String? detail;
 }
 
-/// "Good morning" until noon, "Good afternoon" until 6 pm, then "Good evening".
-String greetingFor(DateTime now) => now.hour < 12
-    ? 'Good morning'
-    : now.hour < 18
-    ? 'Good afternoon'
-    : 'Good evening';
+/// The title of Home: the date in Malaysia, such as "Thu, 26 Nov".
+String dateTitle(DateTime now) =>
+    DateFormat('EEE, d MMM', 'en_US').format(GroupPeriodMath.malaysiaDay(now));
 
 /// The spent total of each of the 7 days from [weekStart] (a Monday, local midnight).
 /// Money received does not count.
@@ -41,17 +40,7 @@ List<Decimal> spentPerDay(List<Expense> expenses, DateTime weekStart) {
   return totals;
 }
 
-/// How many different days [expenses] fall on, spent or received.
-int daysWithPayments(List<Expense> expenses) {
-  final days = <int>{};
-  for (final e in expenses) {
-    final t = DateTime.fromMillisecondsSinceEpoch(e.notificationPostTime);
-    days.add(DateTime(t.year, t.month, t.day).millisecondsSinceEpoch);
-  }
-  return days.length;
-}
-
-/// Picks Mon's face and line for Home. The first fact that holds wins: a problem to fix,
+/// Picks Mon's face and line for Home. The second line of the bubble is the tracking state. The first fact that holds wins: a problem to fix,
 /// then payments to check, then the first payment, then the week against last week.
 MonSay homeMon({
   required bool trackingOn,
@@ -62,50 +51,25 @@ MonSay homeMon({
   required Decimal lastWeekSoFar,
 }) {
   if (!trackingOn) {
-    return const MonSay(
-      MonFace.worry,
-      'I cannot see your payments.',
-      'Turn on tracking below.',
-    );
+    return const MonSay(MonFace.worry, 'I cannot see your payments.');
   }
   if (listensToNoApp) {
-    return const MonSay(
-      MonFace.worry,
-      'I listen to no app.',
-      'Choose your payment apps below.',
-    );
+    return const MonSay(MonFace.worry, 'I listen to no app.');
   }
   if (waitingCount > 0) {
     return MonSay(
       MonFace.idle,
       waitingCount == 1 ? 'A payment is waiting.' : 'Payments are waiting.',
-      'Check them and I will save them.',
     );
   }
   if (!hasAnyPayment) {
-    return const MonSay(
-      MonFace.idle,
-      'Nothing here yet.',
-      'Add one by hand to start.',
-    );
+    return const MonSay(MonFace.idle, 'Nothing here yet.');
   }
   if (lastWeekSoFar > Decimal.zero && weekSpent < lastWeekSoFar) {
-    return const MonSay(
-      MonFace.happy,
-      'You spent less than last week.',
-      'I polished myself to celebrate.',
-    );
+    return const MonSay(MonFace.happy, 'You spent less than last week.');
   }
   if (weekSpent > lastWeekSoFar && lastWeekSoFar > Decimal.zero) {
-    return const MonSay(
-      MonFace.idle,
-      'More than last week so far.',
-      'I will keep an eye on it.',
-    );
+    return const MonSay(MonFace.idle, 'More than last week so far.');
   }
-  return const MonSay(
-    MonFace.idle,
-    'A quiet week so far.',
-    'Nothing to report.',
-  );
+  return const MonSay(MonFace.idle, 'A quiet week so far.');
 }
