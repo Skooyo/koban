@@ -17,11 +17,12 @@ Future<void> pay(
   DateTime at, {
   TransactionType type = TransactionType.withdraw,
   String merchant = 'Kedai Contoh',
+  String categoryId = 'food',
 }) => s.expenses.addManualExpense(
   amount: Decimal.parse(amount),
   merchant: merchant,
   postTime: at.millisecondsSinceEpoch,
-  categoryId: 'food',
+  categoryId: categoryId,
   notes: null,
   type: type,
 );
@@ -276,10 +277,16 @@ void main() {
   ) async {
     final s = await testServices();
     await pay(s, '120.00', DateTime(2026, 11, 13, 9));
-    await pay(s, '30.00', DateTime(2026, 11, 13, 10), merchant: 'Bus');
+    await pay(
+      s,
+      '30.00',
+      DateTime(2026, 11, 13, 10),
+      merchant: 'Bus',
+      categoryId: 'transport',
+    );
     await s.budgets.setLimit('food', Decimal.parse('100'));
     await pumpHome(tester, s);
-    expect(find.text('RM 150.00 of RM 100.00'), findsOneWidget);
+    expect(find.text('RM 120.00 of RM 100.00'), findsOneWidget);
     final over = find.text('1 over');
     expect(over, findsOneWidget);
     expect(
@@ -292,6 +299,17 @@ void main() {
       tester.state<HomeShellState>(find.byType(HomeShell)).tab,
       KobanTab.activity,
     );
+  });
+
+  testWidgets('spending only in an unbudgeted category is not counted', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await pay(s, '520.00', DateTime(2026, 11, 13, 9), categoryId: 'shopping');
+    await s.budgets.setLimit('food', Decimal.parse('100'));
+    await pumpHome(tester, s);
+    expect(find.text('RM 0.00 of RM 100.00'), findsOneWidget);
+    expect(find.textContaining(' over'), findsNothing);
   });
 
   testWidgets('with a limit not reached, there is no over mark', (

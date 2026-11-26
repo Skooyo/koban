@@ -416,7 +416,7 @@ class _DayBars extends StatelessWidget {
 }
 
 /// This month: the total on the right, the money received under it. With budget limits it
-/// says "RM spent of RM limit" and, in red, how many categories are over.
+/// says "RM spent of RM limit" (both for the budgeted categories only) and, in red, how many categories are over.
 class _PeriodRow extends StatelessWidget {
   const _PeriodRow(this.summary, this.budget, this.onTap);
 
@@ -432,7 +432,7 @@ class _PeriodRow extends StatelessWidget {
     if (limits != null && !limits.isEmpty) {
       return KobanRow(
         title: summary.title,
-        subtitle: '${rm(summary.total)} of ${rm(limits.totalLimit)}',
+        subtitle: '${rm(limits.totalSpent)} of ${rm(limits.totalLimit)}',
         trailing: limits.overCount > 0
             ? Text(
                 '${limits.overCount} over',
