@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:decimal/decimal.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/capture/listener_control.dart';
+import 'package:koban/data/database.dart';
+import 'package:koban/rules/types.dart';
 import 'package:koban/screens/settings/settings_screen.dart';
 import 'package:koban/screens/settings/settings_view_model.dart';
 import 'package:koban/ui/kit.dart';
@@ -86,29 +90,52 @@ Future<void> pumpSettings(
 
 Finder field(String label) => find.widgetWithText(TextField, label);
 
+/// Opens the Settings section that has this row title.
+Future<void> openSection(WidgetTester tester, String title) async {
+  await tester.tap(find.widgetWithText(KobanRow, title));
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  testWidgets('Settings shows the tracking rows with their counts', (
+  testWidgets('Settings is a short list and says that tracking is on', (
     tester,
   ) async {
-    final listener = listenerChannel();
     final s = await settingsServices(
-      listener: listener,
       prefs: {
         'payment_apps_chosen': true,
         'payment_app_allowlist': [maybank, tng],
       },
     );
     await pumpSettings(tester, s);
+    double top(String t) => tester.getTopLeft(find.text(t)).dy;
     expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('On · 2 apps chosen'), findsOneWidget);
     expect(find.text('Tracking is off'), findsNothing);
-    expect(find.text('2 apps chosen'), findsOneWidget);
-    expect(find.text('2 notifications captured'), findsOneWidget);
-    expect(
-      find.text('Use this when new payments stop showing up in Koban.'),
-      findsOneWidget,
-    );
+    expect(find.text('Off · Koban cannot read notifications'), findsNothing);
+    expect(find.text('7 categories · 0 monthly limits'), findsOneWidget);
     expect(find.text('Koban 0.1.1'), findsOneWidget);
-    expect(find.text('Xiaomi autostart'), findsNothing);
+    // Categories and budgets is the second section.
+    expect(top('Categories and budgets'), greaterThan(top('Tracking')));
+    expect(top('Online features'), greaterThan(top('Categories and budgets')));
+    expect(top('Troubleshooting'), greaterThan(top('Check for updates')));
+    expect(find.text('Notification log'), findsNothing);
+    expect(find.text('Parser test tool'), findsNothing);
+  });
+
+  testWidgets('Settings says when tracking is off', (tester) async {
+    final listener = listenerChannel();
+    listener.answers['isAccessGranted'] = false;
+    await pumpSettings(tester, await settingsServices(listener: listener));
+    expect(find.text('Off · Koban cannot read notifications'), findsOneWidget);
+    await openSection(tester, 'Tracking');
+    expect(find.text('Tracking is off'), findsOneWidget);
+  });
+
+  testWidgets('Tracking holds the apps and the battery row', (tester) async {
+    final listener = listenerChannel();
+    await pumpSettings(tester, await settingsServices(listener: listener));
+    await openSection(tester, 'Tracking');
+    expect(find.text('Tracking is off'), findsNothing);
     expect(listener.calls.map((c) => c.method), contains('ensureActive'));
     await tester.tap(
       find.text('On. Tracking may stop in the background. Tap to turn it off.'),
@@ -120,17 +147,17 @@ void main() {
     );
   });
 
-  testWidgets('Tracking holds the log and Restart payment tracking', (
+  testWidgets('Troubleshooting holds the log, the restart and the test', (
     tester,
   ) async {
     final listener = listenerChannel();
     listener.answers['recentNotifications'] = [logRow('a')];
     await pumpSettings(tester, await settingsServices(listener: listener));
+    await openSection(tester, 'Troubleshooting');
     double top(String t) => tester.getTopLeft(find.text(t)).dy;
     expect(find.text('1 notification captured'), findsOneWidget);
     expect(find.text('Reconnect listener'), findsNothing);
     expect(find.byIcon(Icons.bug_report), findsNothing);
-    expect(find.byIcon(Icons.list), findsOneWidget);
     expect(
       find.descendant(
         of: find.widgetWithText(KobanRow, 'Notification log'),
@@ -138,14 +165,16 @@ void main() {
       ),
       findsOneWidget,
     );
-    // The rows sit in the Tracking group, above Online.
-    expect(top('Notification log'), greaterThan(top('Payment apps')));
+    expect(
+      find.text('Use this when new payments stop showing up in Koban.'),
+      findsOneWidget,
+    );
     expect(
       top('Restart payment tracking'),
       greaterThan(top('Notification log')),
     );
     expect(
-      top('Online features'),
+      top('Test a notification'),
       greaterThan(top('Restart payment tracking')),
     );
   });
@@ -155,6 +184,7 @@ void main() {
   ) async {
     final s = await settingsServices(prefs: {'payment_apps_chosen': true});
     await pumpSettings(tester, s);
+    await openSection(tester, 'Tracking');
     expect(find.text('None chosen. Koban listens to no app.'), findsOneWidget);
     await s.paymentApps.save({maybank});
     await s.settings.reload();
@@ -166,6 +196,7 @@ void main() {
     'reconnect shows Reconnecting and then the result after the wait',
     (tester) async {
       await pumpSettings(tester, await settingsServices());
+      await openSection(tester, 'Troubleshooting');
       await tester.tap(find.text('Restart payment tracking'));
       await tester.pump();
       expect(find.text('Reconnecting…$reconnectHint'), findsOneWidget);
@@ -173,7 +204,7 @@ void main() {
       expect(find.text('Reconnecting…$reconnectHint'), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump();
-      expect(find.text('Listener connected.$reconnectHint'), findsOneWidget);
+      expect(find.text('Tracking is connected.$reconnectHint'), findsOneWidget);
     },
   );
 
@@ -184,6 +215,7 @@ void main() {
       tester,
       await settingsServices(listener: listenerChannel(connected: false)),
     );
+    await openSection(tester, 'Troubleshooting');
     await tester.tap(find.text('Restart payment tracking'));
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
@@ -200,6 +232,7 @@ void main() {
   ) async {
     final listener = listenerChannel();
     await pumpSettings(tester, await settingsServices(listener: listener));
+    await openSection(tester, 'Troubleshooting');
     int reconnects() =>
         listener.calls.where((c) => c.method == 'reconnect').length;
     await tester.tap(find.text('Restart payment tracking'));
@@ -211,7 +244,7 @@ void main() {
     // The result shows 1 s after the first tap, not after the second.
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
-    expect(find.text('Listener connected.$reconnectHint'), findsOneWidget);
+    expect(find.text('Tracking is connected.$reconnectHint'), findsOneWidget);
     // The next tap works again.
     await tester.tap(find.text('Restart payment tracking'));
     await tester.pump();
@@ -226,6 +259,7 @@ void main() {
       tester,
       await settingsServices(listener: listenerChannel(reconnect: 'THROTTLED')),
     );
+    await openSection(tester, 'Troubleshooting');
     await tester.tap(find.text('Restart payment tracking'));
     await tester.pump();
     await tester.pump();
@@ -248,15 +282,14 @@ void main() {
     expect(await SharedPreferencesAsync().getBool('dark_mode'), true);
   });
 
-  testWidgets('own categories can be added and removed, built-in ones cannot', (
+  testWidgets('own categories can be added and deleted, built-in ones cannot', (
     tester,
   ) async {
     await pumpSettings(tester, await settingsServices());
-    expect(find.text('7 built-in categories'), findsOneWidget);
-    expect(find.text('Built in'), findsNothing);
-    expect(find.textContaining('Food & Dining, '), findsOneWidget);
+    await openSection(tester, 'Categories and budgets');
+    expect(find.text('Food & Dining'), findsOneWidget);
     expect(find.text('Your own'), findsNothing);
-    expect(find.byTooltip('Remove category Food & Dining'), findsNothing);
+    expect(find.byTooltip('Delete category Food & Dining'), findsNothing);
     final add = find.widgetWithText(FilledButton, 'Add');
     expect(tester.widget<FilledButton>(add).onPressed, isNull);
     await tester.enterText(field('New category'), 'Gym');
@@ -264,30 +297,138 @@ void main() {
     await tester.tap(add);
     await tester.pumpAndSettle();
     expect(find.text('Gym'), findsOneWidget);
+    expect(find.text('Gym added'), findsOneWidget);
     expect(find.text('Your own'), findsOneWidget);
     expect(
       tester.widget<TextField>(field('New category')).controller!.text,
       '',
     );
-    await tester.tap(find.byTooltip('Remove category Gym'));
+    await tester.tap(find.byTooltip('Delete category Gym'));
     await tester.pumpAndSettle();
     expect(find.text('Gym'), findsNothing);
-    expect(find.text('7 built-in categories'), findsOneWidget);
+    expect(find.text('Gym deleted.'), findsOneWidget);
   });
 
-  testWidgets('the parser tool reads a sample text', (tester) async {
+  testWidgets('the Done key adds a category and a used name is refused', (
+    tester,
+  ) async {
     await pumpSettings(tester, await settingsServices());
+    await openSection(tester, 'Categories and budgets');
+    await tester.enterText(field('New category'), 'Gym');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.text('Gym added'), findsOneWidget);
+    await tester.enterText(field('New category'), 'gym');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.text('You have a category called Gym'), findsOneWidget);
+    expect(find.text('Gym'), findsOneWidget);
+    await tester.enterText(field('New category'), 'gym2');
+    await tester.pump();
+    expect(find.text('You have a category called Gym'), findsNothing);
+  });
+
+  testWidgets(
+    'deleting a category says how many payments become Uncategorized',
+    (tester) async {
+      final s = await settingsServices();
+      await s.categories.addCategory('Gym', '#5C6BC0');
+      final gym = (await s.categories.getAll()).singleWhere(
+        (c) => c.name == 'Gym',
+      );
+      for (var i = 0; i < 4; i++) {
+        await s.db
+            .into(s.db.expenses)
+            .insert(
+              ExpensesCompanion.insert(
+                id: 'e$i',
+                amount: Decimal.parse('5.00'),
+                currency: 'MYR',
+                rawNotificationText: 'raw',
+                sourcePackage: 'pkg',
+                notificationPostTime: 1761999940000,
+                createdAt: 0,
+                dedupKey: 'k$i',
+                status: ExpenseStatus.autoSaved,
+                confidence: ParseConfidence.high,
+                transactionType: TransactionType.withdraw,
+                privateToGroups: false,
+                categoryId: Value(gym.id),
+              ),
+            );
+      }
+      await pumpSettings(tester, s);
+      await openSection(tester, 'Categories and budgets');
+      await tester.tap(find.byTooltip('Delete category Gym'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Gym deleted. 4 payments are now Uncategorized.'),
+        findsOneWidget,
+      );
+      expect(find.text('Undo'), findsOneWidget);
+    },
+  );
+
+  testWidgets('a monthly limit is set, changed and cleared', (tester) async {
+    final s = await settingsServices();
+    await pumpSettings(tester, s);
+    await openSection(tester, 'Categories and budgets');
+    final food = find.byKey(const ValueKey('limit-food'));
+    Finder box() => find.descendant(of: food, matching: find.byType(TextField));
+    expect(find.text('RM '), findsNWidgets(7));
+    await tester.tap(box());
+    await tester.enterText(box(), '500');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(box()).controller!.text, '500.00');
+    expect(
+      (await s.budgets.getMonth()).items.single.limit,
+      Decimal.parse('500'),
+    );
+    expect(find.text('7 categories · 1 monthly limit'), findsNothing);
+
+    // Zero is not a limit. The old one comes back.
+    await tester.tap(box());
+    await tester.enterText(box(), '0');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(box()).controller!.text, '500.00');
+
+    await tester.tap(box());
+    await tester.enterText(box(), '');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect((await s.budgets.getMonth()).isEmpty, true);
+    expect(tester.widget<TextField>(box()).controller!.text, '');
+  });
+
+  testWidgets('a saved limit shows on the field and in the Settings count', (
+    tester,
+  ) async {
+    final s = await settingsServices();
+    await s.budgets.setLimit('transport', Decimal.parse('300'));
+    await pumpSettings(tester, s);
+    expect(find.text('7 categories · 1 monthly limit'), findsOneWidget);
+    await openSection(tester, 'Categories and budgets');
+    final box = find.descendant(
+      of: find.byKey(const ValueKey('limit-transport')),
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(box).controller!.text, '300.00');
+  });
+
+  testWidgets('the notification test reads a sample text', (tester) async {
+    await pumpSettings(tester, await settingsServices());
+    await openSection(tester, 'Troubleshooting');
     await tester.enterText(field('Notification text'), sample);
-    await tester.tap(find.text('Test parse'));
+    await tester.tap(find.text('Test notification'));
     await tester.pumpAndSettle();
     expect(
-      find.text(
-        'Amount: MYR 15.00\nMerchant: RESTORAN CONTOH\nType: withdraw\nFormat: unknown',
-      ),
+      find.text('Amount: RM 15.00\nShop: RESTORAN CONTOH\nKind: Spent'),
       findsOneWidget,
     );
     await tester.enterText(field('Notification text'), 'Hello');
-    await tester.tap(find.text('Test parse'));
+    await tester.tap(find.text('Test notification'));
     await tester.pumpAndSettle();
     expect(find.text('No rule matched this text'), findsOneWidget);
   });
@@ -306,6 +447,7 @@ void main() {
       }),
     );
     await pumpSettings(tester, s);
+    await openSection(tester, 'Online features');
     final use = find.widgetWithText(FilledButton, 'Use code');
     expect(tester.widget<FilledButton>(use).onPressed, isNull);
     await tester.enterText(field('XXXX-XXXX'), 'k7qx-m2pa');
@@ -339,6 +481,7 @@ void main() {
       http: MockClient((r) async => http.Response('{}', 403)),
     );
     await pumpSettings(tester, s);
+    await openSection(tester, 'Online features');
     await tester.enterText(field('XXXX-XXXX'), 'k7qx-m2pa');
     await tester.pump();
     await tester.tap(find.widgetWithText(FilledButton, 'Use code'));
@@ -391,6 +534,7 @@ void main() {
       ),
     );
     await pumpSettings(tester, s);
+    await openSection(tester, 'Online features');
     await tester.enterText(field('XXXX-XXXX'), 'k7qx-m2pa');
     await tester.pump();
     await tester.tap(find.widgetWithText(FilledButton, 'Use code'));
@@ -465,12 +609,7 @@ void main() {
       tester,
       await settingsServices(prefs: {'online_features': false}),
     );
-    expect(
-      find.text(
-        'Off: Koban makes no network calls. Groups and reading receipts with Claude stop.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Off'), findsOneWidget);
     expect(
       find.text('Turn on Online features to check for updates.'),
       findsOneWidget,
@@ -481,7 +620,14 @@ void main() {
           .onTap,
       isNull,
     );
-    await tester.tap(find.text('Online features'));
+    await openSection(tester, 'Online features');
+    expect(
+      find.text(
+        'Off: Koban makes no network calls. Groups and reading receipts with Claude stop.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Online features').last);
     await tester.pumpAndSettle();
     expect(
       find.text(
@@ -489,6 +635,8 @@ void main() {
       ),
       findsOneWidget,
     );
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
     expect(
       find.text('Turn on Online features to check for updates.'),
       findsNothing,
@@ -502,6 +650,8 @@ void main() {
       secrets: {'device_token': 'test-device-token'},
     );
     await pumpSettings(tester, s);
+    expect(find.text('On · invite code accepted'), findsOneWidget);
+    await openSection(tester, 'Online features');
     expect(find.text(accepted), findsOneWidget);
     expect(field('XXXX-XXXX'), findsNothing);
     await tester.tap(find.widgetWithText(TextButton, 'Remove'));
@@ -516,6 +666,7 @@ void main() {
   ) async {
     final listener = listenerChannel(xiaomi: true);
     await pumpSettings(tester, await settingsServices(listener: listener));
+    await openSection(tester, 'Tracking');
     expect(find.text('Xiaomi autostart'), findsOneWidget);
     expect(
       find.text('• Security app → Autostart → turn ON for Koban'),
@@ -556,7 +707,7 @@ void main() {
   );
 
   testWidgets(
-    'Settings meets the tap target guidelines and works at text scale 1.3',
+    'every Settings page meets the tap target guidelines and works at text scale 1.3',
     (tester) async {
       final handle = tester.ensureSemantics();
       await pumpSettings(
@@ -569,9 +720,22 @@ void main() {
         ),
         textScale: 1.3,
       );
-      expect(tester.takeException(), isNull);
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      for (final section in [
+        null,
+        'Tracking',
+        'Categories and budgets',
+        'Online features',
+        'Troubleshooting',
+      ]) {
+        if (section != null) await openSection(tester, section);
+        expect(tester.takeException(), isNull, reason: '$section');
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        if (section != null) {
+          await tester.tap(find.byTooltip('Back'));
+          await tester.pumpAndSettle();
+        }
+      }
       handle.dispose();
     },
   );

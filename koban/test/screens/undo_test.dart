@@ -339,21 +339,26 @@ void main() {
     );
     final before = await snapshot(s);
     await pumpSettings(tester, s);
-
-    await tester.tap(find.byTooltip('Remove category Gym'));
+    await tester.tap(find.text('Categories and budgets'));
     await settle(tester);
-    expect(find.text('Category deleted: Gym'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Delete category Gym'));
+    await settle(tester);
+    expect(
+      find.text('Gym deleted. 1 payment is now Uncategorized.'),
+      findsOneWidget,
+    );
     expect(await s.categories.getById(gym.id), isNull);
 
     await tapUndo(tester);
     await expectBack(s, before);
-    expect(find.byTooltip('Remove category Gym'), findsOneWidget);
+    expect(find.byTooltip('Delete category Gym'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Remove category Gym'));
+    await tester.tap(find.byTooltip('Delete category Gym'));
     await settle(tester);
     await waitOutUndo(tester);
     expect(await s.categories.getById(gym.id), isNull);
-    expect(find.byTooltip('Remove category Gym'), findsNothing);
+    expect(find.byTooltip('Delete category Gym'), findsNothing);
   });
 
   testWidgets(

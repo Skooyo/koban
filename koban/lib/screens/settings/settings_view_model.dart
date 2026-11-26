@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart' hide Category;
 
 import '../../app/app_services.dart';
@@ -11,6 +12,7 @@ import '../../data/user_error.dart';
 import '../../online/receipt_cloud_client.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/payment_rules.dart';
+import '../../rules/types.dart';
 import '../../update/update_repository.dart';
 
 /// The Xiaomi background steps of 0.1.1 (`OemBatteryHelper.xiaomiChecklist`).
@@ -40,6 +42,12 @@ class SettingsViewModel extends ChangeNotifier with LoadErrors {
         notifyListeners();
       }, onError: onLoadError),
     );
+    _subs.add(
+      _s.budgets.watchLimits().listen((map) {
+        _limits = map;
+        notifyListeners();
+      }, onError: onLoadError),
+    );
     for (final l in _listenables) {
       l.addListener(notifyListeners);
     }
@@ -66,6 +74,7 @@ class SettingsViewModel extends ChangeNotifier with LoadErrors {
   int _capturedCount = 0;
   String _versionName = '';
   List<Category> _categories = const [];
+  Map<String, Decimal> _limits = const {};
   String? _reconnectMessage;
   String? _parserResult;
   var _inviteBusy = false;
@@ -88,6 +97,9 @@ class SettingsViewModel extends ChangeNotifier with LoadErrors {
   int get capturedCount => _capturedCount;
   String get versionName => _versionName;
   List<Category> get categories => _categories;
+
+  /// The limit of this month for each category that has one.
+  Map<String, Decimal> get limits => _limits;
   String? get reconnectMessage => _reconnectMessage;
   String? get parserResult => _parserResult;
   bool get inviteBusy => _inviteBusy;
@@ -162,7 +174,7 @@ class SettingsViewModel extends ChangeNotifier with LoadErrors {
     try {
       final connected = await _s.listener.isConnected();
       _setReconnect(
-        connected ? 'Listener connected.' : 'Still disconnected after 60s — tap the alert notification or open notification access settings.',
+        connected ? 'Tracking is connected.' : 'Still disconnected after 60s — tap the alert notification or open notification access settings.',
       );
     } catch (e, s) {
       _log('Reconnect check failed', e, s);
@@ -217,11 +229,10 @@ class SettingsViewModel extends ChangeNotifier with LoadErrors {
   /// Reads [text] with the payment rules, as the capture engine does, and shows the result.
   void runParserTest(String text) {
     _parserResult = switch (PaymentRules.match('', text.trim())) {
-      Matched(:final expense, :final format) =>
-        'Amount: ${expense.currency} ${AmountFormatter.formatDisplay(expense.amount)}\n'
-            'Merchant: ${expense.merchant ?? '—'}\n'
-            'Type: ${expense.transactionType.name}\n'
-            'Format: ${format.name}',
+      Matched(:final expense) =>
+        'Amount: ${AmountFormatter.currencySymbol(expense.currency)} ${AmountFormatter.formatDisplay(expense.amount)}\n'
+            'Shop: ${expense.merchant ?? '—'}\n'
+            'Kind: ${expense.transactionType == TransactionType.receive ? 'Received' : 'Spent'}',
       NoMatch() => 'No rule matched this text',
     };
     notifyListeners();
@@ -230,8 +241,27 @@ class SettingsViewModel extends ChangeNotifier with LoadErrors {
   Future<void> addCategory(String name) =>
       _s.categories.addCategory(name, _newCategoryColor);
 
-  Future<Undoable?> deleteCategory(String id) =>
-      _s.categories.deleteCategory(id);
+  /// The category that has this name, ignoring case, or null.
+  Category? categoryNamed(String name) {
+    final wanted = name.trim().toLowerCase();
+    for (final c in _categories) {
+      if (c.name.toLowerCase() == wanted) return c;
+    }
+    return null;
+  }
+
+  /// Deletes an own category. It returns how many payments become Uncategorized,
+  /// and the Undo, or null when nothing went.
+  Future<({Undoable undo, int payments})?> deleteCategory(String id) async {
+    final payments = await _s.categories.paymentCount(id);
+    final undo = await _s.categories.deleteCategory(id);
+    return undo == null ? null : (undo: undo, payments: payments);
+  }
+
+  /// Saves the limit of this month. Null clears it.
+  Future<void> saveLimit(String categoryId, Decimal? amount) => amount == null
+      ? _s.budgets.clearLimit(categoryId)
+      : _s.budgets.setLimit(categoryId, amount);
 
   @override
   void dispose() {

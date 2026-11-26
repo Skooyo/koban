@@ -118,6 +118,10 @@ class CategoryRepository {
     );
   });
 
+  /// How many payments have this category.
+  Future<int> paymentCount(String id) =>
+      _db.expenses.count(where: (e) => e.categoryId.equals(id)).getSingle();
+
   Future<Category?> getById(String? id) async =>
       id == null ? null : await _db.categoryById(id).getSingleOrNull();
 }
