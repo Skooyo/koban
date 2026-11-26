@@ -265,6 +265,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
           }
         } else if (vm.loading) {
           slivers.add(const SliverToBoxAdapter(child: LoadingLine()));
+        } else if (vm.loadError != null) {
+          // The error row above says it. No empty copy for data that did not load.
         } else if (state.expenses.isEmpty) {
           slivers.add(
             _emptySliver(

@@ -197,8 +197,8 @@ class ActivityViewModel extends ChangeNotifier with LoadErrors {
     return YearMonth(n.year, n.month);
   }
 
-  /// True until the Month view has its first data.
-  bool get loading => _data == null;
+  /// True until the Month view has its first data. A failed load ends it: the error row shows.
+  bool get loading => _data == null && loadError == null;
 
   ActivityUiState get state {
     final sel = _s.activitySelection.value;

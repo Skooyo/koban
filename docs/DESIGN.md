@@ -67,7 +67,7 @@ Two variable fonts, in `koban/assets/fonts/`:
 - Sheets have `radius-24` top corners. Dialogs have `radius-24`. Buttons are `radius-full`.
 - The add button sits bottom right above the bottom bar. Give the last list row enough bottom padding so the add button never covers it.
 - No shadows. Show depth with `night`, `surface`, `surface-2` and the scene band.
-- The tab bar is a floating dark pill (`tab-bar`, 12px margin) with 4 tabs: Home, Activity, People, Groups. The selected tab is a gold pill with its icon and label; the others show their icon only, with a tooltip.
+- The tab bar is a floating dark pill (`tab-bar`, 12px margin) with 4 tabs: Home, Activity, People, Groups. Every tab shows its icon with its name under it. The selected tab is a gold pill.
 
 ## Icons
 
