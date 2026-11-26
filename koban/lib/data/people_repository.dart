@@ -236,23 +236,32 @@ class PeopleRepository {
   Future<int?> qrAddedAt(String? path) async =>
       (await _qr.addedAt(path))?.millisecondsSinceEpoch;
 
-  /// Copies the picture at [sourcePath] as the QR, and keeps the old picture for Undo.
-  /// Returns null when there was no QR before: nothing to take back.
+  /// Copies the picture at [sourcePath] as the QR. The old picture stays on disk in a side
+  /// file until the snackbar ends: Undo puts it back, and the end of the snackbar
+  /// ([Undoable.commit]) deletes it. Returns null when there was no QR before.
   Future<Undoable?> replaceQr(String personId, String sourcePath) async {
     final old = (await _db.person(personId).getSingleOrNull())?.qrPath;
-    final bytes = await _qr.read(old);
-    final added = await _qr.addedAt(old);
-    await setQr(personId, sourcePath);
-    if (old == null || bytes == null) return null;
+    final kept = old != null && await _qr.keepOld(old);
+    try {
+      await setQr(personId, sourcePath);
+    } catch (_) {
+      if (kept) await _qr.dropOld(old);
+      rethrow;
+    }
+    if (!kept) return null;
     return Undoable(
       undo: () async {
         final person = await _db.person(personId).getSingleOrNull();
         // Removed or deleted since: do not bring a file back that nothing points to.
-        if (person == null || person.qrPath != old) return;
-        await _qr.put(old, bytes, added);
+        if (person == null || person.qrPath != old) {
+          await _qr.dropOld(old);
+          return;
+        }
+        await _qr.restoreOld(old);
         // The file changed, not the row: write the row so the page reads the date again.
         await _upsertPerson(person);
       },
+      commit: () => _qr.dropOld(old),
     );
   }
 

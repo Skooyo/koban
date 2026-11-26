@@ -200,6 +200,57 @@ void main() {
     expect(await s.db.allPeople().get(), isEmpty);
   });
 
+  testWidgets('a second picture in Add person deletes the first cache copy', (
+    tester,
+  ) async {
+    final cache = Directory.systemTemp.createTempSync('koban_cache');
+    addTearDown(() {
+      try {
+        cache.deleteSync(recursive: true);
+      } on FileSystemException {
+        // Windows may still hold the picture: leave it for the system.
+      }
+    });
+    final first = File(p.join(cache.path, 'first.png'))
+      ..writeAsBytesSync(pngBytes);
+    final second = File(p.join(cache.path, 'second.png'))
+      ..writeAsBytesSync(pngBytes);
+    final picks = [first, second];
+    final s = await testServices(
+      cacheDir: cache,
+      pickImage: () async => picks.removeAt(0).path,
+    );
+    await openPeople(tester, s);
+
+    await tester.tap(find.byTooltip('Add person'));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet(find.text('Add their payment QR')));
+    await settleReal(
+      tester,
+      () => find.text('Use this picture?').evaluate().isNotEmpty,
+    );
+    await tester.tap(find.text('Use as their QR'));
+    await tester.pumpAndSettle();
+    expect(first.existsSync(), isTrue);
+    // Let the row finish reading the first picture: Windows cannot delete a file in use.
+    for (var i = 0; i < 3; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(inSheet(find.text('Payment QR')));
+    await settleReal(
+      tester,
+      () => find.text('Use this picture?').evaluate().isNotEmpty,
+    );
+    await tester.tap(find.text('Use as their QR'));
+    await tester.pumpAndSettle();
+
+    await settleReal(tester, () => !first.existsSync());
+    expect(second.existsSync(), isTrue);
+  });
+
   testWidgets('search ignores case and extra spaces', (tester) async {
     final s = await testServices();
     await seedThree(s);

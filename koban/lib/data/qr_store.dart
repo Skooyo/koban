@@ -88,6 +88,41 @@ class QrStore {
     return await file.exists() ? file.lastModified() : null;
   }
 
+  /// The side file that keeps the old picture while Undo is possible.
+  String _oldPath(String path) => '${p.withoutExtension(path)}.old';
+
+  /// Copies the picture at [path] to its side file, with the same day. False when there is none.
+  Future<bool> keepOld(String path) async {
+    final file = File(path);
+    if (!await file.exists()) return false;
+    // A side file that a dead app left behind: copy does not replace it on Windows.
+    await dropOld(path);
+    final kept = await file.copy(_oldPath(path));
+    await kept.setLastModified(await file.lastModified());
+    return true;
+  }
+
+  /// Puts the side file back as the picture at [path], and deletes the side file.
+  Future<void> restoreOld(String path) async {
+    final kept = File(_oldPath(path));
+    if (!await kept.exists()) return;
+    // Write in place: a picture that the page still reads cannot be replaced by a rename on
+    // Windows. The side file stays until the write is done, so a crash loses nothing.
+    final bytes = await kept.readAsBytes();
+    final day = await kept.lastModified();
+    final target = File(path);
+    await target.writeAsBytes(bytes);
+    await target.setLastModified(day);
+    await kept.delete();
+    await qrImage(path).evict();
+  }
+
+  /// Deletes the side file. Nothing happens when there is none.
+  Future<void> dropOld(String path) async {
+    final kept = File(_oldPath(path));
+    if (await kept.exists()) await kept.delete();
+  }
+
   /// Writes [bytes] to [path] over any file there, and sets the day it was added. Undo uses it.
   Future<void> put(String path, Uint8List bytes, DateTime? addedAt) async {
     final file = File(path);

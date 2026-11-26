@@ -382,13 +382,13 @@ class _AddPersonSheetState extends State<_AddPersonSheet> {
   String? _error;
   var _saving = false;
   var _picking = false;
-  var _added = false;
 
   @override
   void dispose() {
     // A sheet closed with a picked picture leaves a copy in the cache. Delete it.
+    // A save that runs now still reads the copy: _save cleans up after it.
     final path = _qrPath;
-    if (path != null && !_added) unawaited(widget.vm.discardPick(path));
+    if (path != null && !_saving) unawaited(widget.vm.discardPick(path));
     super.dispose();
   }
 
@@ -436,15 +436,17 @@ class _AddPersonSheetState extends State<_AddPersonSheet> {
       );
       error = 'Could not add the person. Try again.';
     }
-    if (!mounted) return;
+    if (!mounted) {
+      // Closed during the save. A failed save did not delete the copy; a good one did.
+      final path = _qrPath;
+      if (added == null && path != null) unawaited(widget.vm.discardPick(path));
+      return;
+    }
     setState(() {
       _error = error;
       _saving = false;
     });
-    if (added != null) {
-      _added = true;
-      Navigator.pop(context, added);
-    }
+    if (added != null) Navigator.pop(context, added);
   }
 
   @override

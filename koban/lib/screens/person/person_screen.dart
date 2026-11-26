@@ -362,100 +362,102 @@ class PersonScreenState extends State<PersonScreen> {
 
   /// The QR big, with the 2 steps to pay, Save QR to gallery, Replace QR and Remove QR.
   /// Replace and Remove close the sheet first, so their snackbar with Undo shows on the page.
-  Future<void> _showQr(PersonViewModel vm, String name, String path) =>
-      showKobanSheet<void>(
-        context: context,
-        builder: (sheet) {
-          final theme = Theme.of(sheet);
-          return ListenableBuilder(
-            listenable: vm,
-            builder: (context, _) => Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Semantics(
-                      header: true,
-                      child: Text(
-                        'Pay $name',
-                        style: weighted(theme.textTheme.titleLarge!, 800),
-                      ),
+  Future<void> _showQr(PersonViewModel vm, String name, String path) {
+    vm.clearQrNotices();
+    return showKobanSheet<void>(
+      context: context,
+      builder: (sheet) {
+        final theme = Theme.of(sheet);
+        return ListenableBuilder(
+          listenable: vm,
+          builder: (context, _) => Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      'Pay $name',
+                      style: weighted(theme.textTheme.titleLarge!, 800),
                     ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: QrFrame(
-                        image: qrImage(path),
-                        label: "$name's payment QR",
-                        version: vm.qrVersion,
-                      ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: QrFrame(
+                      image: qrImage(path),
+                      label: "$name's payment QR",
+                      version: vm.qrVersion,
                     ),
-                    const SizedBox(height: 20),
-                    const _Step(1, 'Save the QR to your gallery.'),
-                    const _Step(
-                      2,
-                      'In your bank app, tap Scan, then pick the QR from the gallery.',
-                    ),
-                    const SizedBox(height: 12),
-                    TonalButton(
-                      'Save QR to gallery',
-                      vm.saveQrToGallery,
-                      icon: Icons.download,
-                    ),
-                    if (vm.storageDenied)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              storageRefused,
-                              style: theme.textTheme.bodyMedium!.copyWith(
-                                color: theme.colorScheme.error,
-                              ),
+                  ),
+                  const SizedBox(height: 20),
+                  const _Step(1, 'Save the QR to your gallery.'),
+                  const _Step(
+                    2,
+                    'In your bank app, tap Scan, then pick the QR from the gallery.',
+                  ),
+                  const SizedBox(height: 12),
+                  TonalButton(
+                    'Save QR to gallery',
+                    vm.saveQrToGallery,
+                    icon: Icons.download,
+                  ),
+                  if (vm.storageDenied)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            storageRefused,
+                            style: theme.textTheme.bodyMedium!.copyWith(
+                              color: theme.colorScheme.error,
                             ),
                           ),
-                          TextButton(
-                            onPressed: () => unawaited(
-                              AppScope.of(sheet).device.openAppInfo(),
-                            ),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(0, 48),
-                            ),
-                            child: const Text('Open settings'),
+                        ),
+                        TextButton(
+                          onPressed: () => unawaited(
+                            AppScope.of(sheet).device.openAppInfo(),
                           ),
-                        ],
-                      ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(sheet);
-                        unawaited(
-                          replaceQrOnPage(this.context, _messenger, vm, name),
-                        );
-                      },
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                        foregroundColor: theme.colorScheme.onSurface,
-                      ),
-                      child: const Text('Replace QR'),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 48),
+                          ),
+                          child: const Text('Open settings'),
+                        ),
+                      ],
                     ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(sheet);
-                        vm.removeQr();
-                      },
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                        foregroundColor: theme.colorScheme.error,
-                      ),
-                      child: const Text('Remove QR'),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(sheet);
+                      unawaited(
+                        replaceQrOnPage(this.context, _messenger, vm, name),
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      foregroundColor: theme.colorScheme.onSurface,
                     ),
-                  ],
-                ),
+                    child: const Text('Replace QR'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(sheet);
+                      vm.removeQr();
+                    },
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      foregroundColor: theme.colorScheme.error,
+                    ),
+                    child: const Text('Remove QR'),
+                  ),
+                ],
               ),
             ),
-          );
-        },
-      );
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// One numbered step: a number in a gold disc, then the text.

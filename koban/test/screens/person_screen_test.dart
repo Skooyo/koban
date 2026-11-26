@@ -597,6 +597,34 @@ void main() {
     },
   );
 
+  testWidgets('a failed Replace QR shows its error inside the Edit sheet', (
+    tester,
+  ) async {
+    final (s, ali, qr, _) = await seedQr();
+    // A folder where the temp file goes makes the copy fail.
+    Directory(p.join(qr.parent.path, '$ali.tmp')).createSync();
+    await openPage(tester, s, ali);
+
+    await tester.tap(find.byTooltip('Edit Ali'));
+    await settle(tester);
+    await tester.tap(find.widgetWithText(TextButton, 'Replace QR').last);
+    await waitForPreview(tester);
+    await tester.tap(find.text("Use as Ali's QR"));
+    await settleReal(
+      tester,
+      () => vmOf(tester).qrError == 'Could not save the change. Try again.',
+    );
+
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('Could not save the change. Try again.'),
+      ),
+      findsOneWidget,
+    );
+    expect(qr.readAsBytesSync(), pngBytes);
+  });
+
   testWidgets('Delete person closes the page at once and shows Undo', (
     tester,
   ) async {

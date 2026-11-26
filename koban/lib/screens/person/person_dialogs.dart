@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:decimal/decimal.dart';
@@ -101,6 +102,19 @@ class _EditPersonSheetState extends State<_EditPersonSheet> {
   // The Undo snackbar of the page sits behind this sheet, so a replace shows its Undo here.
   String? _qrNote;
   Undoable? _qrUndo;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.vm.clearQrNotices();
+  }
+
+  @override
+  void dispose() {
+    // The sheet closed with Undo still open: the old picture can go.
+    unawaited(_qrUndo?.commit?.call());
+    super.dispose();
+  }
 
   Future<void> _replaceQr(String name) async {
     final vm = widget.vm;

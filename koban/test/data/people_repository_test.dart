@@ -4,6 +4,7 @@ import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:koban/data/database.dart';
 import 'package:koban/data/people_repository.dart';
 import 'package:koban/data/qr_store.dart';
@@ -12,6 +13,8 @@ import 'package:koban/data/user_error.dart';
 import 'package:koban/device/device_control.dart';
 import 'package:koban/rules/people_math.dart';
 import 'package:koban/rules/types.dart';
+
+import 'qr_store_test.dart' show pngBytes, wideBytes;
 
 final T = DateTime(2026, 11, 13, 12).millisecondsSinceEpoch;
 
@@ -260,4 +263,62 @@ void main() {
       expect((await person(ali)).suggestedSettleExpenseId, isNull);
     },
   );
+
+  group('replace QR keeps the old picture on disk until the snackbar ends', () {
+    Future<(String, File, File, File)> seed() async {
+      final ali = await repo.addPerson('Ali');
+      final qr = File(p.join(files.path, 'qr', '$ali.img'))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(pngBytes);
+      qr.setLastModifiedSync(DateTime(2026, 11, 5, 9));
+      await (db.update(db.splitPeople)..where((p) => p.id.equals(ali))).write(
+        SplitPeopleCompanion(qrPath: Value(qr.path)),
+      );
+      final picked = File('${files.path}/picked.png')
+        ..writeAsBytesSync(wideBytes);
+      return (ali, qr, picked, File(p.join(files.path, 'qr', '$ali.old')));
+    }
+
+    test(
+      'the old file stays beside the new one, and Undo puts it back',
+      () async {
+        final (ali, qr, picked, old) = await seed();
+
+        final undo = await repo.replaceQr(ali, picked.path);
+
+        expect(qr.readAsBytesSync(), wideBytes);
+        expect(old.readAsBytesSync(), pngBytes);
+        await undo!.undo();
+        expect(qr.readAsBytesSync(), pngBytes);
+        expect(qr.lastModifiedSync(), DateTime(2026, 11, 5, 9));
+        expect(old.existsSync(), isFalse);
+      },
+    );
+
+    test(
+      'the end of the snackbar deletes the old file and keeps the new one',
+      () async {
+        final (ali, qr, picked, old) = await seed();
+
+        final undo = await repo.replaceQr(ali, picked.path);
+        await undo!.commit!();
+
+        expect(old.existsSync(), isFalse);
+        expect(qr.readAsBytesSync(), wideBytes);
+      },
+    );
+
+    test('a failed copy keeps the old QR and leaves no side file', () async {
+      final (ali, qr, _, old) = await seed();
+      final notImage = File('${files.path}/x.txt')..writeAsStringSync('no');
+
+      await expectLater(
+        repo.replaceQr(ali, notImage.path),
+        throwsA(isA<KobanUserError>()),
+      );
+
+      expect(qr.readAsBytesSync(), pngBytes);
+      expect(old.existsSync(), isFalse);
+    });
+  });
 }

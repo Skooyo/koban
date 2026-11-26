@@ -200,7 +200,14 @@ class PersonViewModel extends ChangeNotifier with LoadErrors {
       _qrVersion++;
       _notify();
     },
+    commit: u.commit,
   );
+
+  /// A sheet that opens starts clean: no old red message from an earlier try.
+  void clearQrNotices() {
+    _qrError = null;
+    _storageRefused = false;
+  }
 
   /// Deletes the cached copy of a picture that the owner did not use.
   Future<void> discardPick(String path) => _deleteCachedCopy(path);
