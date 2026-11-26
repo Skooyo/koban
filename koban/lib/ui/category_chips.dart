@@ -12,13 +12,14 @@ const categoryChipCount = 4;
 List<Category> chipCategoriesFor(
   List<Category> categories,
   List<String> mostUsed,
-  String? selectedId,
-) {
+  String? selectedId, {
+  int count = categoryChipCount,
+}) {
   final byId = {for (final c in categories) c.id: c};
   final chips = {
     for (final id in mostUsed) ?byId[id],
     ...categories,
-  }.take(categoryChipCount).toList();
+  }.take(count).toList();
   final selected = byId[selectedId];
   if (selected != null && !chips.contains(selected)) {
     chips[chips.length - 1] = selected;

@@ -88,9 +88,12 @@ class RecentShop {
   final String? categoryId;
 }
 
-const _recentShopCount = 3;
+const _recentShopCount = 4;
 
-/// The distinct shops of [newestFirst], by name without case, at most three.
+/// The payment page shows six category chips, then More.
+const paymentChipCount = 6;
+
+/// The distinct shops of [newestFirst], by name without case, at most [_recentShopCount].
 List<RecentShop> _recentShopsOf(List<Expense> newestFirst) {
   final shops = <String, RecentShop>{};
   for (final e in newestFirst) {
@@ -124,9 +127,12 @@ final class PaymentClosed extends PaymentResult {
 
 /// The payment is saved and the split editor opens for it.
 final class PaymentOpenSplit extends PaymentResult {
-  const PaymentOpenSplit(this.expenseId);
+  const PaymentOpenSplit(this.expenseId, {this.undo});
 
   final String expenseId;
+
+  /// The Undo for past payments the save changed. The caller shows it after the split editor closes.
+  final Undoable? undo;
 }
 
 /// The state and the rules of the payment page: add a payment, or edit one.
@@ -136,13 +142,13 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
       _categories = list;
       notifyListeners();
     }, onError: onLoadError);
-    _mostUsedSub = _s.categories.watchMostUsedIds(categoryChipCount).listen((
+    _mostUsedSub = _s.categories.watchMostUsedIds(paymentChipCount).listen((
       ids,
     ) {
       _mostUsed = ids;
       notifyListeners();
     }, onError: onLoadError);
-    // ponytail: reads every saved payment to find 3 shops. Fine for a personal log.
+    // ponytail: reads every saved payment to find 4 shops. Fine for a personal log.
     _recentSub = _s.expenses.watchAllActive().listen((list) {
       _recentShops = _recentShopsOf(list);
       notifyListeners();
@@ -181,6 +187,10 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
   List<Category> _categories = const [];
   bool _saving = false;
   bool _disposed = false;
+  bool _splitWithFriends = false;
+  bool _changePast = true;
+  int _pastCount = 0;
+  String _pastKey = '';
   PaymentResult? _closeNow;
 
   bool get isEditing => _expenseId != null;
@@ -199,15 +209,36 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
 
   List<Category> get categories => _categories;
 
-  /// The category chips: the most used four, with the chosen category on the last chip if needed.
-  List<Category> get chipCategories =>
-      chipCategoriesFor(_categories, _mostUsed, _form?.categoryId);
+  /// The category chips: the most used six, with the chosen category on the last chip if needed.
+  List<Category> get chipCategories => chipCategoriesFor(
+    _categories,
+    _mostUsed,
+    _form?.categoryId,
+    count: paymentChipCount,
+  );
 
-  /// Up to three recent shops, newest first, for the chips under Shop.
+  /// Up to four recent shops, newest first, for the chips above the categories.
   List<RecentShop> get recentShops => _recentShops;
 
   /// True when the owner is in a group.
   bool get inGroups => _s.inGroups.value;
+
+  /// True: Save opens the split editor for the new payment. Only when adding a payment.
+  bool get splitWithFriends => _splitWithFriends;
+
+  /// How many past payments from this shop the picked category would change. Zero hides the checkbox.
+  int get pastCount {
+    final f = _form;
+    final changes =
+        f != null &&
+        f.categoryId != null &&
+        f.categoryId != _loadedCategoryId &&
+        f.merchant.trim().isNotEmpty;
+    return changes ? _pastCount : 0;
+  }
+
+  /// The checkbox "Also change N past payments". On by default.
+  bool get changePast => _changePast;
 
   /// Set when the page must close at once: the edited payment does not exist.
   PaymentResult? get closeNow => _closeNow;
@@ -250,6 +281,28 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
     if (f == null) return;
     _form = change(f);
     notifyListeners();
+    _countPast();
+  }
+
+  /// Counts the past payments the picked category would change, when the shop, category or direction changed.
+  Future<void> _countPast() async {
+    final f = _form;
+    final category = f?.categoryId;
+    if (f == null || category == null) return;
+    final key = '${f.merchant.trim().toLowerCase()}|${f.type.dbName}|$category';
+    if (key == _pastKey) return;
+    _pastKey = key;
+    _pastCount = 0;
+    _changePast = true;
+    final count = await _s.expenses.countPastForShop(
+      f.merchant,
+      f.type,
+      category,
+      excludeId: _expenseId,
+    );
+    if (_disposed || key != _pastKey) return;
+    _pastCount = count;
+    notifyListeners();
   }
 
   void setAmount(String text) => _edit((f) => f.copyWith(amountText: text));
@@ -267,11 +320,25 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
 
   void setMerchant(String s) => _edit((f) => f.copyWith(merchant: s));
   void setNotes(String s) => _edit((f) => f.copyWith(notes: s));
+
+  void setSplitWithFriends(bool on) {
+    _splitWithFriends = on;
+    notifyListeners();
+  }
+
+  void setChangePast(bool on) {
+    _changePast = on;
+    notifyListeners();
+  }
+
   void setPrivateToGroups(bool on) =>
       _edit((f) => f.copyWith(privateToGroups: on));
 
   /// Saves the payment. Returns null when there is no valid amount or a save is under way.
-  Future<PaymentResult?> save() => _persist(split: false);
+  /// With [splitWithFriends] on, the split editor opens for the new payment.
+  Future<PaymentResult?> save() => _persist(
+    split: _splitWithFriends && _form?.type != TransactionType.receive,
+  );
 
   /// Saves the edited payment, then asks for the split editor of it.
   /// Returns null when adding, when there is no valid amount, or when a save is under way.
@@ -289,8 +356,9 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
     final merchant = f.merchant.trim().isEmpty ? null : f.merchant;
     final notes = f.notes.trim().isEmpty ? null : f.notes;
     final id = _expenseId;
+    final Undoable? undo;
     if (id == null) {
-      await _s.expenses.addManualExpense(
+      final added = await _s.expenses.addManualExpense(
         amount: amount,
         merchant: merchant,
         postTime: f.postTime,
@@ -298,9 +366,12 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
         notes: notes,
         type: f.type,
         privateToGroups: f.privateToGroups,
+        applyToPast: _changePast,
       );
+      if (split) return PaymentOpenSplit(added.id, undo: added.undo);
+      undo = added.undo;
     } else {
-      await _s.expenses.updateExpense(
+      undo = await _s.expenses.updateExpense(
         id,
         amount: amount,
         merchant: merchant,
@@ -309,10 +380,14 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
         notes: notes,
         type: f.type,
         privateToGroups: f.privateToGroups,
+        applyToPast: _changePast,
       );
-      if (split) return PaymentOpenSplit(id);
+      if (split) return PaymentOpenSplit(id, undo: undo);
     }
-    return PaymentClosed(id != null ? null : 'Payment saved');
+    return PaymentClosed(
+      id != null && undo == null ? null : 'Payment saved',
+      undo: undo,
+    );
   }
 
   /// The payment no longer counts in totals. Returns null when a save or delete is under way.

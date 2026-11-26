@@ -221,21 +221,27 @@ Future<void> openSettings(BuildContext context) =>
     pushPage<void>(context, const SettingsScreen());
 
 /// Opens the sheet that adds a payment.
+/// With "Split with friends" on, the sheet closes, then the split editor opens for the payment.
 Future<PaymentResult?> openPaymentNew(BuildContext context) =>
-    pushSheet<PaymentResult>(context, const PaymentScreen());
+    _openPayment(context, const PaymentScreen());
 
 /// Opens the sheet that edits the payment [expenseId].
 /// "Split this bill" closes the sheet, then the split editor opens for the payment.
 Future<PaymentResult?> openPaymentEdit(
   BuildContext context,
   String expenseId,
+) => _openPayment(context, PaymentScreen(expenseId: expenseId));
+
+Future<PaymentResult?> _openPayment(
+  BuildContext context,
+  PaymentScreen screen,
 ) async {
-  final result = await pushSheet<PaymentResult>(
-    context,
-    PaymentScreen(expenseId: expenseId),
-  );
+  final result = await pushSheet<PaymentResult>(context, screen);
   if (result is PaymentOpenSplit && context.mounted) {
     await openSplitNew(context, expenseId: result.expenseId);
+    // The caller shows the Undo for the changed past payments once the split editor is closed.
+    final undo = result.undo;
+    if (undo != null) return PaymentClosed('Payment saved', undo: undo);
   }
   return result;
 }

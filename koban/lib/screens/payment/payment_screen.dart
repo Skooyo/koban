@@ -133,12 +133,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _content(BuildContext context, PaymentForm f) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final income = f.type == TransactionType.receive;
     final editing = _vm.isEditing;
     final valid = AmountInput.toAmount(f.amountText) != null;
-    final card = scheme.surfaceContainer;
+    final splitting = _vm.splitWithFriends && !income;
+    final pastCount = _vm.pastCount;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -157,111 +156,74 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         )
                       : null,
                 ),
-                const SizedBox(height: 16),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 12,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        decoration: BoxDecoration(
-                          color: card,
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            DirectionSegments(
-                              selected: f.type,
-                              onPick: _vm.setType,
-                            ),
-                            const SizedBox(height: 12),
-                            Center(
-                              child: CategoryBadge(f.categoryId, size: 48),
-                            ),
-                            _AmountField(
-                              initial: f.amountText,
-                              autofocus: !editing,
-                              income: income,
-                              hint: editing || f.amountText.isNotEmpty
-                                  ? '${income ? 'Received' : 'Spent'} · ${dateTimeLabel(f.postTime)}'
-                                  : 'Type the amount.',
-                              onChanged: _vm.setAmount,
-                            ),
-                          ],
+                      DirectionSegments(selected: f.type, onPick: _vm.setType),
+                      _AmountField(
+                        initial: f.amountText,
+                        autofocus: !editing,
+                        income: income,
+                        onChanged: _vm.setAmount,
+                      ),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () => _pickDate(f),
+                          icon: const Icon(Icons.calendar_month),
+                          label: Text(dateTimeLabel(f.postTime)),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      if (_vm.loadError case final error?) ...[
-                        WarningRow(error),
-                        const SizedBox(height: 12),
-                      ],
-                      Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: card,
-                          borderRadius: BorderRadius.circular(24),
+                      if (_vm.loadError case final error?) WarningRow(error),
+                      if (!editing && _vm.recentShops.isNotEmpty)
+                        _RecentShops(
+                          shops: _vm.recentShops,
+                          selected: f.merchant.trim().toLowerCase(),
+                          onPick: _vm.pickRecentShop,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            CategoryChips(
-                              chips: _vm.chipCategories,
-                              selectedId: f.categoryId,
-                              flagNotSet: false,
-                              padding: EdgeInsets.zero,
-                              onPick: _vm.setCategory,
-                              onMore: () => showCategorySheet(
-                                context,
-                                categories: _vm.categories,
-                                selectedId: f.categoryId,
-                                onPick: _vm.setCategory,
-                              ),
-                            ),
-                            if (!editing && _vm.recentShops.isNotEmpty) ...[
-                              const SizedBox(height: 16),
-                              _RecentShops(
-                                shops: _vm.recentShops,
-                                selected: f.merchant.trim().toLowerCase(),
-                                onPick: _vm.pickRecentShop,
-                              ),
-                            ],
-                          ],
+                      CategoryChips(
+                        chips: _vm.chipCategories,
+                        selectedId: f.categoryId,
+                        flagNotSet: false,
+                        padding: EdgeInsets.zero,
+                        onPick: _vm.setCategory,
+                        onMore: () => showCategorySheet(
+                          context,
+                          categories: _vm.categories,
+                          selectedId: f.categoryId,
+                          onPick: _vm.setCategory,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      ListGroup(
-                        children: [
-                          KobanRow(
-                            title: dateLabel(f.postTime, _s.now()),
-                            subtitle: 'Date',
-                            leading: const Icon(Icons.calendar_month),
-                            showChevron: true,
-                            onTap: () => _pickDate(f),
-                            onTapLabel: 'Change date',
-                          ),
-                          _TextRow(
-                            label: 'Shop',
-                            placeholder: 'Not set',
-                            icon: Icons.storefront,
-                            value: f.merchant,
-                            onChanged: _vm.setMerchant,
-                            singleLine: true,
-                          ),
-                          _TextRow(
-                            label: 'Note',
-                            placeholder: 'Optional',
-                            icon: Icons.edit_note,
-                            value: f.notes,
-                            onChanged: _vm.setNotes,
-                            singleLine: false,
-                          ),
-                        ],
+                      _LabeledField(
+                        label: 'Shop',
+                        value: f.merchant,
+                        onChanged: _vm.setMerchant,
+                        singleLine: true,
                       ),
-                      if (_vm.inGroups && !income) ...[
-                        const SizedBox(height: 12),
+                      if (pastCount > 0)
+                        CheckboxListTile(
+                          value: _vm.changePast,
+                          onChanged: (v) => _vm.setChangePast(v ?? false),
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(
+                            'Also change $pastCount past ${f.merchant.trim()} '
+                            '${pastCount == 1 ? 'payment' : 'payments'} '
+                            'to ${_categoryName(f.categoryId)}',
+                          ),
+                        ),
+                      _LabeledField(
+                        label: 'Note (optional)',
+                        value: f.notes,
+                        onChanged: _vm.setNotes,
+                        singleLine: false,
+                      ),
+                      if (_vm.inGroups && !income)
                         ListGroup(
                           children: [
                             KobanRow(
@@ -282,23 +244,27 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             ),
                           ],
                         ),
-                      ],
-                      if (f.categoryId != null &&
-                          f.categoryId != _vm.loadedCategoryId &&
-                          f.merchant.trim().isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(
-                            'A new category also applies to past payments from this shop',
-                            style: theme.textTheme.bodySmall!.copyWith(
-                              color: scheme.onSurfaceVariant,
+                      if (!editing && !income)
+                        ListGroup(
+                          children: [
+                            KobanRow(
+                              title: 'Split with friends',
+                              subtitle: 'Pick people after you save',
+                              trailing: ExcludeSemantics(
+                                child: IgnorePointer(
+                                  child: Switch(
+                                    value: splitting,
+                                    onChanged: (_) {},
+                                  ),
+                                ),
+                              ),
+                              onTap: () => _vm.setSplitWithFriends(
+                                !_vm.splitWithFriends,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
-                      if (editing && f.type == TransactionType.withdraw) ...[
-                        const SizedBox(height: 12),
+                      if (editing && !income)
                         SizedBox(
                           height: 56,
                           child: TonalButton(
@@ -307,8 +273,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             icon: Icons.groups,
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -326,9 +290,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.check, size: 18),
+                  Icon(splitting ? Icons.groups : Icons.check, size: 18),
                   const SizedBox(width: 8),
-                  const Text('Save payment'),
+                  Text(splitting ? 'Save and split' : 'Save payment'),
                 ],
               ),
             ),
@@ -337,9 +301,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
       ],
     );
   }
+
+  String _categoryName(String? id) {
+    for (final c in _vm.categories) {
+      if (c.id == id) return c.name;
+    }
+    return 'this category';
+  }
 }
 
-/// Up to three chips of recent shops. A tap fills Shop and its last category.
+/// Up to four chips of recent shops. A tap fills Shop and its last category.
 class _RecentShops extends StatelessWidget {
   const _RecentShops({
     required this.shops,
@@ -385,42 +356,36 @@ class _RecentShops extends StatelessWidget {
   }
 }
 
-/// A [KobanRow]-shaped row whose title is typed in place. A tap on the row types.
-class _TextRow extends StatefulWidget {
-  const _TextRow({
+/// A text field with its label on top. Shop and Note.
+class _LabeledField extends StatefulWidget {
+  const _LabeledField({
     required this.label,
-    required this.placeholder,
-    required this.icon,
     required this.value,
     required this.onChanged,
     required this.singleLine,
   });
 
   final String label;
-  final String placeholder;
-  final IconData icon;
   final String value;
   final ValueChanged<String> onChanged;
   final bool singleLine;
 
   @override
-  State<_TextRow> createState() => _TextRowState();
+  State<_LabeledField> createState() => _LabeledFieldState();
 }
 
-class _TextRowState extends State<_TextRow> {
+class _LabeledFieldState extends State<_LabeledField> {
   late final _controller = TextEditingController(text: widget.value);
-  late final _focus = FocusNode();
 
   // A recent-shop chip changes the value from outside. Typing already matches it.
   @override
-  void didUpdateWidget(_TextRow old) {
+  void didUpdateWidget(_LabeledField old) {
     super.didUpdateWidget(old);
     if (widget.value != _controller.text) _controller.text = widget.value;
   }
 
   @override
   void dispose() {
-    _focus.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -428,72 +393,42 @@ class _TextRowState extends State<_TextRow> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
-    final style = theme.textTheme.titleMedium!.copyWith(
-      color: theme.colorScheme.onSurface,
+    final scheme = theme.colorScheme;
+    const shape = OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+      borderSide: BorderSide.none,
     );
-    return InkWell(
-      onTap: _focus.requestFocus,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 56),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: Center(child: Icon(widget.icon, color: muted)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Semantics(
-                      label: widget.label,
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focus,
-                        onChanged: widget.onChanged,
-                        onSubmitted: (_) => _focus.unfocus(),
-                        style: style,
-                        cursorColor: theme.colorScheme.primary,
-                        minLines: 1,
-                        maxLines: widget.singleLine ? 1 : 4,
-                        textCapitalization: TextCapitalization.sentences,
-                        textInputAction: widget.singleLine
-                            ? TextInputAction.done
-                            : TextInputAction.newline,
-                        keyboardType: widget.singleLine
-                            ? TextInputType.text
-                            : TextInputType.multiline,
-                        decoration: InputDecoration(
-                          isCollapsed: true,
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          hintText: widget.placeholder,
-                          hintStyle: style.copyWith(color: muted),
-                        ),
-                      ),
-                    ),
-                    Text(
-                      widget.label,
-                      style: theme.textTheme.bodyMedium!.copyWith(color: muted),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Icon(Icons.keyboard_arrow_right, color: muted, size: 24),
-              ),
-            ],
-          ),
+    return TextField(
+      controller: _controller,
+      onChanged: widget.onChanged,
+      onSubmitted: (_) => FocusScope.of(context).unfocus(),
+      style: theme.textTheme.titleMedium!.copyWith(color: scheme.onSurface),
+      cursorColor: scheme.primary,
+      minLines: 1,
+      maxLines: widget.singleLine ? 1 : 4,
+      textCapitalization: TextCapitalization.sentences,
+      textInputAction: widget.singleLine
+          ? TextInputAction.done
+          : TextInputAction.newline,
+      keyboardType: widget.singleLine
+          ? TextInputType.text
+          : TextInputType.multiline,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        labelStyle: theme.textTheme.bodyMedium!.copyWith(
+          color: scheme.onSurfaceVariant,
         ),
+        filled: true,
+        fillColor: scheme.surfaceContainer,
+        border: shape,
+        enabledBorder: shape,
+        focusedBorder: shape,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        constraints: const BoxConstraints(minHeight: 48),
       ),
     );
   }
@@ -506,14 +441,12 @@ class _AmountField extends StatefulWidget {
     required this.initial,
     required this.autofocus,
     required this.income,
-    required this.hint,
     required this.onChanged,
   });
 
   final String initial;
   final bool autofocus;
   final bool income;
-  final String hint;
   final ValueChanged<String> onChanged;
 
   @override
@@ -541,9 +474,10 @@ class _AmountFieldState extends State<_AmountField> {
     final style = tabular(theme.textTheme.displayLarge!.copyWith(color: color));
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
       onTap: _focus.requestFocus,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           children: [
             FittedBox(
@@ -588,12 +522,6 @@ class _AmountFieldState extends State<_AmountField> {
                     ),
                   ),
                 ],
-              ),
-            ),
-            Text(
-              widget.hint,
-              style: theme.textTheme.bodyMedium!.copyWith(
-                color: scheme.onSurfaceVariant,
               ),
             ),
           ],
