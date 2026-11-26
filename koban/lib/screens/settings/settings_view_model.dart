@@ -9,7 +9,6 @@ import '../../capture/listener_control.dart';
 import '../../data/database.dart';
 import '../../data/undoable.dart';
 import '../../data/user_error.dart';
-import '../../online/receipt_cloud_client.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/payment_rules.dart';
 import '../../rules/types.dart';
@@ -203,24 +202,9 @@ class SettingsViewModel extends ChangeNotifier with LoadErrors {
     _inviteBusy = true;
     _inviteMessage = null;
     notifyListeners();
-    String? message;
-    try {
-      switch (await _s.online.receiptCloud.register(code)) {
-        case RegistrationOk(:final deviceToken):
-          await _s.online.secrets.setDeviceToken(deviceToken);
-        case RegistrationFailed(:final message):
-          _inviteMessage = message;
-      }
-    } catch (e) {
-      // Log only the type: the message of a body error can hold the token.
-      developer.log(
-        'Invite code check failed: ${e.runtimeType}',
-        name: 'Settings',
-      );
-      message = "Koban's server had a problem. Try again later.";
-    }
+    final message = await _s.online.useInviteCode(code);
     _inviteBusy = false;
-    if (message != null) _inviteMessage = message;
+    _inviteMessage = message;
     if (!_disposed) notifyListeners();
   }
 

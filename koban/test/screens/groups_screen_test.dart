@@ -9,6 +9,7 @@ import 'package:koban/app/home_shell.dart';
 import 'package:koban/online/google_accounts.dart';
 import 'package:koban/online/group_repository.dart';
 import 'package:koban/screens/groups/group_screen.dart';
+import 'package:koban/screens/groups/groups_screen.dart';
 import 'package:koban/screens/groups/groups_view_model.dart';
 import 'package:koban/ui/kit.dart';
 import 'package:material_ui/material_ui.dart';
@@ -19,6 +20,17 @@ import '../online/group_repository_test.dart'
 import '../online/group_session_test.dart' show storedSession, tokenReply;
 import '../support/fake_backend.dart';
 import '../support/harness.dart';
+
+/// A Google sign-in that waits for [gate], then gives the account.
+class GatedGoogleAccounts extends FakeGoogleAccounts {
+  final gate = Completer<void>();
+
+  @override
+  Future<GoogleIdentity?> signIn() async {
+    await gate.future;
+    return super.signIn();
+  }
+}
 
 /// A Google sign-in that waits for [gate]. The person then cancels.
 class SlowGoogleAccounts extends FakeGoogleAccounts {
@@ -560,7 +572,7 @@ void main() {
         matching: find.byType(TextButton),
       ),
     );
-    expect(confirm.style, null);
+    expect(confirm.style?.foregroundColor, null);
     await tester.tap(inDialog('Cancel'));
     await tester.pumpAndSettle();
     expect(find.text('Makan Group'), findsOneWidget);
@@ -620,6 +632,46 @@ void main() {
       expect(google.calls, 0);
     },
   );
+
+  testWidgets('the name step waits while another page covers the tab', (
+    tester,
+  ) async {
+    final google = GatedGoogleAccounts();
+    final s = await open(stored: false, google: google);
+    groupRoutes();
+    var profileReads = 0;
+    backend.on('GET', '/rest/v1/profiles', (r) {
+      profileReads++;
+      return jsonReply(
+        profileReads == 1
+            ? []
+            : [
+                {'alias': 'Ali'},
+              ],
+      );
+    });
+    backend.on('POST', '/rest/v1/rpc/link_account', (r) => jsonReply('ok'));
+    await showGroups(tester, s);
+
+    await tester.tap(find.text('Sign in with Google'));
+    await tester.pump();
+    final navigator = Navigator.of(tester.element(find.byType(GroupsScreen)));
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('over')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    google.gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(s.online.groups.state.value.namePending, true);
+
+    navigator.pop();
+    await tester.pumpAndSettle();
+    expect(inDialog('Your name in groups'), findsOneWidget);
+  });
 
   testWidgets('the first sign-in asks for the name in groups', (tester) async {
     final s = await open(stored: false);
@@ -688,6 +740,18 @@ void main() {
     expect(
       backend.requests.where((r) => r.url.path.startsWith('/functions')),
       isEmpty,
+    );
+
+    // Delete account is red.
+    final deleteButton = tester.widget<TextButton>(
+      find.ancestor(
+        of: inDialog('Delete account'),
+        matching: find.byType(TextButton),
+      ),
+    );
+    expect(
+      deleteButton.style!.foregroundColor!.resolve({}),
+      Theme.of(tester.element(find.byType(AlertDialog))).colorScheme.error,
     );
 
     await tester.tap(inDialog('Delete account'));

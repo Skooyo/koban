@@ -3,7 +3,6 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/app_services.dart';
 import '../../app/routes.dart';
 import '../../online/group_repository.dart';
-import '../../online/receipt_cloud_client.dart';
 import '../../theme/koban_theme.dart';
 import '../../theme/mon.dart';
 import '../../theme/tokens.dart';
@@ -178,38 +177,26 @@ class _GroupsScreenState extends State<GroupsScreen> {
       confirm: 'Use code',
       max: 9,
       submit: (code) async {
-        try {
-          return switch (await s.online.receiptCloud.register(code)) {
-            RegistrationOk(:final deviceToken) =>
-              await s.online.secrets
-                  .setDeviceToken(deviceToken)
-                  .then((_) => (worked: true, error: null)),
-            RegistrationFailed(:final message) => (
-              worked: false,
-              error: message,
-            ),
-          };
-        } catch (e) {
-          // ONLINE LOGS rule R1: the type only.
-          debugPrint('Koban: invite code check failed (${e.runtimeType})');
-          return (
-            worked: false,
-            error: "Koban's server had a problem. Try again later.",
-          );
-        }
+        final error = await s.online.useInviteCode(code);
+        return (worked: error == null, error: error);
       },
     );
   }
 
-  Future<void> _alias() => _askAndRun(
-    title: 'Your name in groups',
-    label: 'Name',
-    helper: 'Members see this name.',
-    start: _vm!.state.alias,
-    confirm: 'Save',
-    max: 30,
-    action: (r, name) => r.setAlias(name),
-  );
+  /// False when another page or dialog is over the tab, so nothing showed.
+  Future<bool> _alias() async {
+    if (!_current) return false;
+    await _askAndRun(
+      title: 'Your name in groups',
+      label: 'Name',
+      helper: 'Members see this name.',
+      start: _vm!.state.alias,
+      confirm: 'Save',
+      max: 30,
+      action: (r, name) => r.setAlias(name),
+    );
+    return true;
+  }
 
   Future<void> _signOut() async {
     if (!_current) return;
@@ -228,8 +215,9 @@ class _GroupsScreenState extends State<GroupsScreen> {
 
   /// After the first sign-in: asks which name the groups see, filled with the Google name.
   Future<void> _askFirstName() async {
-    await _alias();
-    if (mounted) AppScope.of(context).online.groups.nameDone();
+    // With no dialog shown, the step stays pending and the next build asks again.
+    final shown = await _alias();
+    if (shown && mounted) AppScope.of(context).online.groups.nameDone();
   }
 
   Future<void> _delete() async {
@@ -240,6 +228,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
       title: 'Delete your account?',
       body: "This removes you from all your groups and deletes your shared totals from Koban's server. The payments on this phone stay.",
       confirm: 'Delete account',
+      destructive: true,
       action: (r) => r.deleteAccount(),
     );
   }
