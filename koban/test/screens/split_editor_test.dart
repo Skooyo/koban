@@ -852,14 +852,14 @@ void main() {
     expect(editorOf(tester).state.items.first.sharedBy, isEmpty);
   });
 
-  testWidgets('two people with the same first name get a last initial', (
+  testWidgets('two people with the same first name keep their full names', (
     tester,
   ) async {
     await openEditor(tester, await testServices());
     await addPeople(tester, ['Ali Hassan', 'Ali Hamid', 'Siti Aminah']);
     final state = editorOf(tester).state;
-    expect(chipNameOf(state, 'Ali Hassan'), 'Ali H.');
-    expect(chipNameOf(state, 'Ali Hamid'), 'Ali H.');
+    expect(chipNameOf(state, 'Ali Hassan'), 'Ali Hassan');
+    expect(chipNameOf(state, 'Ali Hamid'), 'Ali Hamid');
     expect(chipNameOf(state, 'Siti Aminah'), 'Siti');
   });
 

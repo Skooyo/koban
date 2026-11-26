@@ -34,18 +34,16 @@ String nameOf(SplitEditorState s, String id) => id == meId
     ? 'Me'
     : s.people.where((p) => p.id == id).firstOrNull?.name ?? id;
 
-/// The name on an item chip: the first name, and the first letter of the next word
-/// when another person of the split has the same first name ("Ali H.").
+/// The name on an item chip: the first name, or the full name when another person
+/// of the split has the same first name, so the chips stay apart.
 String chipNameOf(SplitEditorState s, String name) {
-  String first(String n) => n.trim().split(RegExp(r'\s+')).first;
-  final words = name.trim().split(RegExp(r'\s+'));
-  final clash = [
-    'Me',
-    for (final p in s.people) p.name,
-  ].where((n) => first(n).toLowerCase() == words.first.toLowerCase()).length > 1;
-  return clash && words.length > 1
-      ? '${words.first} ${words[1].characters.first}.'
-      : words.first;
+  String first(String n) => n.trim().split(RegExp(r'\s+')).first.toLowerCase();
+  final clash =
+      ['Me', for (final p in s.people) p.name]
+          .where((n) => first(n) == first(name))
+          .length >
+      1;
+  return clash ? name.trim() : name.trim().split(RegExp(r'\s+')).first;
 }
 
 /// A white card with radius 24 on the ground of the screen.
