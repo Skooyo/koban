@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:koban/app/app_services.dart';
@@ -7,6 +8,7 @@ import 'package:koban/app/home_shell.dart';
 import 'package:koban/app/routes.dart' as routes_;
 import 'package:koban/screens/groups/group_screen.dart';
 import 'package:koban/theme/mon.dart';
+import 'package:koban/ui/undo_snack_bar.dart' show undoDuration;
 import 'package:material_ui/material_ui.dart';
 
 import '../online/group_repository_test.dart'
@@ -73,6 +75,7 @@ void main() {
           {
             'group_id': 'g1',
             'user_id': 'user-4',
+            'created_at': '2026-11-10T02:00:00+00:00',
             'profiles': {'alias': 'Siti'},
           },
       ]),
@@ -155,14 +158,12 @@ void main() {
     await openGroup(tester, s);
 
     expect(onPageText('Makan Group'), findsOneWidget);
-    expect(
-      onPageText('Updated just now. Pull down to refresh.'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Pull down to refresh'), findsNothing);
+    expect(onPageText('Members, most spent first'), findsOneWidget);
     expect(onPageText('You spent in November'), findsOneWidget);
     expect(onPageText('RM 30.00'), findsWidgets);
     expect(
-      onPageText('2nd most spent of 3 in Makan Group. Resets in 18 days.'),
+      onPageText('2nd most spent of 3. Resets in 18 days.'),
       findsOneWidget,
     );
     expect(
@@ -204,7 +205,7 @@ void main() {
     expect(onPageText('You spent this week'), findsOneWidget);
     expect(onPageText('RM 35.00'), findsWidgets);
     expect(
-      onPageText('2nd most spent of 3 in Makan Group. Resets in 3 days.'),
+      onPageText('2nd most spent of 3. Resets in 3 days.'),
       findsOneWidget,
     );
     final q = sent('/rest/v1/shared_totals').last.url.queryParameters;
@@ -245,20 +246,20 @@ void main() {
       routes();
       backend.on('POST', '/rest/v1/rpc/remove_member', (r) => jsonReply('ok'));
       await openGroup(tester, s);
-      // The category chip is the only Transport until a row opens.
-      expect(onPageText('Transport'), findsOneWidget);
+      // Categories show only when a row opens.
+      expect(onPageText('Transport'), findsNothing);
       expect(onPageText('Remove'), findsNothing);
 
       await tester.tap(onPageText('Mei'));
       await tester.pumpAndSettle();
-      expect(onPageText('Transport'), findsNWidgets(2));
+      expect(onPageText('Transport'), findsOneWidget);
       expect(onPageText('Make owner'), findsOneWidget);
 
       // Abu has no totals. One row is open at a time.
       await tester.tap(onPageText('Abu'));
       await tester.pumpAndSettle();
       expect(onPageText('No spending in this period.'), findsOneWidget);
-      expect(onPageText('Transport'), findsOneWidget);
+      expect(onPageText('Transport'), findsNothing);
 
       await tester.tap(onPageText('Mei'));
       await tester.pumpAndSettle();
@@ -293,7 +294,6 @@ void main() {
 
       await tester.tap(find.byTooltip('Group actions'));
       await tester.pumpAndSettle();
-      expect(find.text('Make a new code'), findsOneWidget);
       await tester.tap(find.text('Rename group'));
       await tester.pumpAndSettle();
       expect(inDialog('Rename group'), findsOneWidget);
@@ -341,13 +341,8 @@ void main() {
     backend.on('POST', '/rest/v1/rpc/answer_request', (r) => jsonReply('ok'));
     await openGroup(tester, s);
 
-    expect(onPageText('Join requests'), findsOneWidget);
-    expect(
-      onPageText(
-        'Only you see these, because you own the group. Requests end after 7 days.',
-      ),
-      findsOneWidget,
-    );
+    expect(onPageText('1 join request'), findsOneWidget);
+    expect(onPageText('Asked Tue, 10 Nov'), findsOneWidget);
     expect(onPageText('Siti'), findsOneWidget);
     expect(onPageText('Decline'), findsOneWidget);
     // After the answer the server has no request.
@@ -362,7 +357,94 @@ void main() {
       'p_approve': true,
     });
     expect(sent('/rest/v1/group_members').length, greaterThan(before));
-    expect(onPageText('Join requests'), findsNothing);
+    expect(onPageText('1 join request'), findsNothing);
+  });
+
+  testWidgets(
+    'the owner sees requests first, the group owner row and the code tools at the end',
+    (tester) async {
+      final s = await open();
+      routes();
+      await openGroup(tester, s);
+
+      double y(String t) => tester.getTopLeft(onPageText(t)).dy;
+      expect(y('1 join request'), lessThan(y('You spent in November')));
+      expect(
+        y('You spent in November'),
+        lessThan(y('Members, most spent first')),
+      );
+      expect(y('Members, most spent first'), lessThan(y('Group code')));
+      expect(onPageText('Group owner'), findsOneWidget);
+      expect(onPageText('Make a new code'), findsOneWidget);
+      expect(y('Group code'), lessThan(y('Leave group')));
+    },
+  );
+
+  testWidgets('Copy code puts the group code on the clipboard', (tester) async {
+    final s = await open();
+    routes();
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await openGroup(tester, s);
+
+    await tester.ensureVisible(find.byTooltip('Copy code'));
+    await tester.tap(find.byTooltip('Copy code'));
+    await tester.pumpAndSettle();
+
+    expect(copied, 'GRP-7KQ2');
+    expect(find.text('Code copied'), findsOneWidget);
+  });
+
+  testWidgets('Decline waits for the end of Undo, and Undo keeps the request', (
+    tester,
+  ) async {
+    final s = await open();
+    routes();
+    backend.on(
+      'POST',
+      '/rest/v1/rpc/answer_request',
+      (r) => jsonReply('declined'),
+    );
+    await openGroup(tester, s);
+
+    await tester.tap(onPageText('Decline'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Request from Siti declined'), findsOneWidget);
+    expect(onPageText('Siti'), findsNothing);
+    expect(sent('/rest/v1/rpc/answer_request'), isEmpty);
+
+    await tester.tap(find.text('Undo'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(onPageText('Siti'), findsOneWidget);
+    expect(sent('/rest/v1/rpc/answer_request'), isEmpty);
+
+    await tester.tap(onPageText('Decline'));
+    await tester.pump();
+    routes(request: false);
+    await tester.pump(undoDuration + const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+
+    expect(jsonDecode(sent('/rest/v1/rpc/answer_request').single.body), {
+      'p_group': 'g1',
+      'p_user': 'user-4',
+      'p_approve': false,
+    });
+    expect(onPageText('1 join request'), findsNothing);
   });
 
   testWidgets('leaving the group closes the page', (tester) async {
@@ -371,9 +453,8 @@ void main() {
     backend.on('POST', '/rest/v1/rpc/leave_group', (r) => jsonReply('ok'));
     await openGroup(tester, s);
 
-    await tester.tap(find.byTooltip('Group actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Leave group'));
+    await tester.ensureVisible(onPageText('Leave group'));
+    await tester.tap(onPageText('Leave group'));
     await tester.pumpAndSettle();
     expect(inDialog('Leave Makan Group?'), findsOneWidget);
     expect(
@@ -408,7 +489,11 @@ void main() {
       ),
     );
     // The tall screen needs a long pull.
-    await tester.fling(onPageText('Members'), const Offset(0, 1500), 1000);
+    await tester.fling(
+      onPageText('Members, most spent first'),
+      const Offset(0, 1500),
+      1000,
+    );
     await tester.pumpAndSettle();
     expect(find.byType(SnackBar), findsOneWidget);
 
