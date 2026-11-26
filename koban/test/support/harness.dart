@@ -146,7 +146,7 @@ Future<AppServices> testServices({
   ImportResult importResult = const ImportSkipped(),
   FakeChannel? listener,
   FakeChannel? device,
-  Duration checkHold = const Duration(milliseconds: 4000),
+  Duration checkHold = const Duration(milliseconds: 6000),
   Directory? filesDir,
   Future<String?> Function()? pickImage,
   Directory? cacheDir,

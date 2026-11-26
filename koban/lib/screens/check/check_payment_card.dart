@@ -1,23 +1,19 @@
 import 'dart:async';
-import 'dart:math' as math;
 
-import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart' show Value;
-import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
-import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../rules/amount_formatter.dart';
 import '../../rules/top_up.dart';
 import '../../rules/types.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/amount_input.dart';
+import '../../ui/category_chips.dart';
 import '../../ui/date_labels.dart';
 import '../../ui/dialogs.dart';
 import '../../ui/kit.dart';
-import '../payment/category_sheet.dart';
 import 'check_payments_view_model.dart';
 
 /// The time of [ms] in the phone's 12-hour or 24-hour format.
@@ -27,26 +23,81 @@ String _timeText(BuildContext context, int ms) =>
       alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
     );
 
-/// One waiting payment. [stamp] gives the drag as -1 (full "Not a payment") to 1 (full "Save").
-/// The callbacks are null on the cards under the top one.
-class CheckPaymentCard extends StatelessWidget {
+const _fieldShape = OutlineInputBorder(
+  borderRadius: BorderRadius.all(Radius.circular(12)),
+  borderSide: BorderSide.none,
+);
+
+/// The waiting payment on one flat card. Amount, shop, category, date and
+/// Spent or Received are edited on the card. Text edits go to the database
+/// when a field loses focus and when [CheckPaymentCardState.flush] runs.
+class CheckPaymentCard extends StatefulWidget {
   const CheckPaymentCard({
     super.key,
     required this.card,
-    this.stamp,
-    this.onEdit,
-    this.onChooseDirection,
-    this.onPickCategory,
+    required this.categories,
+    required this.mostUsedIds,
+    required this.onEdit,
+    required this.onMoreCategories,
   });
 
   final CheckCard card;
-  final ValueListenable<double>? stamp;
-  final VoidCallback? onEdit;
-  final ValueChanged<TransactionType>? onChooseDirection;
-  final VoidCallback? onPickCategory;
+  final List<Category> categories;
+  final List<String> mostUsedIds;
+  final Future<void> Function(PendingPayment edited) onEdit;
+  final VoidCallback onMoreCategories;
+
+  @override
+  State<CheckPaymentCard> createState() => CheckPaymentCardState();
+}
+
+class CheckPaymentCardState extends State<CheckPaymentCard> {
+  PendingPayment get _payment => widget.card.payment;
+
+  late final _amount = TextEditingController(
+    text: AmountInput.fromAmount(_payment.amount),
+  );
+  late final _shop = TextEditingController(text: _payment.merchant ?? '');
+
+  @override
+  void dispose() {
+    // Back or a closed screen with a field still focused: keep the typed text.
+    unawaited(flush());
+    _amount.dispose();
+    _shop.dispose();
+    super.dispose();
+  }
+
+  /// Writes the typed amount and shop. False when the amount is not above 0;
+  /// the field shows the error then.
+  Future<bool> flush() async {
+    final amount = AmountInput.toAmount(_amount.text);
+    if (amount == null) return false;
+    final p = _payment;
+    final shop = _shop.text.trim();
+    final edited = p.copyWith(
+      // 23.4 and 23.40 are the same money.
+      amount: amount == p.amount ? p.amount : amount,
+      merchant: Value(shop.isEmpty ? null : shop),
+    );
+    if (edited != p) await widget.onEdit(edited);
+    return true;
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showPastDatePicker(
+      context,
+      time: _payment.notificationPostTime,
+      now: AppScope.of(context).now(),
+    );
+    if (picked != null && picked != _payment.notificationPostTime) {
+      await widget.onEdit(_payment.copyWith(notificationPostTime: picked));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final card = widget.card;
     final payment = card.payment;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -54,234 +105,180 @@ class CheckPaymentCard extends StatelessWidget {
     final money = MoneyColors.of(context);
     final muted = scheme.onSurfaceVariant;
     final received = payment.transactionType == TransactionType.receive;
-    final timeText = _timeText(context, payment.notificationPostTime);
     final now = AppScope.of(context).now();
-    final amountText =
-        '${AmountFormatter.currencySymbol(payment.currency)} '
-        '${AmountFormatter.formatGrouped(payment.amount)}';
-    final amount = MoneyText(
-      received ? '+ $amountText' : amountText,
-      style: text.displayMedium,
-      color: received ? money.received : scheme.onSurface,
-    );
-    final stamp = this.stamp;
     final topUp = looksLikeTopUp(payment.rawNotificationText);
     final guessed = payment.format == CaptureFormat.unknown && !topUp;
     final dateText =
-        '${dateLabel(payment.notificationPostTime, now)}, $timeText';
-    final category = card.categoryId;
-    final tint = categoryColor(context, category);
+        '${dateLabel(payment.notificationPostTime, now)}, '
+        '${_timeText(context, payment.notificationPostTime)}';
+    final symbol = AmountFormatter.currencySymbol(payment.currency);
+    final amountBad = AmountInput.toAmount(_amount.text) == null;
 
-    // The tap targets for fixing a field. Null on the cards under the top one.
-    Widget editable(Widget child, {double radius = 12}) => onEdit == null
-        ? child
-        : MergeSemantics(
-            child: Semantics(
-              button: true,
-              onTapHint: 'Change payment',
-              child: InkWell(
-                onTap: onEdit,
-                borderRadius: BorderRadius.circular(radius),
-                child: child,
-              ),
-            ),
-          );
-
-    final top = Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: ShapeDecoration(
-            color: scheme.surfaceContainerHigh,
-            shape: const StadiumBorder(),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 6,
-            children: [
-              Icon(Icons.notifications_none, size: 14, color: muted),
-              Text(card.appName, style: text.labelMedium),
-            ],
-          ),
-        ),
-        Expanded(
-          child: editable(
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 48),
-              child: Align(
-                alignment: Alignment.centerRight,
-                widthFactor: 1,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    dateText,
-                    style: tabular(text.bodySmall!.copyWith(color: muted)),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+    InputDecoration field(
+      String label, {
+      String? prefix,
+      String? error,
+    }) => InputDecoration(
+      labelText: label,
+      floatingLabelBehavior: FloatingLabelBehavior.always,
+      labelStyle: text.bodyMedium!.copyWith(color: muted),
+      prefixText: prefix,
+      errorText: error,
+      // The pencil says the row can be typed in. Screen readers get the label.
+      suffixIcon: ExcludeSemantics(
+        child: Icon(Icons.edit_outlined, size: 18, color: muted),
+      ),
+      filled: true,
+      fillColor: scheme.surfaceContainerHigh,
+      border: _fieldShape,
+      enabledBorder: _fieldShape,
+      focusedBorder: _fieldShape,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      constraints: const BoxConstraints(minHeight: 48),
     );
 
-    final middle = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 4,
-      children: [
-        Center(child: CategoryBadge(category, size: 56)),
-        editable(
-          ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
-            child: Center(
-              child: Text(
-                payment.merchant ?? 'Not set',
-                style: weighted(text.titleLarge!, 700),
-                textAlign: TextAlign.center,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 12,
+        children: [
+          Row(
+            spacing: 6,
+            children: [
+              Icon(Icons.notifications_none, size: 16, color: muted),
+              Text(
+                'From ${card.appName}',
+                style: weighted(text.bodyMedium!, 700),
               ),
-            ),
-          ),
-        ),
-        if (guessed)
-          Text(
-            'Shop · guessed',
-            style: text.bodySmall!.copyWith(color: money.review),
-            textAlign: TextAlign.center,
-          ),
-        // Outside the amount, so each choice is its own button for screen readers.
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 280),
-            child: DirectionSegments(
-              selected: payment.directionUnclear
-                  ? null
-                  : payment.transactionType,
-              // A tap switches Spent or Received on the card, also when the
-              // direction is known (owner decision; 0.1.1 opened the sheet).
-              onPick: onChooseDirection,
-            ),
-          ),
-        ),
-        if (payment.directionUnclear)
-          Text(
-            'Spent or Received?',
-            style: text.bodyMedium!.copyWith(color: money.review),
-            textAlign: TextAlign.center,
-          ),
-        editable(Center(child: amount)),
-        Center(
-          child: Semantics(
-            button: onPickCategory != null,
-            onTapHint: 'Change category',
-            child: Material(
-              color: tint.withValues(alpha: 0.16),
-              shape: const StadiumBorder(),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: onPickCategory,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      spacing: 8,
-                      children: [
-                        CategoryDot(tint, size: 10),
-                        Flexible(
-                          child: Text(
-                            category == null
-                                ? 'Pick a category'
-                                : card.categoryName,
-                            style: weighted(text.labelLarge!, 700),
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  onTapHint: 'Change date',
+                  child: InkWell(
+                    onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        spacing: 6,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              dateText,
+                              style: tabular(
+                                text.bodyMedium!.copyWith(color: muted),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        if (onPickCategory != null)
-                          const Icon(Icons.expand_more, size: 18),
-                      ],
+                          ExcludeSemantics(
+                            child: Icon(
+                              Icons.edit_outlined,
+                              size: 16,
+                              color: muted,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
-        ),
-        if (topUp)
-          _Note(
-            icon: Icons.swap_horiz,
-            color: scheme.primary,
-            text: 'Looks like a wallet top-up, so usually not a payment.',
-          )
-        else if (guessed)
-          _Note(
-            icon: Icons.help_outline,
-            color: money.review,
-            text:
-                'Koban did not know this message, so it guessed the shop '
-                'and Spent or Received. Check them before you save.',
-          ),
-      ],
-    );
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: ColoredBox(
-        color: scheme.surfaceContainer,
-        child: Stack(
-          children: [
-            LayoutBuilder(
-              builder: (context, box) => SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: box.maxHeight.isFinite ? box.maxHeight - 32 : 0,
-                  ),
-                  // The quote sits at the foot of the card when there is room.
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    spacing: 12,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        spacing: 4,
-                        children: [top, middle],
-                      ),
-                      _RawText('“${payment.rawNotificationText}”'),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // The stamps only echo the drag. Screen readers get the card actions instead.
-            if (stamp != null) ...[
-              Positioned(
-                top: 22,
-                right: 18,
-                child: _Stamp(
-                  text: 'Save',
-                  color: money.gold,
-                  angle: 12,
-                  alpha: stamp,
-                  sign: 1,
-                ),
-              ),
-              Positioned(
-                top: 22,
-                left: 18,
-                child: _Stamp(
-                  text: 'Not a payment',
-                  color: money.red,
-                  angle: -12,
-                  alpha: stamp,
-                  sign: -1,
-                ),
-              ),
             ],
-          ],
-        ),
+          ),
+          // Each choice is its own button for screen readers. A tap switches
+          // Spent or Received, also when the direction is known.
+          DirectionSegments(
+            selected: payment.directionUnclear ? null : payment.transactionType,
+            onPick: (type) => widget.onEdit(
+              payment.copyWith(transactionType: type, directionUnclear: false),
+            ),
+          ),
+          if (payment.directionUnclear)
+            Text(
+              'Spent or Received?',
+              style: text.bodyMedium!.copyWith(color: money.review),
+            ),
+          Focus(
+            onFocusChange: (focused) {
+              if (!focused) flush();
+            },
+            child: TextField(
+              controller: _amount,
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => FocusScope.of(context).unfocus(),
+              inputFormatters: [AmountInput.formatter],
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.done,
+              style: tabular(
+                text.headlineLarge!.copyWith(
+                  color: received ? money.received : scheme.onSurface,
+                ),
+              ),
+              cursorColor: scheme.primary,
+              decoration: field(
+                'Amount',
+                prefix: received ? '+ $symbol ' : '$symbol ',
+                error: amountBad ? 'Type an amount above 0' : null,
+              ),
+            ),
+          ),
+          Focus(
+            onFocusChange: (focused) {
+              if (!focused) flush();
+            },
+            child: TextField(
+              controller: _shop,
+              onSubmitted: (_) => FocusScope.of(context).unfocus(),
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.done,
+              style: text.titleMedium!.copyWith(color: scheme.onSurface),
+              cursorColor: scheme.primary,
+              decoration: field('Shop'),
+            ),
+          ),
+          if (guessed)
+            Text(
+              'Shop · guessed',
+              style: text.bodySmall!.copyWith(color: money.review),
+            ),
+          CategoryChips(
+            chips: chipCategoriesFor(
+              widget.categories,
+              widget.mostUsedIds,
+              card.categoryId,
+            ),
+            selectedId: card.categoryId,
+            onPick: (id) =>
+                widget.onEdit(payment.copyWith(categoryId: Value(id))),
+            onMore: widget.onMoreCategories,
+            padding: EdgeInsets.zero,
+          ),
+          if (topUp)
+            _Note(
+              icon: Icons.swap_horiz,
+              color: scheme.primary,
+              text: 'Looks like a wallet top-up, so usually not a payment.',
+            )
+          else if (guessed)
+            _Note(
+              icon: Icons.help_outline,
+              color: money.review,
+              text:
+                  'Koban did not know this message, so it guessed the shop '
+                  'and Spent or Received. Check them before you save.',
+            ),
+          _RawText('“${payment.rawNotificationText}”'),
+        ],
       ),
     );
   }
@@ -296,24 +293,21 @@ class _Note extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 10,
-        children: [
-          Icon(icon, size: 20, color: color),
-          Expanded(
-            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
-          ),
-        ],
-      ),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 10,
+      children: [
+        Icon(icon, size: 20, color: color),
+        Expanded(
+          child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+        ),
+      ],
     ),
   );
 }
@@ -377,304 +371,6 @@ class _RawTextState extends State<_RawText> {
           ],
         );
       },
-    );
-  }
-}
-
-/// A stamp at an angle. It shows only while the drag goes in its direction ([sign]).
-class _Stamp extends StatelessWidget {
-  const _Stamp({
-    required this.text,
-    required this.color,
-    required this.angle,
-    required this.alpha,
-    required this.sign,
-  });
-
-  final String text;
-  final Color color;
-  final double angle;
-  final ValueListenable<double> alpha;
-  final double sign;
-
-  @override
-  Widget build(BuildContext context) {
-    final stamp = ExcludeSemantics(
-      child: Transform.rotate(
-        angle: angle * math.pi / 180,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            border: Border.all(color: color, width: 3),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            text,
-            style: weighted(
-              Theme.of(context).textTheme.titleLarge!,
-              900,
-            ).copyWith(color: color),
-          ),
-        ),
-      ),
-    );
-    return ValueListenableBuilder<double>(
-      valueListenable: alpha,
-      child: stamp,
-      builder: (context, v, child) {
-        final a = (v * sign).clamp(0.0, 1.0);
-        return a == 0
-            ? const SizedBox.shrink()
-            : Opacity(opacity: a, child: child);
-      },
-    );
-  }
-}
-
-/// Opens [EditPaymentSheet] for [card]. A swipe down, Back or a tap outside
-/// with changes asks "Discard changes?" first.
-Future<void> showEditPaymentSheet(
-  BuildContext context, {
-  required CheckCard card,
-  required List<Category> categories,
-  required ValueChanged<PendingPayment> onSave,
-}) {
-  final navigator = Navigator.of(context);
-  final localizations = MaterialLocalizations.of(context);
-  return navigator.push(
-    _EditSheetRoute(
-      builder: (_) => SafeArea(
-        top: false,
-        child: EditPaymentSheet(
-          card: card,
-          categories: categories,
-          onSave: onSave,
-        ),
-      ),
-      capturedThemes: InheritedTheme.capture(
-        from: context,
-        to: navigator.context,
-      ),
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      barrierLabel: localizations.scrimLabel,
-      barrierOnTapHint: localizations.scrimOnTapHint(
-        localizations.bottomSheetLabel,
-      ),
-      modalBarrierColor: Theme.of(context).bottomSheetTheme.modalBarrierColor,
-      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
-          ? AnimationStyle.noAnimation
-          : null,
-    ),
-  );
-}
-
-/// A bottom sheet route that stays open while [changed] is true, and asks first.
-/// 0.1.1 does this with `confirmValueChange` of the sheet state.
-class _EditSheetRoute extends ModalBottomSheetRoute<void> {
-  _EditSheetRoute({
-    required super.builder,
-    required super.capturedThemes,
-    required super.isScrollControlled,
-    required super.useSafeArea,
-    required super.showDragHandle,
-    required super.barrierLabel,
-    required super.barrierOnTapHint,
-    required super.modalBarrierColor,
-    required super.sheetAnimationStyle,
-  });
-
-  /// True while the sheet has changes. The sheet sets it.
-  bool changed = false;
-  bool _leaving = false;
-
-  /// Closes the sheet without a question.
-  void leave() {
-    _leaving = true;
-    if (isCurrent) navigator?.pop();
-  }
-
-  @override
-  bool didPop(void result) {
-    if (!changed || _leaving) return super.didPop(result);
-    // A swipe down already started to close the sheet. Open it again.
-    controller?.forward();
-    // The navigator is busy during didPop. Ask after it.
-    scheduleMicrotask(_ask);
-    return false;
-  }
-
-  Future<void> _ask() async {
-    final context = subtreeContext;
-    if (context == null) return;
-    if (await showDiscardChangesDialog(context)) leave();
-  }
-}
-
-/// The add page's fields for one waiting card. A category is stored only when the owner picks one,
-/// so an untouched card keeps following the shop memory.
-class EditPaymentSheet extends StatefulWidget {
-  const EditPaymentSheet({
-    super.key,
-    required this.card,
-    required this.categories,
-    required this.onSave,
-  });
-
-  final CheckCard card;
-  final List<Category> categories;
-  final ValueChanged<PendingPayment> onSave;
-
-  @override
-  State<EditPaymentSheet> createState() => _EditPaymentSheetState();
-}
-
-class _EditPaymentSheetState extends State<EditPaymentSheet> {
-  PendingPayment get _payment => widget.card.payment;
-
-  late String _amountText = AmountInput.fromAmount(_payment.amount);
-  late TransactionType _type = _payment.transactionType;
-  bool _typePicked = false;
-  late String _merchant = _payment.merchant ?? '';
-  late String? _categoryId = widget.card.categoryId;
-  bool _categoryPicked = false;
-  late int _time = _payment.notificationPostTime;
-
-  bool get _changed =>
-      _amountText != AmountInput.fromAmount(_payment.amount) ||
-      _type != _payment.transactionType ||
-      _merchant != (_payment.merchant ?? '') ||
-      _categoryId != widget.card.categoryId ||
-      _time != _payment.notificationPostTime;
-
-  _EditSheetRoute? get _route => switch (ModalRoute.of(context)) {
-    final _EditSheetRoute r => r,
-    _ => null,
-  };
-
-  void _update(VoidCallback change) {
-    setState(change);
-    _route?.changed = _changed;
-  }
-
-  Future<void> _pickCategory() => showCategorySheet(
-    context,
-    categories: widget.categories,
-    selectedId: _categoryId,
-    onPick: (id) => _update(() {
-      _categoryId = id;
-      _categoryPicked = true;
-    }),
-  );
-
-  Future<void> _pickDate() async {
-    final picked = await showPastDatePicker(
-      context,
-      time: _time,
-      now: AppScope.of(context).now(),
-    );
-    if (picked != null) _update(() => _time = picked);
-  }
-
-  void _save(Decimal amount) {
-    final p = _payment;
-    final merchant = _merchant.trim();
-    final edited = p.copyWith(
-      // 23.4 and 23.40 are the same money.
-      amount: amount == p.amount ? p.amount : amount,
-      transactionType: _type,
-      // A tap on Spent or Received here is the owner's choice too.
-      directionUnclear: p.directionUnclear && !_typePicked,
-      merchant: Value(merchant.isEmpty ? null : merchant),
-      categoryId: Value(_categoryPicked ? _categoryId : p.categoryId),
-      notificationPostTime: _time,
-    );
-    if (edited != p) widget.onSave(edited);
-    _route?.leave();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final amount = AmountInput.toAmount(_amountText);
-    final categoryName =
-        widget.categories
-            .where((c) => c.id == _categoryId)
-            .map((c) => c.name)
-            .firstOrNull ??
-        CategoryRepository.uncategorizedName;
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        0,
-        24,
-        MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 12,
-        children: [
-          Semantics(
-            header: true,
-            child: Text('Change payment', style: theme.textTheme.titleLarge),
-          ),
-          DirectionSegments(
-            selected: !_payment.directionUnclear || _typePicked ? _type : null,
-            onPick: (t) => _update(() {
-              _type = t;
-              _typePicked = true;
-            }),
-          ),
-          DialogTextField(
-            value: _amountText,
-            onChanged: (v) => _update(() => _amountText = v),
-            label:
-                'Amount (${AmountFormatter.currencySymbol(_payment.currency)})',
-            isError: amount == null,
-            supportingText: amount == null ? 'Type an amount above 0' : null,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          ),
-          DialogTextField(
-            value: _merchant,
-            onChanged: (v) => _update(() => _merchant = v),
-            label: 'Shop',
-            textCapitalization: TextCapitalization.words,
-          ),
-          ListGroup(
-            children: [
-              KobanRow(
-                title: categoryName,
-                subtitle: 'Category',
-                leading: CategoryDot(
-                  categoryColor(context, _categoryId),
-                  size: 12,
-                ),
-                showChevron: true,
-                onTap: _pickCategory,
-                onTapLabel: 'Change category',
-              ),
-              KobanRow(
-                title: dateLabel(_time, AppScope.of(context).now()),
-                subtitle: 'Date',
-                showChevron: true,
-                onTap: _pickDate,
-                onTapLabel: 'Change date',
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: SizedBox(
-              height: 56,
-              child: FilledButton(
-                onPressed: amount == null ? null : () => _save(amount),
-                child: const Text('Save changes'),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

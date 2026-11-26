@@ -62,7 +62,7 @@ class AppServices {
     ReceiptOcr? ocr,
     ReceiptPhotos? photos,
     UpdateInstaller? updateInstaller,
-    Duration checkHold = const Duration(milliseconds: 4000),
+    Duration checkHold = const Duration(milliseconds: 6000),
   }) {
     int nowMs() => now().millisecondsSinceEpoch;
     receiptReader = ReceiptReader(ocr ?? MlKitReceiptOcr(), now: nowMs);

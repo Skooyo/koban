@@ -9,6 +9,8 @@ import '../../data/database.dart';
 import '../../data/payment_checks.dart';
 import '../../data/user_error.dart';
 import '../../rules/amount_formatter.dart';
+import '../../rules/top_up.dart';
+import '../../rules/types.dart';
 import '../../ui/category_chips.dart';
 
 /// One card on the swipe screen. [categoryId] is the card's own category, or else the shop memory.
@@ -68,10 +70,10 @@ class CheckPaymentsViewModel extends ChangeNotifier with LoadErrors {
   int _handled = 0;
   String? _undoLabel;
   Timer? _undoTimer;
-  String? _heldId;
+  List<String> _heldIds = const [];
 
-  /// The card that Undo brought back. The pill goes when it is on the list again.
-  String? _returning;
+  /// The cards that Undo brought back. The pill goes when all are on the list again.
+  Set<String> _returning = const {};
 
   /// Waiting payments, oldest first. Null until the first database read, so the screen does not close too early.
   List<CheckCard>? get cards => _cards;
@@ -79,7 +81,7 @@ class CheckPaymentsViewModel extends ChangeNotifier with LoadErrors {
   /// Cards swiped on this visit, for the "N of M" counter.
   int get handled => _handled;
 
-  /// Text of the Undo pill, for example "Saved Kedai Contoh · Undo". Null hides it.
+  /// Text of the Undo pill, for example "Payment saved: Kedai Contoh · Undo". Null hides it.
   String? get undoLabel => _undoLabel;
 
   List<Category> get categories => _categories ?? const [];
@@ -139,7 +141,8 @@ class CheckPaymentsViewModel extends ChangeNotifier with LoadErrors {
     }
     if (_disposed || generation != _generation) return;
     _cards = cards;
-    if (_returning != null && cards.any((c) => c.payment.id == _returning)) {
+    if (_returning.isNotEmpty &&
+        _returning.every((id) => cards.any((c) => c.payment.id == id))) {
       _clearPill();
     }
     notifyListeners();
@@ -147,12 +150,29 @@ class CheckPaymentsViewModel extends ChangeNotifier with LoadErrors {
 
   void _clearPill() {
     _undoTimer?.cancel();
-    _returning = null;
+    _returning = const {};
     _undoLabel = null;
   }
 
   void _notify() {
     if (!_disposed) notifyListeners();
+  }
+
+  /// True when Koban is sure of every field of the card: the direction, the shop,
+  /// a known message format, a category, and not a wallet top-up.
+  static bool isSure(CheckCard c) {
+    final p = c.payment;
+    return !p.directionUnclear &&
+        p.format != CaptureFormat.unknown &&
+        !looksLikeTopUp(p.rawNotificationText) &&
+        (p.merchant ?? '').trim().isNotEmpty &&
+        c.categoryId != null;
+  }
+
+  /// "Save all" shows when two or more cards wait and Koban is sure of each one.
+  bool get canSaveAll {
+    final cards = _cards;
+    return cards != null && cards.length >= 2 && cards.every(isSure);
   }
 
   /// Holds the save ([save] true) or the drop of the card [id] for the Undo window.
@@ -166,12 +186,23 @@ class CheckPaymentsViewModel extends ChangeNotifier with LoadErrors {
         payment.merchant ??
         '${AmountFormatter.currencySymbol(payment.currency)} '
             '${AmountFormatter.formatGrouped(payment.amount)}';
-    // Set the pill before the card goes, so the screen never sees an empty list with no pill.
+    _hold([id], '${save ? 'Payment saved' : 'Not a payment'}: $what', save);
+  }
+
+  /// Saves every waiting card as one hold, with one Undo.
+  void saveAll() {
+    final ids = [for (final c in _cards ?? const <CheckCard>[]) c.payment.id];
+    if (ids.isEmpty) return;
+    _hold(ids, '${ids.length} payments saved', true);
+  }
+
+  void _hold(List<String> ids, String what, bool save) {
+    // Set the pill before the cards go, so the screen never sees an empty list with no pill.
     _clearPill();
-    _undoLabel = '${save ? 'Saved' : 'Skipped'} $what · Undo';
-    _heldId = id;
-    _s.paymentChecks.hold(id, save: save);
-    _handled++;
+    _undoLabel = '$what · Undo';
+    _heldIds = ids;
+    _s.paymentChecks.holdAll(ids, save: save);
+    _handled += ids.length;
     _undoTimer = Timer(_s.paymentChecks.holdWindow, () {
       _undoLabel = null;
       _notify();
@@ -181,16 +212,16 @@ class CheckPaymentsViewModel extends ChangeNotifier with LoadErrors {
 
   void undo() {
     _undoTimer?.cancel();
-    final id = _heldId;
-    _heldId = null;
-    if (id == null || !_s.paymentChecks.undo()) {
+    final ids = _heldIds;
+    _heldIds = const [];
+    if (ids.isEmpty || !_s.paymentChecks.undo()) {
       _clearPill();
       notifyListeners();
       return;
     }
-    if (_handled > 0) _handled--;
-    // Keep the pill until the card is back on the list, for the same reason as in swipe.
-    _returning = id;
+    _handled = (_handled - ids.length).clamp(0, _handled);
+    // Keep the pill until the cards are back on the list, for the same reason as in swipe.
+    _returning = ids.toSet();
     _undoTimer = Timer(_undoReturn, () {
       _clearPill();
       _notify();
@@ -214,7 +245,7 @@ class CheckPaymentsViewModel extends ChangeNotifier with LoadErrors {
 
   /// Commits the held swipe now. The screen calls it when the app goes to the background.
   void flushHold() {
-    _heldId = null;
+    _heldIds = const [];
     _clearPill();
     _notify();
     _s.paymentChecks.flushHold();
