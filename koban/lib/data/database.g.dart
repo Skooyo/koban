@@ -3,6 +3,339 @@
 part of 'database.dart';
 
 // ignore_for_file: type=lint
+class BudgetLimits extends Table with TableInfo<BudgetLimits, BudgetLimit> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  BudgetLimits(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
+    'categoryId',
+  );
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
+    'categoryId',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _currencyMeta = const VerificationMeta(
+    'currency',
+  );
+  late final GeneratedColumn<String> currency = GeneratedColumn<String>(
+    'currency',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _startMonthMeta = const VerificationMeta(
+    'startMonth',
+  );
+  late final GeneratedColumn<String> startMonth = GeneratedColumn<String>(
+    'startMonth',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumnWithTypeConverter<Decimal?, String> amount =
+      GeneratedColumn<String>(
+        'amount',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        $customConstraints: '',
+      ).withConverter<Decimal?>(BudgetLimits.$converteramountn);
+  @override
+  List<GeneratedColumn> get $columns => [
+    categoryId,
+    currency,
+    startMonth,
+    amount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'budget_limits';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BudgetLimit> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('categoryId')) {
+      context.handle(
+        _categoryIdMeta,
+        categoryId.isAcceptableOrUnknown(data['categoryId']!, _categoryIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_categoryIdMeta);
+    }
+    if (data.containsKey('currency')) {
+      context.handle(
+        _currencyMeta,
+        currency.isAcceptableOrUnknown(data['currency']!, _currencyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_currencyMeta);
+    }
+    if (data.containsKey('startMonth')) {
+      context.handle(
+        _startMonthMeta,
+        startMonth.isAcceptableOrUnknown(data['startMonth']!, _startMonthMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startMonthMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {categoryId, currency, startMonth};
+  @override
+  BudgetLimit map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BudgetLimit(
+      categoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}categoryId'],
+      )!,
+      currency: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}currency'],
+      )!,
+      startMonth: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}startMonth'],
+      )!,
+      amount: BudgetLimits.$converteramountn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}amount'],
+        ),
+      ),
+    );
+  }
+
+  @override
+  BudgetLimits createAlias(String alias) {
+    return BudgetLimits(attachedDatabase, alias);
+  }
+
+  static TypeConverter<Decimal, String> $converteramount =
+      const MoneyConverter();
+  static TypeConverter<Decimal?, String?> $converteramountn =
+      NullAwareTypeConverter.wrap($converteramount);
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(categoryId, currency, startMonth)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class BudgetLimit extends DataClass implements Insertable<BudgetLimit> {
+  final String categoryId;
+  final String currency;
+  final String startMonth;
+  final Decimal? amount;
+  const BudgetLimit({
+    required this.categoryId,
+    required this.currency,
+    required this.startMonth,
+    this.amount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['categoryId'] = Variable<String>(categoryId);
+    map['currency'] = Variable<String>(currency);
+    map['startMonth'] = Variable<String>(startMonth);
+    if (!nullToAbsent || amount != null) {
+      map['amount'] = Variable<String>(
+        BudgetLimits.$converteramountn.toSql(amount),
+      );
+    }
+    return map;
+  }
+
+  BudgetLimitsCompanion toCompanion(bool nullToAbsent) {
+    return BudgetLimitsCompanion(
+      categoryId: Value(categoryId),
+      currency: Value(currency),
+      startMonth: Value(startMonth),
+      amount: amount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(amount),
+    );
+  }
+
+  factory BudgetLimit.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BudgetLimit(
+      categoryId: serializer.fromJson<String>(json['categoryId']),
+      currency: serializer.fromJson<String>(json['currency']),
+      startMonth: serializer.fromJson<String>(json['startMonth']),
+      amount: serializer.fromJson<Decimal?>(json['amount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'categoryId': serializer.toJson<String>(categoryId),
+      'currency': serializer.toJson<String>(currency),
+      'startMonth': serializer.toJson<String>(startMonth),
+      'amount': serializer.toJson<Decimal?>(amount),
+    };
+  }
+
+  BudgetLimit copyWith({
+    String? categoryId,
+    String? currency,
+    String? startMonth,
+    Value<Decimal?> amount = const Value.absent(),
+  }) => BudgetLimit(
+    categoryId: categoryId ?? this.categoryId,
+    currency: currency ?? this.currency,
+    startMonth: startMonth ?? this.startMonth,
+    amount: amount.present ? amount.value : this.amount,
+  );
+  BudgetLimit copyWithCompanion(BudgetLimitsCompanion data) {
+    return BudgetLimit(
+      categoryId: data.categoryId.present
+          ? data.categoryId.value
+          : this.categoryId,
+      currency: data.currency.present ? data.currency.value : this.currency,
+      startMonth: data.startMonth.present
+          ? data.startMonth.value
+          : this.startMonth,
+      amount: data.amount.present ? data.amount.value : this.amount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BudgetLimit(')
+          ..write('categoryId: $categoryId, ')
+          ..write('currency: $currency, ')
+          ..write('startMonth: $startMonth, ')
+          ..write('amount: $amount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(categoryId, currency, startMonth, amount);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BudgetLimit &&
+          other.categoryId == this.categoryId &&
+          other.currency == this.currency &&
+          other.startMonth == this.startMonth &&
+          other.amount == this.amount);
+}
+
+class BudgetLimitsCompanion extends UpdateCompanion<BudgetLimit> {
+  final Value<String> categoryId;
+  final Value<String> currency;
+  final Value<String> startMonth;
+  final Value<Decimal?> amount;
+  final Value<int> rowid;
+  const BudgetLimitsCompanion({
+    this.categoryId = const Value.absent(),
+    this.currency = const Value.absent(),
+    this.startMonth = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BudgetLimitsCompanion.insert({
+    required String categoryId,
+    required String currency,
+    required String startMonth,
+    this.amount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : categoryId = Value(categoryId),
+       currency = Value(currency),
+       startMonth = Value(startMonth);
+  static Insertable<BudgetLimit> custom({
+    Expression<String>? categoryId,
+    Expression<String>? currency,
+    Expression<String>? startMonth,
+    Expression<String>? amount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (categoryId != null) 'categoryId': categoryId,
+      if (currency != null) 'currency': currency,
+      if (startMonth != null) 'startMonth': startMonth,
+      if (amount != null) 'amount': amount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BudgetLimitsCompanion copyWith({
+    Value<String>? categoryId,
+    Value<String>? currency,
+    Value<String>? startMonth,
+    Value<Decimal?>? amount,
+    Value<int>? rowid,
+  }) {
+    return BudgetLimitsCompanion(
+      categoryId: categoryId ?? this.categoryId,
+      currency: currency ?? this.currency,
+      startMonth: startMonth ?? this.startMonth,
+      amount: amount ?? this.amount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (categoryId.present) {
+      map['categoryId'] = Variable<String>(categoryId.value);
+    }
+    if (currency.present) {
+      map['currency'] = Variable<String>(currency.value);
+    }
+    if (startMonth.present) {
+      map['startMonth'] = Variable<String>(startMonth.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<String>(
+        BudgetLimits.$converteramountn.toSql(amount.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BudgetLimitsCompanion(')
+          ..write('categoryId: $categoryId, ')
+          ..write('currency: $currency, ')
+          ..write('startMonth: $startMonth, ')
+          ..write('amount: $amount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class Expenses extends Table with TableInfo<Expenses, Expense> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -5698,6 +6031,7 @@ class DroppedNotificationsCompanion
 abstract class _$KobanDatabase extends GeneratedDatabase {
   _$KobanDatabase(QueryExecutor e) : super(e);
   $KobanDatabaseManager get managers => $KobanDatabaseManager(this);
+  late final BudgetLimits budgetLimits = BudgetLimits(this);
   late final Expenses expenses = Expenses(this);
   late final Categories categories = Categories(this);
   late final MerchantCategoryMap merchantCategoryMap = MerchantCategoryMap(
@@ -5741,6 +6075,69 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
     'index_split_items_billId',
     'CREATE INDEX index_split_items_billId ON split_items (billId)',
   );
+  Selectable<BudgetLimit> allLimitRows(String currency) {
+    return customSelect(
+      'SELECT * FROM budget_limits WHERE currency = ?1',
+      variables: [Variable<String>(currency)],
+      readsFrom: {this.budgetLimits},
+    ).asyncMap(this.budgetLimits.mapFromRow);
+  }
+
+  Selectable<BudgetLimit> limitRowsOfCategory(String categoryId) {
+    return customSelect(
+      'SELECT * FROM budget_limits WHERE categoryId = ?1',
+      variables: [Variable<String>(categoryId)],
+      readsFrom: {this.budgetLimits},
+    ).asyncMap(this.budgetLimits.mapFromRow);
+  }
+
+  Future<int> deleteLimitsOfCategory(String categoryId) {
+    return customUpdate(
+      'DELETE FROM budget_limits WHERE categoryId = ?1',
+      variables: [Variable<String>(categoryId)],
+      updates: {this.budgetLimits},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Future<int> deleteLimitRow(
+    String categoryId,
+    String currency,
+    String startMonth,
+  ) {
+    return customUpdate(
+      'DELETE FROM budget_limits WHERE categoryId = ?1 AND currency = ?2 AND startMonth = ?3',
+      variables: [
+        Variable<String>(categoryId),
+        Variable<String>(currency),
+        Variable<String>(startMonth),
+      ],
+      updates: {this.budgetLimits},
+      updateKind: UpdateKind.delete,
+    );
+  }
+
+  Selectable<SpentByCategoryInResult> spentByCategoryIn(
+    String currency,
+    int start,
+    int end,
+  ) {
+    return customSelect(
+      'SELECT categoryId, CAST(COALESCE(SUM(COALESCE(countedAmount, amount)), 0) AS TEXT) AS total FROM expenses WHERE status != \'DISMISSED\' AND transactionType != \'RECEIVE\' AND currency = ?1 AND categoryId IS NOT NULL AND notificationPostTime >= ?2 AND notificationPostTime < ?3 GROUP BY categoryId',
+      variables: [
+        Variable<String>(currency),
+        Variable<int>(start),
+        Variable<int>(end),
+      ],
+      readsFrom: {this.expenses},
+    ).map(
+      (QueryRow row) => SpentByCategoryInResult(
+        categoryId: row.readNullable<String>('categoryId'),
+        total: const MoneyConverter().fromSql(row.read<String>('total')),
+      ),
+    );
+  }
+
   Selectable<GroupTotalsResult> groupTotals(
     String? uncategorized,
     String currency,
@@ -5824,23 +6221,6 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
         total: const MoneyConverter().fromSql(row.read<String>('total')),
         spentCount: row.readNullable<int>('spentCount'),
       ),
-    );
-  }
-
-  Future<int> setCategoryForMerchant(
-    String? categoryId,
-    String? merchantKey,
-    TransactionType type,
-  ) {
-    return customUpdate(
-      'UPDATE expenses SET categoryId = ?1 WHERE lower(trim(merchant)) = ?2 AND transactionType = ?3',
-      variables: [
-        Variable<String>(categoryId),
-        Variable<String>(merchantKey),
-        Variable<String>(Expenses.$convertertransactionType.toSql(type)),
-      ],
-      updates: {this.expenses},
-      updateKind: UpdateKind.update,
     );
   }
 
@@ -6288,6 +6668,7 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    budgetLimits,
     expenses,
     categories,
     merchantCategoryMap,
@@ -6309,6 +6690,196 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
   ];
 }
 
+typedef $BudgetLimitsCreateCompanionBuilder = BudgetLimitsCompanion Function({
+  required String categoryId,
+  required String currency,
+  required String startMonth,
+  Value<Decimal?> amount,
+  Value<int> rowid,
+});
+typedef $BudgetLimitsUpdateCompanionBuilder = BudgetLimitsCompanion Function({
+  Value<String> categoryId,
+  Value<String> currency,
+  Value<String> startMonth,
+  Value<Decimal?> amount,
+  Value<int> rowid,
+});
+
+class $BudgetLimitsFilterComposer
+    extends Composer<_$KobanDatabase, BudgetLimits> {
+  $BudgetLimitsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startMonth => $composableBuilder(
+    column: $table.startMonth,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<Decimal?, Decimal, String> get amount =>
+      $composableBuilder(
+        column: $table.amount,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $BudgetLimitsOrderingComposer
+    extends Composer<_$KobanDatabase, BudgetLimits> {
+  $BudgetLimitsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startMonth => $composableBuilder(
+    column: $table.startMonth,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $BudgetLimitsAnnotationComposer
+    extends Composer<_$KobanDatabase, BudgetLimits> {
+  $BudgetLimitsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get currency =>
+      $composableBuilder(column: $table.currency, builder: (column) => column);
+
+  GeneratedColumn<String> get startMonth => $composableBuilder(
+    column: $table.startMonth,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<Decimal?, String> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+}
+
+class $BudgetLimitsTableManager
+    extends
+        RootTableManager<
+          _$KobanDatabase,
+          BudgetLimits,
+          BudgetLimit,
+          $BudgetLimitsFilterComposer,
+          $BudgetLimitsOrderingComposer,
+          $BudgetLimitsAnnotationComposer,
+          $BudgetLimitsCreateCompanionBuilder,
+          $BudgetLimitsUpdateCompanionBuilder,
+          (
+            BudgetLimit,
+            BaseReferences<_$KobanDatabase, BudgetLimits, BudgetLimit>,
+          ),
+          BudgetLimit,
+          PrefetchHooks Function()
+        > {
+  $BudgetLimitsTableManager(_$KobanDatabase db, BudgetLimits table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $BudgetLimitsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $BudgetLimitsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $BudgetLimitsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> categoryId = const Value.absent(),
+                Value<String> currency = const Value.absent(),
+                Value<String> startMonth = const Value.absent(),
+                Value<Decimal?> amount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BudgetLimitsCompanion(
+                categoryId: categoryId,
+                currency: currency,
+                startMonth: startMonth,
+                amount: amount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String categoryId,
+                required String currency,
+                required String startMonth,
+                Value<Decimal?> amount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BudgetLimitsCompanion.insert(
+                categoryId: categoryId,
+                currency: currency,
+                startMonth: startMonth,
+                amount: amount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<BudgetLimits, BudgetLimit>(table),
+                  BaseReferences<_$KobanDatabase, BudgetLimits, BudgetLimit>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $BudgetLimitsProcessedTableManager =
+    ProcessedTableManager<
+      _$KobanDatabase,
+      BudgetLimits,
+      BudgetLimit,
+      $BudgetLimitsFilterComposer,
+      $BudgetLimitsOrderingComposer,
+      $BudgetLimitsAnnotationComposer,
+      $BudgetLimitsCreateCompanionBuilder,
+      $BudgetLimitsUpdateCompanionBuilder,
+      (BudgetLimit, BaseReferences<_$KobanDatabase, BudgetLimits, BudgetLimit>),
+      BudgetLimit,
+      PrefetchHooks Function()
+    >;
 typedef $ExpensesCreateCompanionBuilder = ExpensesCompanion Function({
   required String id,
   required Decimal amount,
@@ -9258,6 +9829,8 @@ typedef $DroppedNotificationsProcessedTableManager =
 class $KobanDatabaseManager {
   final _$KobanDatabase _db;
   $KobanDatabaseManager(this._db);
+  $BudgetLimitsTableManager get budgetLimits =>
+      $BudgetLimitsTableManager(_db, _db.budgetLimits);
   $ExpensesTableManager get expenses =>
       $ExpensesTableManager(_db, _db.expenses);
   $CategoriesTableManager get categories =>
@@ -9280,6 +9853,12 @@ class $KobanDatabaseManager {
       $PendingPaymentsTableManager(_db, _db.pendingPayments);
   $DroppedNotificationsTableManager get droppedNotifications =>
       $DroppedNotificationsTableManager(_db, _db.droppedNotifications);
+}
+
+class SpentByCategoryInResult {
+  final String? categoryId;
+  final Decimal total;
+  SpentByCategoryInResult({this.categoryId, required this.total});
 }
 
 class GroupTotalsResult {

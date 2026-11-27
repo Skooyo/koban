@@ -169,11 +169,11 @@ void main() {
   });
 
   test(
-    'a swipe hides the card, counts it and shows Saved with the shop',
+    'a swipe hides the card, counts it and shows Payment saved with the shop',
     () async {
       final (_, vm) = await start();
       vm.swipe('card0', save: true);
-      expect(vm.undoLabel, 'Saved RESTORAN CONTOH · Undo');
+      expect(vm.undoLabel, 'Payment saved: RESTORAN CONTOH · Undo');
       expect(vm.handled, 1);
       await until(vm, () => vm.cards!.length == 2);
       expect(vm.cards!.first.payment.id, 'card1');
@@ -190,7 +190,7 @@ void main() {
     });
     await until(vm, () => vm.cards?.length == 1);
     vm.swipe('card0', save: false);
-    expect(vm.undoLabel, 'Skipped RM 15.00 · Undo');
+    expect(vm.undoLabel, 'Not a payment: RM 15.00 · Undo');
   });
 
   test('undo counts back and the pill goes when the card is back', () async {
@@ -200,7 +200,7 @@ void main() {
     vm.undo();
     expect(vm.handled, 0);
     // The pill stays until the card is on the list again.
-    expect(vm.undoLabel, 'Saved RESTORAN CONTOH · Undo');
+    expect(vm.undoLabel, 'Payment saved: RESTORAN CONTOH · Undo');
     await until(vm, () => vm.undoLabel == null);
     expect(vm.cards!.map((c) => c.payment.id), ['card0', 'card1', 'card2']);
   });
@@ -223,5 +223,37 @@ void main() {
     vm.swipe('card0', save: true);
     vm.flushHold();
     expect(await message, 'Already saved, so it was not added again.');
+  });
+
+  test('Save all needs two or more cards and every field sure', () async {
+    final (_, vm) = await start();
+    // The first card has no category and the third is received without one.
+    expect(vm.canSaveAll, false);
+    final s = await testServices(device: maeDevice(), checkHold: longHold);
+    for (final i in [0, 1]) {
+      await addCard(
+        s,
+        order: i,
+        amount: '5.00',
+        merchant: 'KEDAI $i',
+        rawText: 'x$i',
+        categoryId: 'transport',
+      );
+    }
+    final sure = CheckPaymentsViewModel(s);
+    addTearDown(() async {
+      sure.dispose();
+      await s.paymentChecks.idle;
+    });
+    await until(sure, () => sure.cards?.length == 2);
+    expect(sure.canSaveAll, true);
+    sure.saveAll();
+    expect(sure.undoLabel, '2 payments saved · Undo');
+    expect(sure.handled, 2);
+    await until(sure, () => sure.cards!.isEmpty);
+    sure.undo();
+    expect(sure.handled, 0);
+    await until(sure, () => sure.undoLabel == null);
+    expect(sure.cards!.map((c) => c.payment.id), ['card0', 'card1']);
   });
 }

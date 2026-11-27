@@ -25,6 +25,7 @@ class OnboardingViewModel extends ChangeNotifier {
   var _step = OnboardingStep.welcome;
   var _openedSettings = false;
   int? _sdkInt;
+  var _autostartOpened = false;
 
   OnboardingStep get step => _step;
 
@@ -93,6 +94,15 @@ class OnboardingViewModel extends ChangeNotifier {
     OnboardingStep.welcome => null,
   };
 
+  /// True after the friend came back from the Autostart settings.
+  bool get autostartChecked => _s.settings.onboardingAutostartChecked;
+
+  /// The Autostart row. The phone cannot tell its state, so a return counts as checked.
+  void openAutostart() {
+    _autostartOpened = true;
+    unawaited(_s.listener.openBackgroundSettings());
+  }
+
   /// Call it just before the screen opens the access settings.
   void openedSettings() {
     _openedSettings = true;
@@ -118,6 +128,10 @@ class OnboardingViewModel extends ChangeNotifier {
       if (opened) {
         _openedSettings = false;
         unawaited(_save());
+      }
+      if (_autostartOpened && _step == OnboardingStep.running) {
+        _autostartOpened = false;
+        await _s.settings.setOnboardingAutostartChecked();
       }
       if (_step == OnboardingStep.running) await refreshRunning();
     } catch (e, s) {

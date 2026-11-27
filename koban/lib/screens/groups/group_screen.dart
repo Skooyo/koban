@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:decimal/decimal.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
 import '../../data/category_repository.dart';
+import '../../data/undoable.dart';
 import '../../online/group_repository.dart';
 import '../../rules/periods.dart';
 import '../../theme/koban_theme.dart';
@@ -13,6 +15,7 @@ import '../../theme/tokens.dart';
 import '../../ui/kit.dart';
 import '../../ui/money.dart';
 import '../../ui/scene_band.dart';
+import '../../ui/undo_snack_bar.dart';
 import 'group_dialogs.dart';
 import 'groups_view_model.dart';
 
@@ -56,9 +59,13 @@ Color _categoryColor(BuildContext context, String name) {
 
 /// The page of one group. A port of the 0.1.1 `GroupsScreen.kt` `GroupScreen` and `GroupBody`.
 class GroupScreen extends StatefulWidget {
-  const GroupScreen(this.groupId, {super.key});
+  const GroupScreen(this.groupId, {this.madeName, super.key});
 
   final String groupId;
+
+  /// Set when the person just made this group: the page shows the group code
+  /// and Share code first, and a snackbar says "[madeName] made".
+  final String? madeName;
 
   @override
   State<GroupScreen> createState() => _GroupScreenState();
@@ -76,8 +83,22 @@ class _GroupScreenState extends State<GroupScreen> {
   String? _open;
   var _help = false;
 
-  /// The name of the category that ranks the members. Null is all spending.
-  String? _category;
+  /// The join requests that the owner declined and that wait for the end of the
+  /// Undo window. They stay hidden. The server call runs when the window ends.
+  final _declined = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    final made = widget.madeName;
+    if (made != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$made made')));
+      });
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -170,6 +191,7 @@ class _GroupScreenState extends State<GroupScreen> {
       title: 'Leave ${g.name}?',
       body: 'Members stop seeing your totals. To come back, ask the owner again with the group code.',
       confirm: 'Leave group',
+      destructive: true,
       action: (r) => r.leave(g.id),
       onOk: _close,
     ),
@@ -183,6 +205,7 @@ class _GroupScreenState extends State<GroupScreen> {
       body:
           "${m.alias} stops seeing this group, and the members stop seeing ${m.alias}'s totals.",
       confirm: 'Remove',
+      destructive: true,
       action: (r) => r.remove(g.id, m.userId),
     ),
   );
@@ -203,7 +226,7 @@ class _GroupScreenState extends State<GroupScreen> {
     final device = AppScope.of(context).device;
     try {
       await device.shareText(
-        'Join my Koban group "${g.name}" with the code ${g.code}.',
+        'Join my Koban group ${g.name}. In Koban, open Groups, tap Join with a group code, and type ${g.code}. No Koban yet? Ask me for an invite code.',
         chooserTitle: 'Share group code',
       );
     } catch (e) {
@@ -212,67 +235,45 @@ class _GroupScreenState extends State<GroupScreen> {
     }
   }
 
-  /// What [m] spent in [category]. A null [category] is the total.
-  Decimal _amount(Member m, String? category) => category == null
-      ? m.total
-      : m.categories
-            .where((c) => c.$1 == category)
-            .fold(Decimal.zero, (sum, c) => sum + c.$2);
-
-  /// The names of the categories of all members, the biggest sum first.
-  List<String> _categoryNames(GroupDetail d) {
-    final sums = <String, Decimal>{};
-    for (final m in d.members) {
-      for (final (c, v) in m.categories) {
-        sums[c] = (sums[c] ?? Decimal.zero) + v;
-      }
-    }
-    return (sums.keys.toList()..sort((a, b) => sums[b]!.compareTo(sums[a]!)));
+  /// Hides the request at once, and tells the server only when the Undo window ends.
+  void _decline(GroupsViewModel vm, JoinRequest r) {
+    final messenger = ScaffoldMessenger.of(context);
+    // ponytail: the decline is only held on this phone. If the app dies inside the
+    // Undo window, the request stays open on the server. Upgrade: a server undecline
+    // RPC, so the decline can run at once and Undo can take it back.
+    setState(() => _declined.add(r.userId));
+    showUndoSnackBar(
+      messenger,
+      'Request from ${r.alias} declined',
+      undo: Undoable(
+        undo: () async {
+          if (mounted) setState(() => _declined.remove(r.userId));
+        },
+        commit: () async {
+          // run() returns at once while another action runs, so wait for it.
+          while (vm.busy) {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+          }
+          await vm.run(
+            (x) => x.answer(r, false),
+            onError: (e) => messenger.showSnackBar(SnackBar(content: Text(e))),
+          );
+          if (mounted) setState(() => _declined.remove(r.userId));
+        },
+      ),
+    );
   }
 
-  /// Mon's line: who spent least in the shown category.
-  ({MonFace face, String line, String? detail}) _monSay(
-    GroupDetail? d,
-    String? category,
-    String? me,
-    bool failed,
-  ) {
-    if (d == null) {
-      return failed
-          ? (
-              face: MonFace.worry,
-              line: 'Could not load the group.',
-              detail: 'Check the internet connection, then try again.',
-            )
-          : (face: MonFace.idle, line: 'One moment.', detail: null);
-    }
-    // A member with nothing in this category has no spot to keep warm.
-    final ranked = [
-      for (final m in d.members)
-        if (_amount(m, category) > Decimal.zero) m,
-    ]..sort((a, b) => _amount(a, category).compareTo(_amount(b, category)));
-    if (ranked.isEmpty) {
-      return (
-        face: MonFace.idle,
-        line: 'Nothing to rank yet.',
-        detail: 'Totals show after members send them.',
-      );
-    }
-    final least = ranked.first;
-    final isMe = least.userId == me;
-    return (
-      face: isMe ? MonFace.happy : MonFace.idle,
-      line:
-          '${isMe ? 'You' : least.alias} spent least '
-          '${category == null ? 'overall' : 'on ${category.toLowerCase()}'}.',
-      detail: isMe ? 'I am proud, quietly.' : 'I am keeping the spot warm.',
-    );
+  Future<void> _copy(String code) async {
+    await Clipboard.setData(ClipboardData(text: code));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Code copied')));
   }
 
   @override
   Widget build(BuildContext context) {
     final vm = _vm!;
-    final scheme = Theme.of(context).colorScheme;
     return ListenableBuilder(
       listenable: vm,
       builder: (context, _) {
@@ -280,53 +281,7 @@ class _GroupScreenState extends State<GroupScreen> {
         final state = vm.state;
         final isOwner = d != null && d.group.ownerId == state.userId;
         final failed = d == null && vm.loadFailed && !state.loading;
-        // A category that no member has any more does not stay selected.
-        final category = d != null && _categoryNames(d).contains(_category)
-            ? _category
-            : null;
-        final say = _monSay(d, category, state.userId, failed);
-        final band = SceneBand(
-          title: d?.group.name ?? 'Group',
-          back: true,
-          compact: true,
-          face: say.face,
-          line: say.line,
-          detail: say.detail,
-          stats: [
-            if (d != null)
-              '${d.members.length} ${d.members.length == 1 ? 'member' : 'members'}',
-          ],
-          action: d == null
-              ? null
-              : PopupMenuButton<VoidCallback>(
-                  tooltip: 'Group actions',
-                  icon: const Icon(Icons.more_vert),
-                  style: IconButton.styleFrom(
-                    backgroundColor: scheme.surfaceContainer.withValues(
-                      alpha: 0.7,
-                    ),
-                    foregroundColor: scheme.onSurface,
-                    minimumSize: const Size(48, 48),
-                  ),
-                  onSelected: (action) => action(),
-                  itemBuilder: (_) => [
-                    if (isOwner) ...[
-                      PopupMenuItem(
-                        value: () => _rename(d.group),
-                        child: const Text('Rename group'),
-                      ),
-                      PopupMenuItem(
-                        value: () => _newCode(d.group),
-                        child: const Text('Make a new code'),
-                      ),
-                    ],
-                    PopupMenuItem(
-                      value: () => _leave(d.group),
-                      child: const Text('Leave group'),
-                    ),
-                  ],
-                ),
-        );
+        final theme = Theme.of(context);
         return Scaffold(
           body: Stack(
             children: [
@@ -336,14 +291,47 @@ class _GroupScreenState extends State<GroupScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.zero,
                   children: [
-                    band,
+                    TaskHeader(
+                      title: d?.group.name ?? 'Group',
+                      action: d != null && isOwner
+                          ? PopupMenuButton<VoidCallback>(
+                              tooltip: 'Group actions',
+                              icon: const Icon(Icons.more_vert),
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size(48, 48),
+                              ),
+                              onSelected: (action) => action(),
+                              itemBuilder: (_) => [
+                                PopupMenuItem(
+                                  value: () => _rename(d.group),
+                                  child: const Text('Rename group'),
+                                ),
+                              ],
+                            )
+                          : null,
+                    ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      child: d == null
-                          ? (failed
-                                ? Align(child: TonalButton('Try again', _pull))
-                                : const SizedBox.shrink())
-                          : _body(context, vm, d, isOwner, category),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      child: d != null
+                          ? _body(context, vm, d, isOwner)
+                          : failed
+                          ? Column(
+                              spacing: 12,
+                              children: [
+                                const Mon(MonFace.worry, size: 72),
+                                Text(
+                                  'Could not load the group.',
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                                Text(
+                                  'Check the internet connection, then try again.',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                                TonalButton('Try again', _pull),
+                              ],
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ],
                 ),
@@ -368,7 +356,6 @@ class _GroupScreenState extends State<GroupScreen> {
     GroupsViewModel vm,
     GroupDetail d,
     bool isOwner,
-    String? category,
   ) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -379,18 +366,15 @@ class _GroupScreenState extends State<GroupScreen> {
     final period = vm.period;
     final mine = d.members.where((m) => m.userId == me).firstOrNull;
     final today = GroupPeriodMath.malaysiaDay(now);
-    final loadedAt = vm.loadedAt;
-    final names = _categoryNames(d);
-    final ranked =
-        [for (final (i, m) in d.members.indexed) (i, m, _amount(m, category))]
-          ..sort(
-            (a, b) => b.$3.compareTo(a.$3) != 0
-                ? b.$3.compareTo(a.$3)
-                : a.$1.compareTo(b.$1),
-          );
+    final ranked = [for (final (i, m) in d.members.indexed) (i, m)]
+      ..sort(
+        (a, b) => b.$2.total.compareTo(a.$2.total) != 0
+            ? b.$2.total.compareTo(a.$2.total)
+            : a.$1.compareTo(b.$1),
+      );
     final top = ranked.fold(
       0.0,
-      (t, r) => r.$3.toDouble() > t ? r.$3.toDouble() : t,
+      (t, r) => r.$2.total.toDouble() > t ? r.$2.total.toDouble() : t,
     );
     Widget card(Widget child, {Border? border}) => DecoratedBox(
       decoration: BoxDecoration(
@@ -400,58 +384,177 @@ class _GroupScreenState extends State<GroupScreen> {
       ),
       child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
-    final periodText = period == Period.week ? 'this week' : 'this month';
+    final made = widget.madeName != null;
+    final requests = [
+      for (final r in d.requests)
+        if (!_declined.contains(r.userId)) r,
+    ];
+    final codeCard = card(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 8,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Group code',
+                      style: theme.textTheme.bodySmall!.copyWith(color: muted),
+                    ),
+                    Text(d.group.code, style: theme.textTheme.headlineSmall),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => _copy(d.group.code),
+                tooltip: 'Copy code',
+                icon: const Icon(Icons.copy),
+                style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              TonalButton(
+                'Share code',
+                () => _share(d.group),
+                icon: Icons.share,
+              ),
+              if (isOwner)
+                TextButton(
+                  onPressed: () => _newCode(d.group),
+                  style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                  child: const Text('Make a new code'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+    final requestsCard = isOwner && requests.isNotEmpty
+        ? card(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 4,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    '${requests.length} join ${requests.length == 1 ? 'request' : 'requests'}',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+                for (final r in requests)
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: Row(
+                      children: [
+                        InitialsAvatar(r.alias, size: 36),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(r.alias, style: theme.textTheme.bodyLarge),
+                                if (r.sentAt != null)
+                                  Text(
+                                    'Asked ${_asked(r.sentAt!)}',
+                                    style: theme.textTheme.bodySmall!.copyWith(
+                                      color: muted,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => _decline(vm, r),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 48),
+                            foregroundColor: scheme.onSurface,
+                          ),
+                          child: const Text('Decline'),
+                        ),
+                        TonalButton(
+                          'Approve',
+                          () => vm.run((x) => x.answer(r, true)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            border: Border.all(color: scheme.primary),
+          )
+        : null;
+    final days = GroupPeriodMath.daysLeft(period, today: today);
+    final summary = card(
+      MergeSemantics(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 4,
+          children: [
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Text(
+                  period == Period.month
+                      ? 'You spent in ${_months[today.month - 1]}'
+                      : 'You spent this week',
+                  style: theme.textTheme.bodyMedium!.copyWith(color: muted),
+                ),
+                SegmentedControl(
+                  labels: const ['Week', 'Month'],
+                  selectedIndex: period == Period.week ? 0 : 1,
+                  onPick: (i) => vm.setPeriod(Period.values[i]),
+                ),
+              ],
+            ),
+            if (mine != null) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: MoneyText(
+                  rm(mine.total),
+                  style: theme.textTheme.displayMedium,
+                  color: scheme.onSurface,
+                ),
+              ),
+              Text(
+                '${ordinal(d.members.indexOf(mine) + 1)} most spent of ${d.members.length}. '
+                'Resets in $days ${days == 1 ? 'day' : 'days'}.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+    final nothing = d.members.every((m) => m.total <= Decimal.zero);
     final items = <Widget>[
+      if (made) codeCard,
+      ?requestsCard,
+      summary,
       card(
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 8,
           children: [
-            SegmentedControl(
-              labels: const ['Week', 'Month'],
-              selectedIndex: period == Period.week ? 0 : 1,
-              onPick: (i) => vm.setPeriod(Period.values[i]),
-            ),
-            if (loadedAt != null)
-              _RelativeText(
-                time: loadedAt,
-                now: now,
-                // The 0.1.1 text says "just now" for the first minute.
-                justNow: true,
-                build: (rel) => Text(
-                  'Updated $rel. Pull down to refresh.',
-                  style: theme.textTheme.bodySmall!.copyWith(color: muted),
-                ),
-              ),
-            if (names.isNotEmpty)
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  spacing: 8,
-                  children: [
-                    _CategoryChip(
-                      label: 'All',
-                      color: null,
-                      selected: category == null,
-                      onTap: () => setState(() => _category = null),
-                    ),
-                    for (final c in names)
-                      _CategoryChip(
-                        label: c,
-                        color: _categoryColor(context, c),
-                        selected: category == c,
-                        onTap: () => setState(() => _category = c),
-                      ),
-                  ],
-                ),
-              ),
             Row(
               children: [
                 Expanded(
                   child: Semantics(
                     header: true,
                     child: Text(
-                      'Members',
+                      'Members, most spent first',
                       style: theme.textTheme.titleSmall!.copyWith(color: muted),
                     ),
                   ),
@@ -465,23 +568,23 @@ class _GroupScreenState extends State<GroupScreen> {
                 ),
               ],
             ),
-            Text(
-              '${category ?? 'All spending'} $periodText, most spent first',
-              style: theme.textTheme.bodySmall!.copyWith(color: muted),
-            ),
-            for (final (rank, (_, m, amount)) in ranked.indexed)
+            if (nothing)
+              Text(
+                'Nothing to rank yet. Totals show after members send them.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            for (final (rank, (_, m)) in ranked.indexed)
               _MemberRow(
                 key: ValueKey(m.userId),
                 member: m,
                 rank: rank + 1,
-                amount: amount,
-                category: category,
                 isMe: m.userId == me,
+                isGroupOwner: m.userId == d.group.ownerId,
                 isOwner: isOwner,
                 expanded: _open == m.userId,
                 now: now,
                 barFraction: top > 0
-                    ? (amount.toDouble() / top).clamp(0.02, 1.0)
+                    ? (m.total.toDouble() / top).clamp(0.02, 1.0)
                     : 1,
                 onToggle: () =>
                     setState(() => _open = _open == m.userId ? null : m.userId),
@@ -496,107 +599,7 @@ class _GroupScreenState extends State<GroupScreen> {
           ],
         ),
       ),
-      if (mine != null)
-        MergeSemantics(
-          child: card(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 4,
-              children: [
-                Text(
-                  period == Period.month
-                      ? 'You spent in ${_months[today.month - 1]}'
-                      : 'You spent this week',
-                  style: theme.textTheme.bodyMedium!.copyWith(color: muted),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: MoneyText(
-                    rm(mine.total),
-                    style: theme.textTheme.displayMedium,
-                    color: scheme.onSurface,
-                  ),
-                ),
-                Builder(
-                  builder: (_) {
-                    final days = GroupPeriodMath.daysLeft(period, today: today);
-                    return Text(
-                      '${ordinal(d.members.indexOf(mine) + 1)} of ${d.members.length} in ${d.group.name}. '
-                      'Resets in $days ${days == 1 ? 'day' : 'days'}.',
-                      style: theme.textTheme.bodyMedium,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      if (isOwner && d.requests.isNotEmpty)
-        card(
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 8,
-            children: [
-              Text('Join requests', style: theme.textTheme.titleMedium),
-              Text(
-                'Only you see these, because you own the group. Requests end after 7 days.',
-                style: theme.textTheme.bodySmall!.copyWith(color: muted),
-              ),
-              for (final r in d.requests)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: Row(
-                    children: [
-                      InitialsAvatar(r.alias, size: 36),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 12),
-                          child: Text(
-                            r.alias,
-                            style: theme.textTheme.bodyLarge,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => vm.run((x) => x.answer(r, false)),
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                        ),
-                        child: const Text('Decline'),
-                      ),
-                      TonalButton(
-                        'Approve',
-                        () => vm.run((x) => x.answer(r, true)),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          border: Border.all(color: scheme.primary),
-        ),
-      card(
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Group code',
-                    style: theme.textTheme.bodySmall!.copyWith(color: muted),
-                  ),
-                  Text(
-                    d.group.code,
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                ],
-              ),
-            ),
-            TonalButton('Share code', () => _share(d.group), icon: Icons.share),
-          ],
-        ),
-      ),
+      if (!made) codeCard,
       card(
         Row(
           spacing: 12,
@@ -632,6 +635,16 @@ class _GroupScreenState extends State<GroupScreen> {
           ],
         ),
       ),
+      Align(
+        child: TextButton(
+          onPressed: () => _leave(d.group),
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            foregroundColor: scheme.error,
+          ),
+          child: const Text('Leave group'),
+        ),
+      ),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -639,87 +652,26 @@ class _GroupScreenState extends State<GroupScreen> {
       children: items,
     );
   }
-}
 
-/// One category to rank by. A null [color] is "All".
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
-    required this.label,
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color? color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final accent = color ?? scheme.primary;
-    return Semantics(
-      button: true,
-      selected: selected,
-      inMutuallyExclusiveGroup: true,
-      excludeSemantics: true,
-      label: label,
-      onTap: onTap,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: ShapeDecoration(
-                shape: StadiumBorder(
-                  side: selected
-                      ? BorderSide(color: accent, width: 2)
-                      : BorderSide.none,
-                ),
-                color: selected
-                    ? accent.withValues(alpha: 0.16)
-                    : scheme.surfaceContainerHigh,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                spacing: 8,
-                children: [
-                  if (color != null) CategoryDot(color!),
-                  Text(
-                    label,
-                    style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                      color: selected
-                          ? scheme.onSurface
-                          : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  /// "Tue, 24 Nov": the day of the request in Malaysia.
+  String _asked(DateTime sentAt) {
+    final day = GroupPeriodMath.malaysiaDay(sentAt);
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return '${weekdays[day.weekday - 1]}, ${day.day} ${_months[day.month - 1].substring(0, 3)}';
   }
 }
 
 /// A text that holds a relative time of the phone ("2 days ago"). It shows nothing
-/// until the phone answers. With [justNow], the first minute reads "just now".
+/// until the phone answers.
 class _RelativeText extends StatefulWidget {
   const _RelativeText({
     required this.time,
     required this.now,
     required this.build,
-    this.justNow = false,
   });
 
   final DateTime time;
   final DateTime now;
-  final bool justNow;
   final Widget Function(String relative) build;
 
   @override
@@ -744,11 +696,6 @@ class _RelativeTextState extends State<_RelativeText> {
 
   void _load() {
     final time = _for = widget.time;
-    if (widget.justNow &&
-        widget.now.difference(time) < const Duration(seconds: 60)) {
-      _text = 'just now';
-      return;
-    }
     _text = null;
     final device = AppScope.of(context).device;
     unawaited(
@@ -778,9 +725,8 @@ class _MemberRow extends StatelessWidget {
     super.key,
     required this.member,
     required this.rank,
-    required this.amount,
-    required this.category,
     required this.isMe,
+    required this.isGroupOwner,
     required this.isOwner,
     required this.expanded,
     required this.now,
@@ -792,11 +738,10 @@ class _MemberRow extends StatelessWidget {
 
   final Member member;
   final int rank;
-
-  /// What the member spent in [category], or in total when [category] is null.
-  final Decimal amount;
-  final String? category;
   final bool isMe;
+
+  /// True for the member who owns the group.
+  final bool isGroupOwner;
   final bool isOwner;
   final bool expanded;
   final DateTime now;
@@ -816,9 +761,6 @@ class _MemberRow extends StatelessWidget {
         updated == null ||
         updated.isBefore(now.subtract(const Duration(hours: 24)));
     final name = isMe ? '${m.alias} (you)' : m.alias;
-    final barColor = category == null
-        ? null
-        : _categoryColor(context, category!);
     return Semantics(
       button: true,
       onTapHint: expanded ? 'Hide categories' : 'Show categories',
@@ -858,19 +800,35 @@ class _MemberRow extends StatelessWidget {
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.only(left: 12),
-                        child: Text(
-                          name,
-                          style: (isMe
-                                  ? weighted(theme.textTheme.bodyLarge!, 600)
-                                  : theme.textTheme.bodyLarge!)
-                              .copyWith(color: scheme.onSurface),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style:
+                                  (isMe
+                                          ? weighted(
+                                              theme.textTheme.bodyLarge!,
+                                              600,
+                                            )
+                                          : theme.textTheme.bodyLarge!)
+                                      .copyWith(color: scheme.onSurface),
+                            ),
+                            if (isGroupOwner)
+                              Text(
+                                'Group owner',
+                                style: theme.textTheme.bodySmall!.copyWith(
+                                  color: muted,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
                     Padding(
                       padding: const EdgeInsets.only(left: 8),
                       child: MoneyText(
-                        rm(amount),
+                        rm(m.total),
                         style: theme.textTheme.titleMedium,
                         color: scheme.onSurface,
                       ),
@@ -881,54 +839,37 @@ class _MemberRow extends StatelessWidget {
                   ExcludeSemantics(
                     child: Padding(
                       padding: const EdgeInsets.only(left: 24),
-                      child: barColor == null
-                          ? Align(
-                              alignment: Alignment.centerLeft,
-                              child: FractionallySizedBox(
-                                widthFactor: barFraction,
-                                child: SizedBox(
-                                  height: 8,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: Row(
-                                      spacing: 2,
-                                      children: [
-                                        for (final (c, v) in m.categories)
-                                          Expanded(
-                                            flex:
-                                                ((v.toDouble() < 0.01
-                                                            ? 0.01
-                                                            : v.toDouble()) *
-                                                        100)
-                                                    .round()
-                                                    .clamp(1, 1 << 30),
-                                            child: ColoredBox(
-                                              color: _categoryColor(context, c),
-                                              child: const SizedBox.expand(),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            )
-                          : ClipRRect(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FractionallySizedBox(
+                          widthFactor: barFraction,
+                          child: SizedBox(
+                            height: 8,
+                            child: ClipRRect(
                               borderRadius: BorderRadius.circular(4),
-                              child: ColoredBox(
-                                color: barColor.withValues(alpha: 0.16),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: FractionallySizedBox(
-                                    widthFactor: barFraction,
-                                    child: SizedBox(
-                                      height: 8,
-                                      child: ColoredBox(color: barColor),
+                              child: Row(
+                                spacing: 2,
+                                children: [
+                                  for (final (c, v) in m.categories)
+                                    Expanded(
+                                      flex:
+                                          ((v.toDouble() < 0.01
+                                                      ? 0.01
+                                                      : v.toDouble()) *
+                                                  100)
+                                              .round()
+                                              .clamp(1, 1 << 30),
+                                      child: ColoredBox(
+                                        color: _categoryColor(context, c),
+                                        child: const SizedBox.expand(),
+                                      ),
                                     ),
-                                  ),
-                                ),
+                                ],
                               ),
                             ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 if (stale)

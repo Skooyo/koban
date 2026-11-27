@@ -101,7 +101,7 @@ void main() {
   });
 
   testWidgets(
-    'the Category row opens the sheet with Most used and a pick saves',
+    'the category chips show on the card and More opens the sheet with Most used',
     (tester) async {
       final s = await testServices(device: maeDevice());
       // One shop each: a category on a shop also moves that shop's older payments.
@@ -116,30 +116,38 @@ void main() {
       }
       await addOne(s);
       await openCheck(tester, s);
-      expect(find.byType(ChoiceChip), findsNothing);
-      expect(find.text('Pick a category'), findsOneWidget);
+      expect(find.text('Category · not set'), findsOneWidget);
+      expect(find.byType(ChoiceChip), findsNWidgets(4));
+      // Most used first: Transport, then Shopping.
+      expect(
+        [
+          for (final c in tester.widgetList<ChoiceChip>(
+            find.byType(ChoiceChip),
+          ))
+            (c.label as Text).data,
+        ].take(2),
+        ['Transport', 'Shopping'],
+      );
 
-      await tester.tap(find.text('Pick a category'));
+      await tester.tap(find.text('More…'));
       await tester.pumpAndSettle();
       expect(find.text('Most used'), findsOneWidget);
       expect(find.text('All categories'), findsOneWidget);
-      final rows = [
-        for (final t in tester.widgetList<Text>(
-          find.descendant(
-            of: find.byType(BottomSheet),
-            matching: find.byType(Text),
-          ),
-        ))
-          t.data,
-      ];
-      final most = rows.indexOf('Most used');
-      expect(rows.sublist(most + 1, most + 3), ['Transport', 'Shopping']);
-
-      await tester.tap(find.text('Shopping'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text('Shopping'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Most used'), findsNothing);
-      expect(find.text('Shopping'), findsOneWidget);
-      expect(find.text('Pick a category'), findsNothing);
+      expect(find.text('Category · not set'), findsNothing);
+      expect(
+        tester
+            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Shopping'))
+            .selected,
+        true,
+      );
       await tester.tap(saveButton);
       await tester.pumpAndSettle();
       await endHold(tester);
@@ -166,9 +174,10 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     await tester.pumpAndSettle();
     const screen = Rect.fromLTWH(0, 0, 390, 844);
+    // The buttons stay on screen; the long card scrolls above them.
     for (final f in [
       find.widgetWithText(OutlinedButton, 'Save payment'),
-      find.text('Show full text'),
+      find.widgetWithText(FilledButton, 'Not a payment'),
     ]) {
       final r = tester.getRect(f);
       expect(
@@ -176,6 +185,10 @@ void main() {
         true,
       );
     }
+    await tester.ensureVisible(find.text('Show full text'));
+    await tester.pumpAndSettle();
+    final r = tester.getRect(find.text('Show full text'));
+    expect(screen.contains(r.topLeft) && screen.contains(r.bottomRight), true);
   });
 
   testWidgets('notifications off shows a row and Turn on asks Android again', (

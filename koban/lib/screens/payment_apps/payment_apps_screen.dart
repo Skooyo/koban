@@ -9,9 +9,12 @@ import 'payment_apps_view_model.dart';
 /// Pick which installed apps Koban listens to. Save with none ticked is allowed.
 /// [onSaved] replaces the default, which closes the page. Back is the system Back.
 class PaymentAppsScreen extends StatefulWidget {
-  const PaymentAppsScreen({super.key, this.onSaved});
+  const PaymentAppsScreen({super.key, this.onSaved, this.progress});
 
   final VoidCallback? onSaved;
+
+  /// The step bar when onboarding shows the picker as step 2.
+  final Widget? progress;
 
   @override
   State<PaymentAppsScreen> createState() => _PaymentAppsScreenState();
@@ -82,6 +85,16 @@ class _PaymentAppsScreenState extends State<PaymentAppsScreen> {
                       line: 'Pick the apps I listen to.',
                       detail: 'Koban reads notifications only from the apps you tick.',
                     ),
+                    if (widget.progress != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          20,
+                          SceneBand.overlap + 16,
+                          20,
+                          16,
+                        ),
+                        child: widget.progress,
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                       child: TextField(

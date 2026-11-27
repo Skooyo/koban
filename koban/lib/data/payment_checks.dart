@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 
 import '../rules/amount_formatter.dart';
 import '../rules/dedup_key_generator.dart';
@@ -13,9 +14,9 @@ import 'pending_payment_repository.dart';
 enum ConfirmResult { saved, alreadySaved, dropped }
 
 class _Held {
-  _Held(this.id, this.save);
+  _Held(this.ids, this.save);
 
-  final String id;
+  final List<String> ids;
   final bool save;
   Timer? timer;
 }
@@ -32,7 +33,7 @@ class PaymentChecks {
     required this._pending,
     required this._expenses,
     required this._now,
-    this._hold = const Duration(milliseconds: 4000),
+    this._hold = const Duration(milliseconds: 6000),
   });
 
   final KobanDatabase _db;
@@ -41,7 +42,7 @@ class PaymentChecks {
   final int Function() _now;
   final Duration _hold;
 
-  /// The hold and Undo window: 4000 ms (`HOLD_MS`, `UNDO_MS` of 0.1.1).
+  /// The hold and Undo window: 6000 ms (DESIGN.md; 0.1.1 had 4000 ms).
   Duration get holdWindow => _hold;
 
   _Held? _held;
@@ -129,17 +130,20 @@ class PaymentChecks {
   }
 
   /// Holds a swipe for the Undo window, then commits it. An earlier hold of
-  /// another card commits at once. The same card again only replaces the
+  /// other cards commits at once. The same card again only replaces the
   /// choice and starts the window again.
-  void hold(String id, {required bool save}) {
+  void hold(String id, {required bool save}) => holdAll([id], save: save);
+
+  /// Holds one choice for several cards: one window, one Undo.
+  void holdAll(List<String> ids, {required bool save}) {
     final previous = _held;
     _held = null;
     if (previous != null) {
       previous.timer?.cancel();
-      if (previous.id != id) _launchCommit(previous);
+      if (!listEquals(previous.ids, ids)) _launchCommit(previous);
     }
-    _hide(id);
-    final entry = _Held(id, save);
+    ids.forEach(_hide);
+    final entry = _Held(ids, save);
     entry.timer = Timer(_hold, () {
       if (!identical(_held, entry)) return;
       _held = null;
@@ -154,7 +158,7 @@ class PaymentChecks {
     if (entry == null) return false;
     _held = null;
     entry.timer?.cancel();
-    _show(entry.id);
+    entry.ids.forEach(_show);
     return true;
   }
 
@@ -187,40 +191,48 @@ class PaymentChecks {
 
   Future<void> _commit(_Held entry) async {
     try {
-      final result = await _db.transaction(() async {
-        final payment = await (_db.select(
-          _db.pendingPayments,
-        )..where((t) => t.id.equals(entry.id))).getSingleOrNull();
-        if (payment == null) return null;
-        if (entry.save) {
-          final inserted = await _expenses.saveConfirmed(payment);
-          // A payment covers the card in both outcomes, so the card goes.
+      final results = await _db.transaction(() async {
+        final done = <(String, ConfirmResult)>[];
+        for (final id in entry.ids) {
+          final payment = await (_db.select(
+            _db.pendingPayments,
+          )..where((t) => t.id.equals(id))).getSingleOrNull();
+          if (payment == null) continue;
+          if (entry.save) {
+            final inserted = await _expenses.saveConfirmed(payment);
+            // A payment covers the card in both outcomes, so the card goes.
+            await _deleteCard(payment.id);
+            done.add((
+              id,
+              inserted ? ConfirmResult.saved : ConfirmResult.alreadySaved,
+            ));
+            continue;
+          }
+          final notificationKey = payment.notificationKey;
+          await _db
+              .into(_db.droppedNotifications)
+              .insert(
+                DroppedNotification(
+                  dedupKey: payment.dedupKey,
+                  // Some apps use one notification key for every payment, so the key has the post time too.
+                  notificationKey: notificationKey == null
+                      ? null
+                      : '$notificationKey@${payment.notificationPostTime}',
+                  droppedAt: _now(),
+                ),
+                mode: InsertMode.insertOrReplace,
+              );
           await _deleteCard(payment.id);
-          return inserted ? ConfirmResult.saved : ConfirmResult.alreadySaved;
+          done.add((id, ConfirmResult.dropped));
         }
-        final notificationKey = payment.notificationKey;
-        await _db
-            .into(_db.droppedNotifications)
-            .insert(
-              DroppedNotification(
-                dedupKey: payment.dedupKey,
-                // Some apps use one notification key for every payment, so the key has the post time too.
-                notificationKey: notificationKey == null
-                    ? null
-                    : '$notificationKey@${payment.notificationPostTime}',
-                droppedAt: _now(),
-              ),
-              mode: InsertMode.insertOrReplace,
-            );
-        await _deleteCard(payment.id);
-        return ConfirmResult.dropped;
+        return done;
       });
-      if (result != null) {
-        _gone.add(entry.id);
+      for (final (id, result) in results) {
+        _gone.add(id);
         _results.add(result);
       }
     } catch (e, s) {
-      // The row stays, so the card shows again and the owner can swipe it again.
+      // The rows stay, so the cards show again and the owner can swipe them again.
       developer.log(
         'Commit of waiting payment failed',
         name: 'PaymentChecks',
@@ -228,7 +240,7 @@ class PaymentChecks {
         stackTrace: s,
       );
     } finally {
-      _show(entry.id);
+      entry.ids.forEach(_show);
     }
   }
 

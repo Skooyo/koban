@@ -280,7 +280,7 @@ void main() {
   });
 
   test(
-    'rate charges and Split the rest fill a payment and save the charges in RM',
+    'rate charges on a payment save the charges in RM',
     () async {
       final s = await testServices();
       final id = await addPayment(s, amount: '86.40');
@@ -306,11 +306,13 @@ void main() {
       // 86.40 over 1.16 is a subtotal of 74.48. The items have 33.10 of it.
       expect(SplitEditorViewModel.missingItemsOf(vm.state), d('41.38'));
 
-      vm.splitTheRest();
+      vm.addItem(
+        name: 'The rest',
+        quantity: 1,
+        price: d('41.38'),
+        sharedBy: {meId, aliId},
+      );
 
-      final rest = vm.state.items.last;
-      expect((rest.name, rest.price), ('The rest', '41.38'));
-      expect(rest.sharedBy, {meId, aliId});
       expect(SplitEditorViewModel.missingItemsOf(vm.state), d('0.00'));
       expect(SplitEditorViewModel.totalOf(vm.state), d('86.40'));
       vm.next();
@@ -455,6 +457,17 @@ void main() {
     },
   );
 
+  test('back on the people step asks only when a new split has people', () async {
+    final vm = await open(await testServices());
+    expect(vm.back(), false);
+    vm.addPerson('Ali');
+    expect(vm.back(), true);
+    expect(vm.state.confirmDiscard, true);
+    expect(vm.state.step, SplitStep.people);
+    vm.keepEditing();
+    expect(vm.state.confirmDiscard, false);
+  });
+
   test('done on a viewed bill saves nothing', () async {
     final s = await testServices();
     final billId = await saveDraft(s);
@@ -569,7 +582,7 @@ void main() {
       expect(vm.state.items, isEmpty);
       expect(
         vm.state.message,
-        "Couldn't read this receipt. Add the items by hand.",
+        "Could not read this receipt. Add the items by hand.",
       );
     });
 
@@ -720,7 +733,7 @@ void main() {
       expect(File(r.path).existsSync(), true);
       vm.next();
 
-      expect(vm.state.step, SplitStep.link);
+      expect(vm.state.step, SplitStep.summary);
       await photoGone(r.path);
       expect(File(r.path).existsSync(), false);
     });

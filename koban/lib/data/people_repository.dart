@@ -232,6 +232,60 @@ class PeopleRepository {
     });
   }
 
+  /// When the QR file at [path] was added (epoch ms), or null when there is none.
+  Future<int?> qrAddedAt(String? path) async =>
+      (await _qr.addedAt(path))?.millisecondsSinceEpoch;
+
+  /// Copies the picture at [sourcePath] as the QR. The old picture stays on disk in a side
+  /// file until the snackbar ends: Undo puts it back, and the end of the snackbar
+  /// ([Undoable.commit]) deletes it. Returns null when there was no QR before.
+  Future<Undoable?> replaceQr(String personId, String sourcePath) async {
+    final old = (await _db.person(personId).getSingleOrNull())?.qrPath;
+    final side = old == null ? null : await _qr.keepOld(old);
+    try {
+      await setQr(personId, sourcePath);
+    } catch (_) {
+      if (side != null) await _qr.dropOld(side);
+      rethrow;
+    }
+    if (old == null || side == null) return null;
+    return Undoable(
+      undo: () async {
+        final person = await _db.person(personId).getSingleOrNull();
+        // Removed or deleted since: do not bring a file back that nothing points to.
+        if (person == null || person.qrPath != old) {
+          await _qr.dropOld(side);
+          return;
+        }
+        await _qr.restoreOld(side, old);
+        // The file changed, not the row: write the row so the page reads the date again.
+        await _upsertPerson(person);
+      },
+      commit: () => _qr.dropOld(side),
+    );
+  }
+
+  /// Removes the QR: the row stops pointing at it and the file goes. Undo brings both back.
+  /// Returns null when there is no QR.
+  Future<Undoable?> removeQr(String personId) async {
+    final person = await _db.person(personId).getSingleOrNull();
+    final path = person?.qrPath;
+    if (person == null || path == null) return null;
+    final bytes = await _qr.read(path);
+    final added = await _qr.addedAt(path);
+    await _upsertPerson(person.copyWith(qrPath: const Value(null)));
+    await _qr.delete(path);
+    return Undoable(
+      undo: () async {
+        final now = await _db.person(personId).getSingleOrNull();
+        // A new QR in the meantime stays.
+        if (now == null || now.qrPath != null || bytes == null) return;
+        await _qr.put(path, bytes, added);
+        await _upsertPerson(now.copyWith(qrPath: Value(path)));
+      },
+    );
+  }
+
   Future<void> saveQrToGallery(String personId) async {
     final person = await _db.person(personId).getSingleOrNull();
     final path = person?.qrPath;
@@ -309,13 +363,23 @@ class PeopleRepository {
     );
   });
 
-  Future<void> markOwedItemPaid(String id) => _db.transaction(() async {
+  /// Marks the item paid. Undo puts it back open, and the repayment suggestion that it cleared.
+  /// It returns null when the item is missing or paid already.
+  Future<Undoable?> markOwedItemPaid(String id) => _db.transaction(() async {
     final item = await _db.owedItem(id).getSingleOrNull();
-    if (item == null || item.status == DebtStatus.paid) return;
+    if (item == null || item.status == DebtStatus.paid) return null;
+    final suggested = (await _db.person(item.personId).getSingleOrNull())
+        ?.suggestedSettleExpenseId;
     await _db
         .update(_db.owedItems)
         .replace(item.copyWith(status: DebtStatus.paid, paidAt: Value(_now())));
     await _splits.clearSettleSuggestion(item.personId);
+    return Undoable(
+      undo: () => _db.transaction(() async {
+        await _db.update(_db.owedItems).replace(item);
+        await _splits.restoreSettleSuggestion(item.personId, suggested);
+      }),
+    );
   });
 
   /// Adds money that [personId] owes the owner without a bill, for example cash lent.

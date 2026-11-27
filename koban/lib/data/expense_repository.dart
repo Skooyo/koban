@@ -75,7 +75,7 @@ class ExpenseRepository {
     );
   }
 
-  /// The Monday-to-Sunday weeks of a month with their totals. [month0] is 0-based.
+  /// The weeks of a month with their totals, cut to the days of the month. [month0] is 0-based.
   Future<List<WeekSummary>> weekSummariesForMonth(int year, int month0) async {
     final weeks = <WeekSummary>[];
     for (final (start, end) in PeriodCalculator.weeksInMonth(year, month0)) {
@@ -83,7 +83,7 @@ class ExpenseRepository {
         WeekSummary(
           startMs: start,
           endMs: end,
-          label: PeriodCalculator.weekLabel(start, end),
+          label: PeriodCalculator.daysLabel(start, end),
           total: await _db.totalForRangeOnce(start, end).getSingle(),
         ),
       );
@@ -201,7 +201,9 @@ class ExpenseRepository {
     return true;
   });
 
-  Future<void> updateExpense(
+  /// Saves the edit. A new category also changes the past payments from the shop, unless
+  /// [applyToPast] is false. Returns an Undo for that change, or null when no past payment changed.
+  Future<Undoable?> updateExpense(
     String id, {
     required Decimal amount,
     String? merchant,
@@ -210,14 +212,18 @@ class ExpenseRepository {
     String? notes,
     required TransactionType type,
     bool privateToGroups = false,
+    bool applyToPast = true,
   }) async {
     final existing = await getById(id);
-    if (existing == null) return;
-    await _merchants.saveMapping(merchant, categoryId);
+    if (existing == null) return null;
     // A new category applies to every payment from this shop in the same direction, past ones included.
-    if (categoryId != null && categoryId != existing.categoryId) {
-      await _applyToShop(merchant, type, categoryId);
-    }
+    final undo = await _rememberShop(
+      merchant,
+      type,
+      categoryId,
+      applyToPast: applyToPast && categoryId != existing.categoryId,
+      excludeId: id,
+    );
     await _db
         .update(_db.expenses)
         .replace(
@@ -242,10 +248,12 @@ class ExpenseRepository {
         stackTrace: s,
       );
     }
+    return undo;
   }
 
   /// A payment that the owner types in, for one that came without a readable notification.
-  Future<void> addManualExpense({
+  /// Returns its id, and an Undo for the change of past payments from the shop, if any.
+  Future<({String id, Undoable? undo})> addManualExpense({
     required Decimal amount,
     String? merchant,
     required int postTime,
@@ -253,10 +261,16 @@ class ExpenseRepository {
     String? notes,
     required TransactionType type,
     bool privateToGroups = false,
+    bool applyToPast = true,
   }) async {
-    await _merchants.saveMapping(merchant, categoryId);
-    if (categoryId != null) await _applyToShop(merchant, type, categoryId);
     final id = newId();
+    final undo = await _rememberShop(
+      merchant,
+      type,
+      categoryId,
+      applyToPast: applyToPast,
+      excludeId: id,
+    );
     final expense = Expense(
       id: id,
       amount: AmountFormatter.toMoney(amount),
@@ -289,6 +303,7 @@ class ExpenseRepository {
         );
       }
     }
+    return (id: id, undo: undo);
   }
 
   /// Hides the payment from every total. The row and its split links stay.
@@ -310,14 +325,94 @@ class ExpenseRepository {
     );
   }
 
+  /// How many past payments from the shop a change to [categoryId] would change.
+  Future<int> countPastForShop(
+    String? merchant,
+    TransactionType type,
+    String categoryId, {
+    String? excludeId,
+  }) async => (await _pastRows(merchant, type, categoryId, excludeId)).length;
+
   // ponytail: SQLite lower() folds ASCII letters only, so a shop with non-ASCII capitals can be missed.
   // Upgrade: store the normalized key in its own column.
-  Future<void> _applyToShop(
+  /// The payments from the shop, in the same direction, that a change to [categoryId] would change.
+  /// Dismissed payments stay out, so the count the owner sees is the count that changes.
+  Future<List<({String id, String? categoryId})>> _pastRows(
     String? merchant,
     TransactionType type,
     String categoryId,
+    String? excludeId,
   ) async {
     final key = _merchants.normalizeKey(merchant);
-    if (key != null) await _db.setCategoryForMerchant(categoryId, key, type);
+    if (key == null) return const [];
+    final rows = await _db
+        .customSelect(
+          'SELECT id, categoryId FROM expenses '
+          "WHERE lower(trim(merchant)) = ? AND transactionType = ? AND status != 'DISMISSED' "
+          "AND id != ? AND COALESCE(categoryId, '') != ?",
+          variables: [
+            Variable<String>(key),
+            Variable<String>(type.dbName),
+            Variable<String>(excludeId ?? ''),
+            Variable<String>(categoryId),
+          ],
+          readsFrom: {_db.expenses},
+        )
+        .get();
+    return [
+      for (final r in rows)
+        (
+          id: r.read<String>('id'),
+          categoryId: r.readNullable<String>('categoryId'),
+        ),
+    ];
   }
+
+  /// Remembers the category of the shop, and changes its past payments when [applyToPast].
+  /// The Undo puts the past payments and the shop's mapping back as they were.
+  /// It is null when no past payment changed.
+  Future<Undoable?> _rememberShop(
+    String? merchant,
+    TransactionType type,
+    String? categoryId, {
+    required bool applyToPast,
+    required String excludeId,
+  }) async {
+    final key = _merchants.normalizeKey(merchant);
+    final before = key == null
+        ? null
+        : await _db.merchantMappingByKey(key).getSingleOrNull();
+    await _merchants.saveMapping(merchant, categoryId);
+    if (key == null || categoryId == null || !applyToPast) return null;
+    final rows = await _pastRows(merchant, type, categoryId, excludeId);
+    if (rows.isEmpty) return null;
+    await _db.transaction(() async {
+      for (final r in rows) {
+        await _setCategory(r.id, categoryId);
+      }
+    });
+    return Undoable(
+      changed: rows.length,
+      undo: () => _db.transaction(() async {
+        for (final r in rows) {
+          await _setCategory(r.id, r.categoryId);
+        }
+        if (before == null) {
+          await (_db.delete(
+            _db.merchantCategoryMap,
+          )..where((m) => m.merchantKey.equals(key))).go();
+        } else {
+          await _db
+              .into(_db.merchantCategoryMap)
+              .insert(before, mode: InsertMode.insertOrReplace);
+        }
+      }),
+    );
+  }
+
+  Future<void> _setCategory(String id, String? categoryId) => _db.customUpdate(
+    'UPDATE expenses SET categoryId = ? WHERE id = ?',
+    variables: [Variable<String>(categoryId), Variable<String>(id)],
+    updates: {_db.expenses},
+  );
 }

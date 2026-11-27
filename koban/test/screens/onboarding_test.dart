@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koban/app/app_services.dart';
 import 'package:koban/app/home_shell.dart';
@@ -18,6 +19,7 @@ FakeChannel newListener() => FakeChannel(ListenerControl.channelName, {
   'isConnected': false,
   'isBatteryOptimizationIgnored': false,
   'isXiaomiFamily': false,
+  'openBackgroundSettings': 'XIAOMI_AUTOSTART',
 });
 
 /// The device channel of an Android 14 phone without the alerts permission.
@@ -65,7 +67,7 @@ Iterable<String> methods(FakeChannel c) => c.calls.map((c) => c.method);
 Future<void> toApps(WidgetTester tester, FakeChannel listener) async {
   await tester.tap(find.text('Get started'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Open settings'));
+  await tester.tap(find.text('Open notification settings'));
   await tester.pump();
   listener.answers['isAccessGranted'] = true;
   await leaveAndComeBack(tester);
@@ -97,9 +99,9 @@ void main() {
     expect(tester.takeException(), isNull);
     for (final t in [
       'Koban counts your spending for you.',
-      'Reads payment alerts from the apps you pick.',
+      'Reads payment notifications from the apps you pick.',
       'You check each payment before it counts.',
-      'Nothing leaves the phone. No account needed.',
+      'Payments stay on this phone. Online features are your choice.',
       'Get started',
     ]) {
       expect(find.text(t), findsOneWidget, reason: t);
@@ -110,13 +112,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     for (final t in [
-      'Step 1 of 4 · Notification access',
-      'Let Koban see payment alerts',
-      'When your bank or e-wallet sends a payment alert, Koban turns it into a payment for you to check.',
-      'Koban reads only the apps you pick next.',
-      'It ignores chats and all other alerts.',
-      'Open settings',
+      'Set up Koban',
+      'I need to see your notifications.',
+      'Only the payment ones.',
+      'Step 1 of 3 · Notifications',
+      'Let Koban read payment notifications',
+      'When your bank or e-wallet sends a payment notification, Koban turns it into a payment for you to check.',
+      'Koban reads only the apps you pick in step 2.',
+      'It ignores chats and all other notifications.',
+      'Open notification settings',
       'In the list, tap Koban, then turn on Allow.',
+      'Koban checks again when you come back.',
     ]) {
       expect(find.text(t), findsOneWidget, reason: t);
     }
@@ -134,11 +140,11 @@ void main() {
     expect(find.text('Payment apps'), findsOneWidget);
     expect(find.text('Search apps'), findsOneWidget);
     expect(find.text('Save 2 apps'), findsOneWidget);
-    expect(find.textContaining('Step '), findsNothing);
+    expect(find.text('Step 2 of 3 · Payment apps'), findsOneWidget);
     // Back on the picker goes to the access step.
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Step 1 of 4 · Notification access'), findsOneWidget);
+    expect(find.text('Step 1 of 3 · Notifications'), findsOneWidget);
   });
 
   testWidgets(
@@ -150,11 +156,11 @@ void main() {
       await pumpNewFriend(tester, listener: listener, device: device);
       await tester.tap(find.text('Get started'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Open settings'));
+      await tester.tap(find.text('Open notification settings'));
       await tester.pump();
       await leaveAndComeBack(tester);
       for (final t in [
-        'Step 1 of 4 · Notification access',
+        'Step 1 of 3 · Notifications',
         'Android blocked this',
         'Koban was installed from a file, so Android wants one more step.',
         '1  Tap Open app info below',
@@ -201,10 +207,10 @@ void main() {
       expect(s.settings.paymentApps.value, {maybank, tng});
       expect(s.settings.paymentAppsChosen.value, true);
       for (final t in [
-        'Step 3 of 4 · Keep it running',
+        'Step 3 of 3 · Keep it running',
         'Keep Koban running',
         'Phones stop apps in the background to save battery. These settings keep tracking on.',
-        'Alerts',
+        'Notifications',
         'Tell me when tracking stops',
         'Allow',
         'Battery',
@@ -212,10 +218,10 @@ void main() {
         'Open settings',
         'Only the settings your phone needs show here.',
         'Next',
-        'Skip for now',
       ]) {
         expect(find.text(t), findsOneWidget, reason: t);
       }
+      expect(find.text('Skip for now'), findsNothing);
       expect(find.text('Autostart'), findsNothing);
       await expectGuidelines(tester);
       await tester.tap(find.text('Open settings'));
@@ -259,7 +265,7 @@ void main() {
       device.answers['notificationsAllowed'] = true;
       await leaveAndComeBack(tester);
       expect(find.text('Allow'), findsNothing);
-      expect(find.bySemanticsLabel('Alerts done'), findsOneWidget);
+      expect(find.bySemanticsLabel('Notifications done'), findsOneWidget);
       handle.dispose();
     },
   );
@@ -277,7 +283,6 @@ void main() {
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
     for (final t in [
-      'Step 4 of 4 · Ready',
       'Koban is ready',
       'Pay with a card or e-wallet. The payment shows up in Koban within a few seconds.',
       'Go to Home',
@@ -288,7 +293,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Keep Koban running'), findsOneWidget);
-    await tester.tap(find.text('Skip for now'));
+    await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
     final home = find.text('Go to Home');
     await tester.tap(home);
@@ -328,7 +333,6 @@ void main() {
       final listener = newListener();
       await toReadyWithNoApp(tester, listener);
       for (final t in [
-        'Step 4 of 4 · Ready',
         'Koban listens to no app yet.',
         'Choose the bank and wallet apps you pay with. Koban finds payments only in those apps.',
         'Choose apps',
@@ -363,9 +367,23 @@ void main() {
     expect(find.byType(KobanTabBar), findsOneWidget);
   });
 
-  testWidgets('Back on Welcome stores onboarding as done and closes', (
+  testWidgets('Back on Welcome closes the app and keeps onboarding due', (
     tester,
   ) async {
+    final closed = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        closed.add(call.method);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
     final s = await pumpNewFriend(
       tester,
       listener: newListener(),
@@ -374,10 +392,33 @@ void main() {
     expect(find.text('Get started'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(await SharedPreferencesAsync().getBool('onboarding_done'), true);
-    expect(s.settings.onboardingDone.value, true);
-    expect(find.text('Get started'), findsNothing);
-    expect(find.byType(KobanTabBar), findsOneWidget);
+    expect(closed, contains('SystemNavigator.pop'));
+    expect(await SharedPreferencesAsync().getBool('onboarding_done'), isNull);
+    expect(s.settings.onboardingDone.value, false);
+    expect(find.text('Get started'), findsOneWidget);
+  });
+
+  testWidgets('Autostart shows Checked by you after the friend comes back', (
+    tester,
+  ) async {
+    final listener = newListener();
+    listener.answers['isXiaomiFamily'] = true;
+    final s = await pumpNewFriend(
+      tester,
+      listener: listener,
+      device: android14(),
+    );
+    await toRunning(tester, listener);
+    expect(find.text('Autostart'), findsOneWidget);
+    expect(find.text('Checked by you'), findsNothing);
+    // The battery row opens a page too, but only Autostart counts as checked.
+    await tester.tap(find.text('Open settings').last);
+    await tester.pump();
+    expect(methods(listener), contains('openBackgroundSettings'));
+    expect(find.text('Checked by you'), findsNothing);
+    await leaveAndComeBack(tester);
+    expect(find.text('Checked by you'), findsOneWidget);
+    expect(s.settings.onboardingAutostartChecked, true);
   });
 
   testWidgets(
@@ -386,7 +427,7 @@ void main() {
       await pumpNewFriend(tester, listener: newListener(), device: android14());
       await tester.tap(find.text('Get started'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Open settings'));
+      await tester.tap(find.text('Open notification settings'));
       await tester.pump();
       // Android stops the app. The friend turns on access and starts the app again.
       await tester.pumpWidget(const SizedBox());

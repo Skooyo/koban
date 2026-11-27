@@ -48,10 +48,6 @@ ORDER BY COALESCE(SUM(
     CASE WHEN transactionType = 'RECEIVE' THEN 0 ELSE COALESCE(countedAmount, amount) END
 ), 0) DESC;
 
-setCategoryForMerchant:
-UPDATE expenses SET categoryId = :categoryId
-WHERE lower(trim(merchant)) = :merchantKey AND transactionType = :type;
-
 monthlyTotals:
 SELECT
     (CAST(strftime('%Y', notificationPostTime / 1000, 'unixepoch', 'localtime') AS INTEGER) * 100

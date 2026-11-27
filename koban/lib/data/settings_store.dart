@@ -20,6 +20,7 @@ class KobanSettings {
   // Flutter only: 0.1.1 kept these two values in a SavedStateHandle.
   static const _onboardingStepKey = 'flutter_onboarding_step';
   static const _onboardingOpenedKey = 'flutter_onboarding_opened_settings';
+  static const _onboardingAutostartKey = 'flutter_onboarding_autostart_checked';
 
   final SharedPreferencesAsync _prefs;
   final SecretStore _secrets;
@@ -32,6 +33,7 @@ class KobanSettings {
   final _hasDeviceToken = ValueNotifier<bool>(false);
   String? _onboardingStep;
   var _onboardingOpenedSettings = false;
+  var _onboardingAutostartChecked = false;
 
   /// Loads the settings. [hasDeviceToken] follows the device token of [secrets].
   static Future<KobanSettings> load(
@@ -67,6 +69,15 @@ class KobanSettings {
   /// True when the friend opened the access settings from onboarding and did not come back yet.
   bool get onboardingOpenedSettings => _onboardingOpenedSettings;
 
+  /// True when the friend came back from the Autostart settings in onboarding.
+  /// Android gives no way to read that setting, so Koban only knows the friend checked it.
+  bool get onboardingAutostartChecked => _onboardingAutostartChecked;
+
+  Future<void> setOnboardingAutostartChecked() async {
+    _onboardingAutostartChecked = true;
+    await _prefs.setBool(_onboardingAutostartKey, true);
+  }
+
   Future<void> setDarkMode(bool on) async {
     await _prefs.setBool(_darkModeKey, on);
     _darkMode.value = on;
@@ -89,6 +100,8 @@ class KobanSettings {
     _onboardingDone.value = true;
     _onboardingStep = null;
     _onboardingOpenedSettings = false;
+    _onboardingAutostartChecked = false;
+    await _prefs.remove(_onboardingAutostartKey);
     await _prefs.remove(_onboardingStepKey);
     await _prefs.remove(_onboardingOpenedKey);
   }
@@ -120,6 +133,8 @@ class KobanSettings {
     _onboardingStep = await _prefs.getString(_onboardingStepKey);
     _onboardingOpenedSettings =
         await _prefs.getBool(_onboardingOpenedKey) ?? false;
+    _onboardingAutostartChecked =
+        await _prefs.getBool(_onboardingAutostartKey) ?? false;
     _onlineFeatures.value = await _prefs.getBool(_onlineFeaturesKey) ?? true;
     await _secrets.load();
     _readDeviceToken();

@@ -6,6 +6,7 @@ import 'package:koban/capture/listener_control.dart';
 import 'package:koban/data/legacy_import.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/theme/koban_theme.dart';
+import 'package:koban/ui/kit.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
@@ -17,11 +18,12 @@ Future<void> pay(
   DateTime at, {
   TransactionType type = TransactionType.withdraw,
   String merchant = 'Kedai Contoh',
+  String categoryId = 'food',
 }) => s.expenses.addManualExpense(
   amount: Decimal.parse(amount),
   merchant: merchant,
   postTime: at.millisecondsSinceEpoch,
-  categoryId: 'food',
+  categoryId: categoryId,
   notes: null,
   type: type,
 );
@@ -57,7 +59,7 @@ void main() {
     await pay(s, '12.50', DateTime(2026, 11, 13, 9));
     await pumpHome(tester, s);
     for (final t in [
-      'Good afternoon',
+      'Fri, 13 Nov',
       'Spent today',
       'RM 12.50',
       'Spent this week',
@@ -207,9 +209,7 @@ void main() {
     expect(find.text('Found by Koban, not saved yet'), findsOneWidget);
   });
 
-  testWidgets('a tap on Spent today opens the week', (
-    tester,
-  ) async {
+  testWidgets('a tap on Spent today opens the week', (tester) async {
     final s = await testServices();
     await pay(s, '12.50', DateTime(2026, 11, 13, 9));
     await pumpHome(tester, s);
@@ -249,6 +249,95 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
     expect(find.text('Tracking on'), findsOneWidget);
+    expect(find.text('Tracking is off'), findsNothing);
+  });
+
+  testWidgets('Mon says Tracking on in the bubble, and no card', (
+    tester,
+  ) async {
+    await pumpHome(tester, await testServices());
+    expect(find.text('Tracking on'), findsOneWidget);
+    expect(find.text('Turn on'), findsNothing);
+  });
+
+  testWidgets('the payments to check row comes before the week card', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await addThreeCards(s);
+    await pumpHome(tester, s);
+    expect(
+      tester.getTopLeft(find.text('3 payments to check')).dy,
+      lessThan(tester.getTopLeft(find.text('Spent this week')).dy),
+    );
+    expect(find.textContaining(' to check'), findsOneWidget);
+  });
+
+  testWidgets('with limits, This month says spent of limit and N over', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await pay(s, '120.00', DateTime(2026, 11, 13, 9));
+    await pay(
+      s,
+      '30.00',
+      DateTime(2026, 11, 13, 10),
+      merchant: 'Bus',
+      categoryId: 'transport',
+    );
+    await s.budgets.setLimit('food', Decimal.parse('100'));
+    await pumpHome(tester, s);
+    expect(find.text('Budgets: RM 120.00 of RM 100.00'), findsOneWidget);
+    // The month total stays on the row.
+    expect(
+      find.descendant(
+        of: find.widgetWithText(KobanRow, 'This month'),
+        matching: find.text('RM 150.00'),
+      ),
+      findsOneWidget,
+    );
+    final over = find.text('1 over');
+    expect(over, findsOneWidget);
+    expect(
+      tester.widget<Text>(over).style!.color,
+      Theme.of(tester.element(over)).colorScheme.error,
+    );
+    await tester.tap(find.text('This month'));
+    await tester.pump();
+    expect(
+      tester.state<HomeShellState>(find.byType(HomeShell)).tab,
+      KobanTab.activity,
+    );
+  });
+
+  testWidgets('spending only in an unbudgeted category is not counted', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await pay(s, '520.00', DateTime(2026, 11, 13, 9), categoryId: 'shopping');
+    await s.budgets.setLimit('food', Decimal.parse('100'));
+    await pumpHome(tester, s);
+    expect(find.text('Budgets: RM 0.00 of RM 100.00'), findsOneWidget);
+    expect(find.textContaining(' over'), findsNothing);
+  });
+
+  testWidgets('with a limit not reached, there is no over mark', (
+    tester,
+  ) async {
+    final s = await testServices();
+    await pay(s, '20.00', DateTime(2026, 11, 13, 9));
+    await s.budgets.setLimit('food', Decimal.parse('100'));
+    await pumpHome(tester, s);
+    expect(find.text('Budgets: RM 20.00 of RM 100.00'), findsOneWidget);
+    expect(find.textContaining(' over'), findsNothing);
+  });
+
+  testWidgets('with no limits, This month keeps its date line', (tester) async {
+    final s = await testServices();
+    await pay(s, '20.00', DateTime(2026, 11, 13, 9));
+    await pumpHome(tester, s);
+    expect(find.text('November 2026'), findsOneWidget);
+    expect(find.textContaining(' of RM'), findsNothing);
   });
 
   testWidgets('Home meets the tap target guidelines', (tester) async {

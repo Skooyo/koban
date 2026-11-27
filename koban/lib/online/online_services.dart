@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:http/http.dart' show Client;
 import 'package:supabase/supabase.dart';
 
@@ -69,6 +71,37 @@ class OnlineServices {
 
   /// The receipt functions of Koban's server.
   late final ReceiptCloudClient receiptCloud = ReceiptCloudClient(this);
+
+  /// Trades the invite code for a device token and stores the token (never the code).
+  /// Gives an error message for the person, or null when it worked.
+  Future<String?> useInviteCode(String code) async {
+    final Registration r;
+    try {
+      r = await receiptCloud.register(code);
+    } catch (e) {
+      // Log only the type: the message of a body error can hold the token.
+      developer.log(
+        'Invite code check failed: ${e.runtimeType}',
+        name: 'Online',
+      );
+      return "Koban's server had a problem. Try again later.";
+    }
+    switch (r) {
+      case RegistrationFailed(:final message):
+        return message;
+      case RegistrationOk(:final deviceToken):
+        try {
+          await secrets.setDeviceToken(deviceToken);
+        } catch (e) {
+          developer.log(
+            'Invite code save failed: ${e.runtimeType}',
+            name: 'Online',
+          );
+          return 'Koban could not save the invite code on this phone. Try again.';
+        }
+        return null;
+    }
+  }
 
   /// True when the Online features switch is on.
   bool get allowed => settings.onlineFeatures.value;

@@ -27,8 +27,8 @@ const _tall = Size(0, 48);
   if (!signedIn) {
     return (
       face: MonFace.worry,
-      line: 'I cannot see your groups.',
-      detail: 'Sign in below to bring them back.',
+      line: 'Sign in to see your groups.',
+      detail: null,
     );
   }
   return (
@@ -82,11 +82,14 @@ class _GroupsScreenState extends State<GroupsScreen> {
   /// itself: the tab drops them, so one message does not show two times.
   var _groupOpen = false;
 
-  Future<void> _openGroup(String id) async {
+  /// True while the first-sign-in name step shows.
+  var _askingName = false;
+
+  Future<void> _openGroup(String id, {String? madeName}) async {
     if (!_current) return;
     _groupOpen = true;
     try {
-      await openGroup(context, id);
+      await openGroup(context, id, madeName: madeName);
     } finally {
       _groupOpen = false;
     }
@@ -103,6 +106,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
     required int max,
     required Future<String?> Function(GroupRepository r, String text) action,
     VoidCallback? onOk,
+    String? helper,
+    String Function(String)? transform,
   }) async {
     if (!_current) return;
     await askNameAndRun(
@@ -115,21 +120,41 @@ class _GroupsScreenState extends State<GroupsScreen> {
       max: max,
       action: action,
       onOk: onOk,
+      helper: helper,
+      transform: transform,
     );
   }
 
-  Future<void> _make() => _askAndRun(
-    title: 'Make a group',
-    label: 'Group name',
-    start: '',
-    confirm: 'Make group',
-    max: 40,
-    action: (r, name) => r.makeGroup(name),
-  );
+  /// Makes the group, then opens its page with the group code on top.
+  Future<void> _make() {
+    String? id;
+    String? name;
+    return _askAndRun(
+      title: 'Make a group',
+      label: 'Group name',
+      start: '',
+      confirm: 'Make group',
+      max: 40,
+      action: (r, typed) {
+        name = typed;
+        return r.makeGroup(typed, onMade: (made) => id = made);
+      },
+      onOk: () {
+        final made = id;
+        if (made != null && mounted) _openGroup(made, madeName: name);
+      },
+    );
+  }
 
   Future<void> _join() => _askAndRun(
     title: 'Join a group',
-    label: 'Group code, for example GRP-7KQ2',
+    label: 'Group code',
+    helper: 'Like GRP-7KQ2',
+    // Capitals as you type. A pasted share message gives the code in it.
+    transform: (v) {
+      final up = v.toUpperCase();
+      return RegExp(r'GRP-[A-Z0-9]{4}').firstMatch(up)?.group(0) ?? up;
+    },
     start: '',
     confirm: 'Ask to join',
     max: 8,
@@ -138,19 +163,62 @@ class _GroupsScreenState extends State<GroupsScreen> {
         _snack('Request sent. You join when the group owner approves it.'),
   );
 
-  Future<void> _alias() => _askAndRun(
-    title: 'Your name in groups',
-    label: 'Name',
-    start: _vm!.state.alias,
-    confirm: 'Save',
-    max: 30,
-    action: (r, name) => r.setAlias(name),
-  );
+  /// The invite check before the Google sign-in: trades the code for a device token.
+  Future<void> _inviteCode() async {
+    if (!_current) return;
+    final s = AppScope.of(context);
+    await showTextDialog(
+      context,
+      title: 'Enter invite code',
+      label: 'Invite code',
+      helper: 'Like ABCD-2345',
+      transform: (v) => v.toUpperCase(),
+      start: '',
+      confirm: 'Use code',
+      max: 9,
+      submit: (code) async {
+        final error = await s.online.useInviteCode(code);
+        return (worked: error == null, error: error);
+      },
+    );
+  }
 
-  Future<void> _signOut() => _vm!.run((r) async {
-    await r.signOut();
-    return null;
-  });
+  /// False when another page or dialog is over the tab, so nothing showed.
+  Future<bool> _alias() async {
+    if (!_current) return false;
+    await _askAndRun(
+      title: 'Your name in groups',
+      label: 'Name',
+      helper: 'Members see this name.',
+      start: _vm!.state.alias,
+      confirm: 'Save',
+      max: 30,
+      action: (r, name) => r.setAlias(name),
+    );
+    return true;
+  }
+
+  Future<void> _signOut() async {
+    if (!_current) return;
+    final ok = await showConfirmDialog(
+      context,
+      title: 'Sign out?',
+      body: 'Your groups come back when you sign in again.',
+      confirm: 'Sign out',
+    );
+    if (!ok) return;
+    await _vm!.run((r) async {
+      await r.signOut();
+      return null;
+    });
+  }
+
+  /// After the first sign-in: asks which name the groups see, filled with the Google name.
+  Future<void> _askFirstName() async {
+    // With no dialog shown, the step stays pending and the next build asks again.
+    final shown = await _alias();
+    if (shown && mounted) AppScope.of(context).online.groups.nameDone();
+  }
 
   Future<void> _delete() async {
     if (!_current) return;
@@ -160,6 +228,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
       title: 'Delete your account?',
       body: "This removes you from all your groups and deletes your shared totals from Koban's server. The payments on this phone stay.",
       confirm: 'Delete account',
+      destructive: true,
       action: (r) => r.deleteAccount(),
     );
   }
@@ -188,6 +257,13 @@ class _GroupsScreenState extends State<GroupsScreen> {
         }
         final state = vm.state;
         final signedIn = state.online && state.userId != null;
+        if (signedIn && state.namePending && !_askingName && _current) {
+          _askingName = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (mounted) await _askFirstName();
+            _askingName = false;
+          });
+        }
         final scheme = Theme.of(context).colorScheme;
         final say = _monSay(state, signedIn: signedIn);
         final band = SceneBand(
@@ -234,9 +310,16 @@ class _GroupsScreenState extends State<GroupsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               child: !state.online
                   ? _OnlineOff(onTurnOn: () => vm.setOnline(true))
-                  : _SignedOut(
-                      busy: vm.busy,
-                      onSignIn: () => vm.run((r) => r.signIn()),
+                  : ValueListenableBuilder(
+                      valueListenable: AppScope.of(context)
+                          .settings
+                          .hasDeviceToken,
+                      builder: (_, hasInvite, _) => _SignedOut(
+                        busy: vm.busy,
+                        hasInvite: hasInvite,
+                        onInviteCode: _inviteCode,
+                        onSignIn: () => vm.run((r) => r.signIn()),
+                      ),
                     ),
             ),
           ],
@@ -293,7 +376,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                 title: g.name,
                 subtitle:
                     '${g.members} ${g.members == 1 ? 'member' : 'members'}'
-                    '${g.ownerId == state.userId ? ' · you are the owner' : ''}',
+                    '${g.ownerId == state.userId ? ' · you are the group owner' : ''}',
                 leading: InitialsAvatar(g.name, tint: scheme.primaryContainer),
                 trailing: g.requests > 0
                     ? DecoratedBox(
@@ -307,7 +390,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                             vertical: 4,
                           ),
                           child: Text(
-                            '${g.requests} ${g.requests == 1 ? 'request' : 'requests'}',
+                            '${g.requests} ${g.requests == 1 ? 'join request' : 'join requests'}',
                             style: theme.textTheme.labelMedium!.copyWith(
                               color: scheme.onPrimaryContainer,
                             ),
@@ -321,40 +404,39 @@ class _GroupsScreenState extends State<GroupsScreen> {
               ),
           ],
         ),
-      Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      if (state.waiting.isNotEmpty) ...[
+        Semantics(
+          header: true,
+          child: Text(
+            'Waiting for the group owner',
+            style: theme.textTheme.titleSmall!.copyWith(color: muted),
+          ),
+        ),
+        ListGroup(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: vm.busy ? null : _make,
-                    style: FilledButton.styleFrom(minimumSize: _tall),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Make a group'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: vm.busy ? null : _join,
-                    style: OutlinedButton.styleFrom(minimumSize: _tall),
-                    child: const Text('Join a group'),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'You can be in up to 5 groups. Each group has up to 10 members.',
-                style: theme.textTheme.bodySmall!.copyWith(color: muted),
+            for (final r in state.waiting)
+              KobanRow(
+                title: 'Join request',
+                subtitle: _waitingText(r.sentAt, AppScope.of(context).now()),
+                leading: Icon(Icons.hourglass_empty, color: muted),
               ),
-            ),
           ],
         ),
+      ],
+      FilledButton.icon(
+        onPressed: vm.busy ? null : _make,
+        style: FilledButton.styleFrom(minimumSize: _tall),
+        icon: const Icon(Icons.add, size: 18),
+        label: const Text('Make a group'),
+      ),
+      OutlinedButton(
+        onPressed: vm.busy ? null : _join,
+        style: OutlinedButton.styleFrom(minimumSize: _tall),
+        child: const Text('Join with a group code'),
+      ),
+      Text(
+        'Up to 5 groups, 10 members in each.',
+        style: theme.textTheme.bodySmall!.copyWith(color: muted),
       ),
     ];
     return Stack(
@@ -391,6 +473,31 @@ class _GroupsScreenState extends State<GroupsScreen> {
   }
 }
 
+const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const _monthNames = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// "Sent Tue, 24 Nov. It ends in 5 days." A request ends 7 days after it is sent.
+String _waitingText(DateTime? sentAt, DateTime now) {
+  if (sentAt == null) return 'Sent. It ends 7 days after you send it.';
+  final sent = sentAt.toLocal();
+  final left = (7 - now.difference(sentAt).inDays).clamp(1, 7);
+  return 'Sent ${_weekdays[sent.weekday - 1]}, ${sent.day} ${_monthNames[sent.month - 1]}. '
+      'It ends in $left ${left == 1 ? 'day' : 'days'}.';
+}
+
 class _OnlineOff extends StatelessWidget {
   const _OnlineOff({required this.onTurnOn});
 
@@ -407,9 +514,18 @@ class _OnlineOff extends StatelessWidget {
 }
 
 class _SignedOut extends StatelessWidget {
-  const _SignedOut({required this.busy, required this.onSignIn});
+  const _SignedOut({
+    required this.busy,
+    required this.hasInvite,
+    required this.onInviteCode,
+    required this.onSignIn,
+  });
 
   final bool busy;
+
+  /// False until the phone has an invite code. Groups need one, so the card asks for it first.
+  final bool hasInvite;
+  final VoidCallback onInviteCode;
   final VoidCallback onSignIn;
 
   @override
@@ -454,19 +570,23 @@ class _SignedOut extends StatelessWidget {
                 ),
                 line(
                   Icon(Icons.lock, color: scheme.onSurfaceVariant),
-                  'Never shared: single payments, shops, times, notes, money in',
+                  'Never shared: single payments, shops, times, notes, Received',
                 ),
               ],
             ),
           ),
         ),
         FilledButton(
-          onPressed: busy ? null : onSignIn,
+          onPressed: hasInvite ? (busy ? null : onSignIn) : onInviteCode,
           style: FilledButton.styleFrom(minimumSize: _tall),
-          child: Text(busy ? 'Signing in…' : 'Sign in with Google'),
+          child: Text(
+            hasInvite
+                ? (busy ? 'Signing in…' : 'Sign in with Google')
+                : 'Enter invite code',
+          ),
         ),
         Text(
-          'Groups use the invite code you entered in Settings.',
+          hasInvite ? 'Groups use the invite code of this phone.' : 'Groups need an invite code from the Koban owner. Enter it first, then sign in.',
           style: theme.textTheme.bodySmall!.copyWith(
             color: scheme.onSurfaceVariant,
           ),

@@ -96,16 +96,31 @@ class CategoryRepository {
   }
 
   /// Deletes an own category. A built-in category stays. It returns null when no row went.
-  /// Payments keep the id, so Undo only puts the row back.
+  /// Payments keep the id, so Undo puts the row back. The limits of the category go with it, and Undo puts them back too.
   Future<Undoable?> deleteCategory(String id) => _db.transaction(() async {
     final row = await _db.categoryById(id).getSingleOrNull();
     if (row == null || await _db.deleteCustomCategory(id) == 0) return null;
+    final limits = await _db.limitRowsOfCategory(id).get();
+    await _db.deleteLimitsOfCategory(id);
     return Undoable(
-      undo: () => _db
-          .into(_db.categories)
-          .insert(row, mode: InsertMode.insertOrReplace),
+      undo: () => _db.transaction(() async {
+        await _db
+            .into(_db.categories)
+            .insert(row, mode: InsertMode.insertOrReplace);
+        await _db.batch(
+          (b) => b.insertAll(
+            _db.budgetLimits,
+            limits,
+            mode: InsertMode.insertOrReplace,
+          ),
+        );
+      }),
     );
   });
+
+  /// How many payments have this category.
+  Future<int> paymentCount(String id) =>
+      _db.expenses.count(where: (e) => e.categoryId.equals(id)).getSingle();
 
   Future<Category?> getById(String? id) async =>
       id == null ? null : await _db.categoryById(id).getSingleOrNull();

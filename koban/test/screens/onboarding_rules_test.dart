@@ -208,7 +208,9 @@ void main() {
     expect(OnboardingRules.stepNumber(OnboardingStep.blocked), 1);
   });
 
-  test('the welcome step has no step number', () {
+  test('the welcome and ready steps have no step number', () {
     expect(OnboardingRules.stepNumber(OnboardingStep.welcome), null);
+    expect(OnboardingRules.stepNumber(OnboardingStep.ready), null);
+    expect(OnboardingRules.stepNumber(OnboardingStep.running), 3);
   });
 }

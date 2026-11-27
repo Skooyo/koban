@@ -102,7 +102,7 @@ void main() {
     Finder inTab<T extends Widget>(String text) =>
         find.descendant(of: find.byType(T), matching: find.text(text));
     final shell = tester.state<HomeShellState>(find.byType(HomeShell));
-    expect(inTab<HomeScreen>('Good afternoon'), findsWidgets);
+    expect(inTab<HomeScreen>('Fri, 13 Nov'), findsWidgets);
     shell.select(KobanTab.activity);
     await tester.pumpAndSettle();
     expect(inTab<ActivityScreen>('Activity'), findsWidgets);
@@ -117,7 +117,7 @@ void main() {
 
     await visit(tester, (c) => openPerson(c, ali), 'Ali');
     await visit(tester, (c) => openSplitNew(c), 'Split a bill');
-    await visit(tester, (c) => openSplitEdit(c, billId), 'Split done');
+    await visit(tester, (c) => openSplitEdit(c, billId), 'Split');
     await visit(tester, (c) => openPaymentNew(c), 'Save payment');
     await visit(tester, (c) => openPaymentEdit(c, expenseId), 'Payment');
     await visit(tester, openCheckPayments, 'Check payments');

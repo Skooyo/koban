@@ -4,6 +4,7 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart' hide Category;
 
 import '../../app/app_services.dart';
+import '../../data/budget_repository.dart';
 import '../../data/activity_selection.dart';
 import '../../data/category_repository.dart';
 import '../../data/database.dart';
@@ -124,6 +125,7 @@ class ActivityViewModel extends ChangeNotifier with LoadErrors {
     _watched = _s.activitySelection.value;
     _s.activitySelection.addListener(_onSelection);
     _watchMonth();
+    _watchBudget();
     if (_watched.showAll) _watchAllTime();
     _subs.add(
       _s.categories.watchAll().listen((list) {
@@ -151,6 +153,8 @@ class ActivityViewModel extends ChangeNotifier with LoadErrors {
   final List<StreamSubscription<Object?>> _subs = [];
   List<StreamSubscription<Object?>> _monthSubs = [];
   List<StreamSubscription<Object?>> _allTimeSubs = [];
+  StreamSubscription<BudgetMonth>? _budgetSub;
+  BudgetMonth? _budget;
   late Selection _watched;
   var _generation = 0;
   _MonthData? _data;
@@ -196,6 +200,22 @@ class ActivityViewModel extends ChangeNotifier with LoadErrors {
     final n = _s.now();
     return YearMonth(n.year, n.month);
   }
+
+  /// The budget of each category for the shown month, by category id. Empty for a week: a budget is monthly.
+  Map<String, CategoryBudget> get budgets {
+    final b = _budget;
+    if (b == null || _watched.weekStart != null) return const {};
+    return {for (final item in b.items) item.category.id: item};
+  }
+
+  /// The names of the categories over their limit this month.
+  List<String> get overBudget => [
+    for (final item in _budget?.items ?? const <CategoryBudget>[])
+      if (item.state == BudgetState.over) item.category.name,
+  ];
+
+  /// True until the Month view has its first data. A failed load ends it: the error row shows.
+  bool get loading => _data == null && loadError == null;
 
   ActivityUiState get state {
     final sel = _s.activitySelection.value;
@@ -273,6 +293,8 @@ class ActivityViewModel extends ChangeNotifier with LoadErrors {
     if (sel.month != old.month || sel.weekStart != old.weekStart) {
       _watchMonth();
     }
+    // watchMonth does not follow the clock, so the stream starts again for each month.
+    if (sel.month != old.month) _watchBudget();
     if (sel.showAll != old.showAll) {
       if (sel.showAll) {
         _watchAllTime();
@@ -300,9 +322,6 @@ class ActivityViewModel extends ChangeNotifier with LoadErrors {
         ? null
         : weekRanges.where((w) => w.$1 == _watched.weekStart).firstOrNull;
     final (listStart, listEnd) = week ?? (monthStart, monthEnd);
-    // Full Monday-to-Sunday weeks reach into the next and the last month, so watch the whole span.
-    final spanStart = weekRanges.firstOrNull?.$1 ?? monthStart;
-    final spanEnd = weekRanges.lastOrNull?.$2 ?? monthEnd;
 
     Decimal? total;
     Decimal? received;
@@ -336,7 +355,7 @@ class ActivityViewModel extends ChangeNotifier with LoadErrors {
         emit();
       }, onError: onLoadError),
       e
-          .watchInRange(spanStart, spanEnd)
+          .watchInRange(monthStart, monthEnd)
           .asyncMap((list) async {
             final weeks = await e.weekSummariesForMonth(year, month0);
             return (
@@ -358,6 +377,15 @@ class ActivityViewModel extends ChangeNotifier with LoadErrors {
         emit();
       }, onError: onLoadError),
     ];
+  }
+
+  void _watchBudget() {
+    _budgetSub?.cancel();
+    _budget = null;
+    _budgetSub = _s.budgets.watchMonth(_watched.month).listen((v) {
+      _budget = v;
+      notifyListeners();
+    }, onError: onLoadError);
   }
 
   void _watchAllTime() {
@@ -467,6 +495,7 @@ class ActivityViewModel extends ChangeNotifier with LoadErrors {
     _cancelAll(_subs);
     _cancelAll(_monthSubs);
     _cancelAll(_allTimeSubs);
+    _budgetSub?.cancel();
     super.dispose();
   }
 }

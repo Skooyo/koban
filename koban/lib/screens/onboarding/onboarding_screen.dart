@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/app_services.dart';
@@ -10,16 +11,16 @@ import 'onboarding_rules.dart';
 import 'onboarding_view_model.dart';
 
 const _stepNames = {
-  OnboardingStep.access: 'Notification access',
-  OnboardingStep.blocked: 'Notification access',
+  OnboardingStep.access: 'Notifications',
+  OnboardingStep.blocked: 'Notifications',
   OnboardingStep.apps: 'Payment apps',
   OnboardingStep.running: 'Keep it running',
   OnboardingStep.ready: 'Ready',
 };
 
-/// First-start flow (`OnboardingScreen.kt` of 0.1.1): welcome, notification access,
+/// First-start flow (`OnboardingScreen.kt` of 0.1.1): welcome, notifications,
 /// payment apps, keep-alive settings, ready. Back goes one step back.
-/// Back on Welcome and Go to Home store the done flag and show Home.
+/// Back on Welcome closes the app and keeps onboarding due. Go to Home stores the done flag.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -81,14 +82,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onPopInvokedWithResult: (didPop, _) {
             if (didPop) return;
             if (vm.step == OnboardingStep.welcome) {
-              _finish();
+              SystemNavigator.pop();
             } else {
               vm.back();
             }
           },
           // The picker keeps its own top bar and Save button.
           child: step == OnboardingStep.apps
-              ? PaymentAppsScreen(onSaved: vm.appsSaved)
+              ? PaymentAppsScreen(
+                  onSaved: vm.appsSaved,
+                  progress: StepProgress(
+                    number: OnboardingRules.stepNumber(step)!,
+                    total: OnboardingRules.stepCount,
+                    name: _stepNames[step]!,
+                  ),
+                )
               : _page(context, vm, step),
         );
       },
@@ -102,11 +110,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ) {
     final number = OnboardingRules.stepNumber(step);
     final s = AppScope.of(context);
-    final (face, line) = _mon(step, vm);
+    final (face, line, detail) = _mon(step, vm);
     return Scaffold(
       body: Column(
         children: [
-          SceneBand(title: 'Koban', face: face, line: line),
+          SceneBand(
+            title: 'Set up Koban',
+            face: face,
+            line: line,
+            detail: detail,
+            compact: true,
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(
@@ -122,7 +136,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   if (number != null)
                     StepProgress(
                       number: number,
-                      total: 4,
+                      total: OnboardingRules.stepCount,
                       name: _stepNames[step]!,
                     ),
                   ...switch (step) {
@@ -149,7 +163,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _MainButton('Get started', vm.next),
                   ],
                   OnboardingStep.access => [
-                    _MainButton('Open settings', _openAccessSettings),
+                    _MainButton(
+                      'Open notification settings',
+                      _openAccessSettings,
+                    ),
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
@@ -157,6 +174,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         style: _small(context),
                         textAlign: TextAlign.center,
                       ),
+                    ),
+                    Text(
+                      'Koban checks again when you come back.',
+                      style: _small(context),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                   OnboardingStep.blocked => [
@@ -172,15 +194,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                   ],
-                  OnboardingStep.running => [
-                    _MainButton('Next', vm.next),
-                    Center(
-                      child: TextButton(
-                        onPressed: vm.next,
-                        child: const Text('Skip for now'),
-                      ),
-                    ),
-                  ],
+                  OnboardingStep.running => [_MainButton('Next', vm.next)],
                   OnboardingStep.ready when vm.listensToNoApp => [
                     _MainButton('Choose apps', vm.chooseApps),
                     Center(
@@ -201,22 +215,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  (MonFace, String) _mon(OnboardingStep step, OnboardingViewModel vm) =>
-      switch (step) {
-        OnboardingStep.welcome => (MonFace.idle, 'Hello. I count the money.'),
-        OnboardingStep.access => (MonFace.idle, 'I need to see your alerts.'),
-        OnboardingStep.blocked => (MonFace.worry, 'Android said no. Fixable.'),
-        OnboardingStep.running => (
-          MonFace.idle,
-          'Keep me awake. I keep counting.',
-        ),
-        OnboardingStep.ready when vm.listensToNoApp => (
-          MonFace.worry,
-          'I have nothing to listen to.',
-        ),
-        OnboardingStep.ready => (MonFace.happy, 'Ready. Go pay for something.'),
-        OnboardingStep.apps => (MonFace.idle, ''),
-      };
+  (MonFace, String, String?) _mon(
+    OnboardingStep step,
+    OnboardingViewModel vm,
+  ) => switch (step) {
+    OnboardingStep.welcome => (MonFace.idle, 'Hello. I count the money.', null),
+    OnboardingStep.access => (
+      MonFace.idle,
+      'I need to see your notifications.',
+      'Only the payment ones.',
+    ),
+    OnboardingStep.blocked => (
+      MonFace.worry,
+      'Android said no. Fixable.',
+      null,
+    ),
+    OnboardingStep.running => (
+      MonFace.idle,
+      'Keep me awake. I keep counting.',
+      null,
+    ),
+    OnboardingStep.ready when vm.listensToNoApp => (
+      MonFace.worry,
+      'I have nothing to listen to.',
+      null,
+    ),
+    OnboardingStep.ready => (
+      MonFace.happy,
+      'Ready. Go pay for something.',
+      null,
+    ),
+    OnboardingStep.apps => (MonFace.idle, '', null),
+  };
 
   TextStyle _small(BuildContext context) {
     final theme = Theme.of(context);
@@ -238,7 +268,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       const _InfoRow(
         Icons.notifications_active,
-        'Reads payment alerts from the apps you pick.',
+        'Reads payment notifications from the apps you pick.',
       ),
       const _InfoRow(
         Icons.touch_app,
@@ -246,27 +276,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       const _InfoRow(
         Icons.lock,
-        'Nothing leaves the phone. No account needed.',
+        'Payments stay on this phone. Online features are your choice.',
       ),
     ];
   }
 
   List<Widget> _access(BuildContext context) => [
     Text(
-      'Let Koban see payment alerts',
+      'Let Koban read payment notifications',
       style: Theme.of(context).textTheme.headlineSmall,
     ),
     Text(
-      'When your bank or e-wallet sends a payment alert, Koban turns it into a payment for you to check.',
+      'When your bank or e-wallet sends a payment notification, Koban turns it into a payment for you to check.',
       style: _body(context),
     ),
     const _InfoRow(
       Icons.check_circle,
-      'Koban reads only the apps you pick next.',
+      'Koban reads only the apps you pick in step 2.',
     ),
     const _InfoRow(
       Icons.check_circle,
-      'It ignores chats and all other alerts.',
+      'It ignores chats and all other notifications.',
     ),
   ];
 
@@ -296,7 +326,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   List<Widget> _runningStep(BuildContext context, OnboardingViewModel vm) {
     final rows = vm.running;
-    final listener = AppScope.of(context).listener;
     return [
       Text(
         'Keep Koban running',
@@ -309,7 +338,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (rows != null) ...[
         if (rows.showAlerts)
           _SettingRow(
-            title: 'Alerts',
+            title: 'Notifications',
             action: 'Tell me when tracking stops',
             done: rows.alertsAllowed,
             buttonLabel: 'Allow',
@@ -320,15 +349,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           action: 'No restrictions',
           done: rows.batteryIgnored,
           buttonLabel: 'Open settings',
-          onPressed: listener.openBatteryOptimizationSettings,
+          onPressed: AppScope.of(context)
+              .listener
+              .openBatteryOptimizationSettings,
         ),
         if (rows.xiaomi)
           _SettingRow(
             title: 'Autostart',
             action: 'Start Koban after a restart',
-            done: false,
+            done: vm.autostartChecked,
+            doneText: 'Checked by you',
             buttonLabel: 'Open settings',
-            onPressed: listener.openBackgroundSettings,
+            onPressed: vm.openAutostart,
           ),
       ],
       Text(
@@ -407,6 +439,7 @@ class _SettingRow extends StatelessWidget {
     required this.done,
     required this.buttonLabel,
     required this.onPressed,
+    this.doneText,
   });
 
   final String title;
@@ -414,6 +447,9 @@ class _SettingRow extends StatelessWidget {
   final bool done;
   final String buttonLabel;
   final VoidCallback onPressed;
+
+  /// Words next to the check when the phone cannot tell the state, such as 'Checked by you'.
+  final String? doneText;
 
   @override
   Widget build(BuildContext context) {
@@ -437,7 +473,19 @@ class _SettingRow extends StatelessWidget {
               ],
             ),
           ),
-          if (done)
+          if (done && doneText != null)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 8,
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  color: MoneyColors.of(context).received,
+                ),
+                Text(doneText!, style: theme.textTheme.labelLarge),
+              ],
+            )
+          else if (done)
             Icon(
               Icons.check_circle,
               semanticLabel: '$title done',

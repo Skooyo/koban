@@ -1,0 +1,37 @@
+import 'schema.drift';
+import 'package:decimal/decimal.dart';
+import 'converters.dart';
+
+-- Monthly spending limits on the phone. Not a Room table: the table starts in schema version 2.
+-- A row holds the limit that starts in [startMonth] ('YYYY-MM', Malaysia time).
+-- An amount of NULL means: no limit from that month on.
+CREATE TABLE budget_limits (
+    categoryId TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    startMonth TEXT NOT NULL,
+    amount TEXT MAPPED BY `const MoneyConverter()`,
+    PRIMARY KEY (categoryId, currency, startMonth)
+);
+
+allLimitRows:
+SELECT * FROM budget_limits WHERE currency = :currency;
+
+limitRowsOfCategory:
+SELECT * FROM budget_limits WHERE categoryId = :categoryId;
+
+deleteLimitsOfCategory:
+DELETE FROM budget_limits WHERE categoryId = :categoryId;
+
+deleteLimitRow:
+DELETE FROM budget_limits
+WHERE categoryId = :categoryId AND currency = :currency AND startMonth = :startMonth;
+
+-- Money out of a category in one period. It counts the same as totalsByCategory.
+spentByCategoryIn:
+SELECT categoryId,
+CAST(COALESCE(SUM(COALESCE(countedAmount, amount)), 0) AS TEXT) MAPPED BY `const MoneyConverter()` AS total
+FROM expenses
+WHERE status != 'DISMISSED' AND transactionType != 'RECEIVE'
+AND currency = :currency AND categoryId IS NOT NULL
+AND notificationPostTime >= :start AND notificationPostTime < :end
+GROUP BY categoryId;

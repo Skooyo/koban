@@ -576,7 +576,7 @@ class SplitEditorViewModel extends ChangeNotifier {
         readsLeft: readsLeft ?? s.readsLeft,
         canReadAgain: _canReadAgain(s.onlineAccess),
         message: draft == null
-            ? "Couldn't read this receipt. Add the items by hand."
+            ? "Could not read this receipt. Add the items by hand."
             : draft.printedTotal == null
             ? 'No total found on the receipt. Check the items.'
             : null,
@@ -629,18 +629,6 @@ class SplitEditorViewModel extends ChangeNotifier {
       ],
     ),
   );
-
-  /// Adds a line for the item money still missing to the receipt or payment, shared by everyone.
-  void splitTheRest() {
-    final rest = missingItemsOf(_state);
-    if (rest == null || rest.sign <= 0) return;
-    addItem(
-      name: restItemName,
-      quantity: 1,
-      price: rest,
-      sharedBy: _everyone(_state),
-    );
-  }
 
   void updateItem(int key, ItemRow Function(ItemRow) change) => _update(
     (s) => s.copyWith(
@@ -717,6 +705,16 @@ class SplitEditorViewModel extends ChangeNotifier {
       sharedBy: r.sharedBy.contains(personId)
           ? ({...r.sharedBy}..remove(personId))
           : {...r.sharedBy, personId},
+    ),
+  );
+
+  /// One item goes to everyone, or to no one when it already goes to everyone.
+  void toggleEveryone(int key) => updateItem(
+    key,
+    (r) => r.copyWith(
+      sharedBy: r.sharedBy.length == _everyone(_state).length
+          ? <String>{}
+          : _everyone(_state),
     ),
   );
 
@@ -863,14 +861,12 @@ class SplitEditorViewModel extends ChangeNotifier {
     final s = _state;
     final target = switch (s.step) {
       SplitStep.people => SplitStep.start,
-      SplitStep.items => s.skipLink ? SplitStep.summary : SplitStep.link,
-      SplitStep.link => SplitStep.summary,
+      SplitStep.items || SplitStep.link => SplitStep.summary,
       _ => null,
     };
     if (target == null) return;
     if (s.step == SplitStep.items) _dropPhoto();
     _update((st) => st.copyWith(step: target, error: null));
-    if (target == SplitStep.link) _loadCandidatesLogged();
   }
 
   /// Returns false when the screen must leave the editor.
@@ -879,6 +875,11 @@ class SplitEditorViewModel extends ChangeNotifier {
     final SplitStep target;
     switch (s.step) {
       case SplitStep.people:
+        // A new split with people added: the screen asks before it drops them.
+        if (s.billId == null && s.people.isNotEmpty) {
+          _update((st) => st.copyWith(confirmDiscard: true));
+          return true;
+        }
         return false;
       case SplitStep.start:
         target = SplitStep.people;
@@ -897,7 +898,7 @@ class SplitEditorViewModel extends ChangeNotifier {
         if (s.billId != null) return false;
         target = SplitStep.start;
       case SplitStep.link:
-        target = s.locked || s.skipLink ? SplitStep.summary : SplitStep.items;
+        target = SplitStep.summary;
       case SplitStep.summary:
         // Back leaves the typed amounts first.
         if (s.amounts != null) {
@@ -916,7 +917,7 @@ class SplitEditorViewModel extends ChangeNotifier {
           );
           return true;
         }
-        target = s.skipLink ? SplitStep.items : SplitStep.link;
+        target = SplitStep.items;
     }
     _update((st) => st.copyWith(step: target, error: null));
     return true;

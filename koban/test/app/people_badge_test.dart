@@ -1,5 +1,8 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
+
+import 'package:koban/app/home_shell.dart';
 
 import '../support/harness.dart';
 
@@ -24,7 +27,13 @@ void main() {
     );
     await tester.pump();
 
-    final tab = find.byTooltip('People');
+    final tab = find.ancestor(
+      of: find.descendant(
+        of: find.byType(KobanTabBar),
+        matching: find.text('People'),
+      ),
+      matching: find.byType(InkResponse),
+    );
     expect(find.descendant(of: tab, matching: find.text('2')), findsOneWidget);
     expect(tester.getSemantics(tab).label, '2 open\nPeople\nTab 3 of 4');
     handle.dispose();

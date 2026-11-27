@@ -54,6 +54,12 @@ Future<void> openCheck(
 Finder get saveButton => find.widgetWithText(FilledButton, 'Save payment');
 Finder get dropButton => find.widgetWithText(OutlinedButton, 'Not a payment');
 
+/// The typed text of the field with [label].
+String fieldText(WidgetTester tester, String label) => tester
+    .widget<TextField>(find.widgetWithText(TextField, label))
+    .controller!
+    .text;
+
 Future<List<String?>> expenseShops(AppServices s) async => [
   for (final e in await s.db.select(s.db.expenses).get()) e.merchant,
 ];
@@ -62,9 +68,9 @@ Future<List<String>> cardIds(AppServices s) async => [
   for (final p in await s.db.select(s.db.pendingPayments).get()) p.id,
 ];
 
-/// Ends the 4-second hold on the fake clock and lets the commit run.
+/// Ends the 6-second hold on the fake clock and lets the commit run.
 Future<void> endHold(WidgetTester tester) async {
-  await tester.pump(const Duration(seconds: 4));
+  await tester.pump(const Duration(seconds: 6));
   await tester.pumpAndSettle();
 }
 
@@ -84,22 +90,20 @@ void main() {
     expect(find.byTooltip('Back'), findsOneWidget);
     expect(find.text('1 of 3'), findsOneWidget);
     expect(find.text('Today, 12:00'), findsOneWidget);
-    expect(find.text('RM 15.00'), findsOneWidget);
-    expect(find.text('Today, 12:00'), findsOneWidget);
+    expect(find.text('From MAE'), findsOneWidget);
+    expect(fieldText(tester, 'Amount'), '15.00');
+    expect(fieldText(tester, 'Shop'), 'RESTORAN CONTOH');
     expect(find.text('“$firstText”'), findsOneWidget);
-    expect(
-      find.text(
-        'Tap a field to fix it. Swipe right to save, left for Not a payment.',
-      ),
-      findsOneWidget,
-    );
+    // One flat card, no hint line, no stamps. Koban is not sure of every card.
+    expect(find.byType(CheckPaymentCard), findsOneWidget);
+    expect(find.textContaining('Tap a field to fix it'), findsNothing);
+    expect(find.text('Save all 3'), findsNothing);
+    expect(find.text('2 more after this'), findsOneWidget);
     expect(saveButton, findsOneWidget);
     expect(dropButton, findsOneWidget);
-    // The stack has 3 cards. The received card shows its amount with a plus.
-    expect(find.byType(CheckPaymentCard), findsNWidgets(3));
-    expect(find.text('+ RM 50.00'), findsOneWidget);
-    // The stamps show only during a drag.
-    expect(find.text('Save'), findsNothing);
+    // Both buttons are as wide as the screen less its 16 dp gutters.
+    expect(tester.getSize(saveButton).width, 411 - 32);
+    expect(tester.getSize(dropButton).width, 411 - 32);
   });
 
   testWidgets('Save payment saves the top card after the Undo window', (
@@ -109,14 +113,18 @@ void main() {
     await openCheck(tester, s);
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
-    expect(find.text('Saved RESTORAN CONTOH · Undo'), findsOneWidget);
+    expect(find.text('Payment saved: RESTORAN CONTOH · Undo'), findsOneWidget);
     expect(find.text('2 of 3'), findsOneWidget);
     expect(find.text('Today, 12:00'), findsNothing);
+    expect(await expenseShops(s), isEmpty);
+    // Undo stays 6 seconds, not 4.
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.text('Payment saved: RESTORAN CONTOH · Undo'), findsOneWidget);
     expect(await expenseShops(s), isEmpty);
     await endHold(tester);
     expect(await expenseShops(s), ['RESTORAN CONTOH']);
     expect(await cardIds(s), unorderedEquals(['card1', 'card2']));
-    expect(find.text('Saved RESTORAN CONTOH · Undo'), findsNothing);
+    expect(find.text('Payment saved: RESTORAN CONTOH · Undo'), findsNothing);
   });
 
   testWidgets('Not a payment drops the top card', (tester) async {
@@ -124,7 +132,7 @@ void main() {
     await openCheck(tester, s);
     await tester.tap(dropButton);
     await tester.pumpAndSettle();
-    expect(find.text('Skipped RESTORAN CONTOH · Undo'), findsOneWidget);
+    expect(find.text('Not a payment: RESTORAN CONTOH · Undo'), findsOneWidget);
     await endHold(tester);
     expect(await expenseShops(s), isEmpty);
     expect(await cardIds(s), unorderedEquals(['card1', 'card2']));
@@ -139,11 +147,11 @@ void main() {
     final start = tester.getTopLeft(find.text('Today, 12:00'));
     await tester.drag(find.text('Today, 12:00'), const Offset(80, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Saved RESTORAN CONTOH · Undo'), findsNothing);
+    expect(find.text('Payment saved: RESTORAN CONTOH · Undo'), findsNothing);
     expect(tester.getTopLeft(find.text('Today, 12:00')), start);
     await tester.drag(find.text('Today, 12:00'), const Offset(150, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Saved RESTORAN CONTOH · Undo'), findsOneWidget);
+    expect(find.text('Payment saved: RESTORAN CONTOH · Undo'), findsOneWidget);
     expect(find.text('2 of 3'), findsOneWidget);
   });
 
@@ -151,7 +159,7 @@ void main() {
     await openCheck(tester, await threeCards());
     await tester.drag(find.text('Today, 12:00'), const Offset(-150, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Skipped RESTORAN CONTOH · Undo'), findsOneWidget);
+    expect(find.text('Not a payment: RESTORAN CONTOH · Undo'), findsOneWidget);
   });
 
   testWidgets('Undo brings the card back', (tester) async {
@@ -159,11 +167,11 @@ void main() {
     await openCheck(tester, s);
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Saved RESTORAN CONTOH · Undo'));
+    await tester.tap(find.text('Payment saved: RESTORAN CONTOH · Undo'));
     await tester.pumpAndSettle();
     expect(find.text('1 of 3'), findsOneWidget);
     expect(find.text('Today, 12:00'), findsOneWidget);
-    expect(find.text('Saved RESTORAN CONTOH · Undo'), findsNothing);
+    expect(find.text('Payment saved: RESTORAN CONTOH · Undo'), findsNothing);
     await endHold(tester);
     expect(await expenseShops(s), isEmpty);
     expect(await cardIds(s), hasLength(3));
@@ -201,8 +209,7 @@ void main() {
     await openCheck(tester, s);
     await tester.tap(find.text('Received'));
     await tester.pumpAndSettle();
-    expect(find.text('Change payment'), findsNothing);
-    expect(find.text('+ RM 15.00'), findsOneWidget);
+    expect(find.text('+ RM '), findsOneWidget);
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
     await endHold(tester);
@@ -230,7 +237,7 @@ void main() {
       await tester.tap(saveButton);
       await tester.pumpAndSettle();
       expect(find.text('Choose Spent or Received first.'), findsOneWidget);
-      expect(find.text('Saved RESTORAN CONTOH · Undo'), findsNothing);
+      expect(find.text('Payment saved: RESTORAN CONTOH · Undo'), findsNothing);
       await endHold(tester);
       expect(await expenseShops(s), isEmpty);
       expect(await cardIds(s), ['card0']);
@@ -240,7 +247,10 @@ void main() {
       expect(find.text('Spent or Received?'), findsNothing);
       await tester.tap(saveButton);
       await tester.pumpAndSettle();
-      expect(find.text('Saved RESTORAN CONTOH · Undo'), findsOneWidget);
+      expect(
+        find.text('Payment saved: RESTORAN CONTOH · Undo'),
+        findsOneWidget,
+      );
       await endHold(tester);
       final saved = await s.db.select(s.db.expenses).get();
       expect(
@@ -265,7 +275,7 @@ void main() {
     await openCheck(tester, s);
     await tester.tap(dropButton);
     await tester.pumpAndSettle();
-    expect(find.text('Skipped RESTORAN CONTOH · Undo'), findsOneWidget);
+    expect(find.text('Not a payment: RESTORAN CONTOH · Undo'), findsOneWidget);
     await endHold(tester);
     expect(await cardIds(s), isEmpty);
     expect(await s.db.select(s.db.droppedNotifications).get(), hasLength(1));
@@ -277,7 +287,7 @@ void main() {
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
     expect(await expenseShops(s), isEmpty);
-    // The friend presses Home inside the 4-second window.
+    // The friend presses Home inside the 6-second window.
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     await tester.pump(const Duration(milliseconds: 100));
@@ -293,9 +303,9 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
     expect(find.text('Today, 12:00'), findsNothing);
-    expect(find.text('Saved RESTORAN CONTOH · Undo'), findsNothing);
+    expect(find.text('Payment saved: RESTORAN CONTOH · Undo'), findsNothing);
     expect(find.text('2 of 3'), findsOneWidget);
-    expect(find.text('RM 8.00'), findsOneWidget);
+    expect(fieldText(tester, 'Amount'), '8.00');
   });
 
   testWidgets('leaving the app from another page commits the held swipe', (
@@ -337,12 +347,12 @@ void main() {
       await tester.tap(saveButton);
       await tester.pumpAndSettle();
       expect(find.text('All checked'), findsOneWidget);
+      expect(find.text('That was the last one.'), findsOneWidget);
+      expect(find.text('Back to Home'), findsOneWidget);
       expect(
-        find.text('Nothing left. I will just sit here and shine.'),
+        find.text('Payment saved: RESTORAN CONTOH · Undo'),
         findsOneWidget,
       );
-      expect(find.text('Back to Home'), findsOneWidget);
-      expect(find.text('Saved RESTORAN CONTOH · Undo'), findsOneWidget);
       expect(find.text('Check payments'), findsOneWidget);
       await endHold(tester);
       expect(find.text('Check payments'), findsNothing);
@@ -351,72 +361,100 @@ void main() {
     },
   );
 
-  testWidgets('a tap on the shop opens Change payment and saves the edit', (
+  testWidgets('amount and shop are edited on the card and one Save saves', (
     tester,
   ) async {
     final s = await threeCards();
     await openCheck(tester, s);
-    await tester.tap(find.text('RESTORAN CONTOH'));
-    await tester.pumpAndSettle();
-    expect(find.text('Change payment'), findsOneWidget);
-    expect(find.text('Amount (RM)'), findsOneWidget);
-    expect(find.text('Save changes'), findsOneWidget);
+    expect(find.text('Change payment'), findsNothing);
+    expect(find.text('Save changes'), findsNothing);
     await tester.enterText(
       find.widgetWithText(TextField, 'Shop'),
       'RESTORAN BARU',
     );
-    await tester.enterText(find.widgetWithText(TextField, 'Amount (RM)'), '');
+    await tester.enterText(find.widgetWithText(TextField, 'Amount'), '');
     await tester.pump();
     expect(find.text('Type an amount above 0'), findsOneWidget);
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Amount (RM)'),
-      '16.50',
-    );
-    await tester.pump();
-    await tester.tap(find.text('Save changes'));
+    // A bad amount stops the save, and nothing is held.
+    await tester.tap(saveButton);
     await tester.pumpAndSettle();
-    expect(find.text('Change payment'), findsNothing);
-    expect(find.text('RESTORAN BARU'), findsOneWidget);
-    expect(find.text('RM 16.50'), findsOneWidget);
-    final row = await (s.db.select(
-      s.db.pendingPayments,
-    )..where((t) => t.id.equals('card0'))).getSingle();
+    expect(find.textContaining('Undo'), findsNothing);
+    await tester.enterText(find.widgetWithText(TextField, 'Amount'), '16.50');
+    await tester.pump();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Payment saved: RESTORAN BARU · Undo'), findsOneWidget);
+    await endHold(tester);
+    final saved = await s.db.select(s.db.expenses).get();
     expect(
-      (row.merchant, row.amount.toString(), row.edited),
-      ('RESTORAN BARU', '16.5', true),
+      [for (final e in saved) (e.merchant, e.amount.toString())],
+      [('RESTORAN BARU', '16.5')],
     );
   });
 
-  testWidgets('a swipe down or Back with changes asks Discard changes?', (
+  testWidgets('a typed edit is written when the field is done', (tester) async {
+    final s = await threeCards();
+    await openCheck(tester, s);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Shop'),
+      'KEDAI BARU',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    final row = await (s.db.select(
+      s.db.pendingPayments,
+    )..where((t) => t.id.equals('card0'))).getSingle();
+    expect((row.merchant, row.edited), ('KEDAI BARU', true));
+  });
+
+  testWidgets('Back with an amount still being typed keeps the amount', (
     tester,
   ) async {
     final s = await threeCards();
     await openCheck(tester, s);
-    await tester.tap(find.text('RESTORAN CONTOH'));
+    await tester.enterText(find.widgetWithText(TextField, 'Amount'), '21.40');
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Shop'),
-      'RESTORAN BARU',
-    );
-    await tester.pump();
-    await tester.fling(find.text('Change payment'), const Offset(0, 500), 2000);
-    await tester.pumpAndSettle();
-    expect(find.text('Discard changes?'), findsOneWidget);
-    expect(find.text('Change payment'), findsOneWidget);
-    await tester.tap(find.text('Keep editing'));
-    await tester.pumpAndSettle();
-    expect(find.text('Change payment'), findsOneWidget);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.text('Discard changes?'), findsOneWidget);
-    await tester.tap(find.text('Discard'));
-    await tester.pumpAndSettle();
-    expect(find.text('Change payment'), findsNothing);
-    expect(find.text('RESTORAN CONTOH'), findsOneWidget);
+    expect(find.text('Open check'), findsOneWidget);
     final row = await (s.db.select(
       s.db.pendingPayments,
     )..where((t) => t.id.equals('card0'))).getSingle();
-    expect(row.merchant, 'RESTORAN CONTOH');
+    expect((row.amount.toString(), row.edited), ('21.4', true));
+  });
+
+  testWidgets('Save all 3 shows when every field is sure, with one Undo', (
+    tester,
+  ) async {
+    final s = await testServices(device: maeDevice());
+    for (final i in [0, 1, 2]) {
+      await addCard(
+        s,
+        order: i,
+        amount: '${10 + i}.00',
+        merchant: 'KEDAI $i',
+        rawText: 'x$i',
+        categoryId: 'transport',
+      );
+    }
+    await openCheck(tester, s);
+    expect(find.text('Save all 3'), findsOneWidget);
+    await tester.tap(find.text('Save all 3'));
+    await tester.pumpAndSettle();
+    expect(find.text('3 payments saved · Undo'), findsOneWidget);
+    expect(await expenseShops(s), isEmpty);
+    // One Undo brings every card back.
+    await tester.tap(find.text('3 payments saved · Undo'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 of 3'), findsOneWidget);
+    expect(find.text('Save all 3'), findsOneWidget);
+    await tester.tap(find.text('Save all 3'));
+    await tester.pumpAndSettle();
+    await endHold(tester);
+    expect(
+      await expenseShops(s),
+      unorderedEquals(['KEDAI 0', 'KEDAI 1', 'KEDAI 2']),
+    );
+    expect(await cardIds(s), isEmpty);
   });
 
   testWidgets('screen readers get Save and Not a payment as card actions', (
@@ -456,7 +494,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Skipped RESTORAN CONTOH · Undo'), findsOneWidget);
+    expect(find.text('Not a payment: RESTORAN CONTOH · Undo'), findsOneWidget);
     handle.dispose();
   });
 

@@ -11,6 +11,7 @@ MonSay activityMon({
   required bool filtered,
   required String monthLabel,
   required List<CategoryBreakdown> breakdown,
+  List<String> overBudget = const [],
 }) {
   if (searching || filtered) {
     return const MonSay(
@@ -40,6 +41,10 @@ MonSay activityMon({
   return MonSay(
     MonFace.idle,
     '${spent.first.name} leads.',
-    'It is $percent% of what you spent.',
+    switch (overBudget.length) {
+      0 => 'It is $percent% of what you spent.',
+      1 => '${overBudget.first} is over its limit.',
+      final n => '$n categories are over their limit.',
+    },
   );
 }

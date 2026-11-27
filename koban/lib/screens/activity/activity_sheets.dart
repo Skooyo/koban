@@ -163,10 +163,11 @@ class _FilterOptionRow extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: (selected
-                          ? weighted(theme.textTheme.bodyLarge!, 700)
-                          : theme.textTheme.bodyLarge!)
-                      .copyWith(color: theme.colorScheme.onSurface),
+                  style:
+                      (selected
+                              ? weighted(theme.textTheme.bodyLarge!, 700)
+                              : theme.textTheme.bodyLarge!)
+                          .copyWith(color: theme.colorScheme.onSurface),
                 ),
               ),
             ),

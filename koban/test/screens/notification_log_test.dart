@@ -657,6 +657,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Troubleshooting'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Notification log'));
     await tester.pumpAndSettle();
     expect(find.text('Koban can read notifications'), findsOneWidget);

@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/app_services.dart';
 import '../../app/home_shell.dart';
 import '../../app/routes.dart';
+import '../../data/budget_repository.dart';
 import '../../data/category_repository.dart';
 import '../../data/database.dart';
 import '../../data/legacy_import.dart';
@@ -19,10 +20,9 @@ import '../../ui/payment_row.dart';
 import '../../ui/scene_band.dart';
 import '../../ui/undo_snack_bar.dart';
 import '../payment/payment_view_model.dart';
-import 'home_mon.dart';
 import 'home_view_model.dart';
 
-/// The Home tab: Mon's band, this week, the month, and the latest payments.
+/// The Home tab: Mon's band, payments to check, this week, the month, and the latest payments.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -77,7 +77,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = _vm!;
-    final s = AppScope.of(context);
     final theme = Theme.of(context);
     const gap = SizedBox(height: 12);
     return ListenableBuilder(
@@ -88,23 +87,21 @@ class _HomeScreenState extends State<HomeScreen> {
         final month = vm.month;
         final recent = week?.recentExpenses ?? const <Expense>[];
         final say = vm.monSay;
-        final saved = vm.daysSaved;
         return Stack(
           children: [
             ListView(
               padding: EdgeInsets.zero,
               children: [
                 SceneBand(
-                  title: greetingFor(s.now()),
+                  title: vm.title,
+                  compact: true,
+                  onCoins: false,
                   face: say.face,
                   line: say.line,
-                  detail: say.detail,
-                  stats: [
-                    if (week != null) ...[
-                      '$saved ${saved == 1 ? 'day' : 'days'} with payments',
-                      '${vm.waitingCount} to check',
-                    ],
-                  ],
+                  detail: vm.isAccessGranted ? 'Tracking on' : 'Tracking off',
+                  detailDot: vm.isAccessGranted
+                      ? MoneyColors.of(context).received
+                      : null,
                   action: SceneIconButton(
                     icon: Icons.settings,
                     tooltip: 'Settings',
@@ -116,43 +113,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (week != null && today != null) ...[
-                        _WeekCard(
-                          week: week,
-                          today: today,
-                          days: vm.weekDays,
-                          todayIndex: vm.todayIndex,
-                          onOpen: () => _openActivity(withWeek: true),
-                        ),
-                        gap,
-                      ],
-                      // The 0.1.1 data did not move and is safe.
-                      if (vm.importFailed) ...[
-                        const WarningRow(importFailedMessage),
-                        gap,
-                      ],
-                      if (vm.loadError case final error?) ...[
-                        WarningRow(error),
-                        gap,
-                      ],
-                      ListenerStatusBanner(
-                        isAccessGranted: vm.isAccessGranted,
-                        onEnable: vm.openNotificationSettings,
-                      ),
-                      gap,
-                      if (vm.alertsOff) ...[
-                        AlertsOffRow(onTurnOn: vm.askForAlerts),
-                        gap,
-                      ],
-                      if (vm.listensToNoApp) ...[
-                        ListGroup(
-                          children: [
-                            KobanRow(
-                              title: 'Koban listens to no app. Choose your payment apps.',
-                              showChevron: true,
-                              onTap: () => openPaymentApps(context),
-                            ),
-                          ],
+                      if (!vm.isAccessGranted) ...[
+                        ListenerStatusBanner(
+                          onEnable: vm.openNotificationSettings,
                         ),
                         gap,
                       ],
@@ -177,6 +140,31 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         gap,
                       ],
+                      // The 0.1.1 data did not move and is safe.
+                      if (vm.importFailed) ...[
+                        const WarningRow(importFailedMessage),
+                        gap,
+                      ],
+                      if (vm.loadError case final error?) ...[
+                        WarningRow(error),
+                        gap,
+                      ],
+                      if (vm.alertsOff) ...[
+                        AlertsOffRow(onTurnOn: vm.askForAlerts),
+                        gap,
+                      ],
+                      if (vm.listensToNoApp) ...[
+                        ListGroup(
+                          children: [
+                            KobanRow(
+                              title: 'Koban listens to no app. Choose your payment apps.',
+                              showChevron: true,
+                              onTap: () => openPaymentApps(context),
+                            ),
+                          ],
+                        ),
+                        gap,
+                      ],
                       if (vm.isAccessGranted &&
                           !vm.hasAnyPayment &&
                           vm.waitingCount == 0 &&
@@ -187,11 +175,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         gap,
                       ],
+                      if (week != null && today != null) ...[
+                        _WeekCard(
+                          week: week,
+                          today: today,
+                          days: vm.weekDays,
+                          todayIndex: vm.todayIndex,
+                          onOpen: () => _openActivity(withWeek: true),
+                        ),
+                        gap,
+                      ],
                       if (month != null) ...[
                         ListGroup(
                           children: [
                             _PeriodRow(
                               month,
+                              vm.budget,
                               () => _openActivity(withWeek: false),
                             ),
                           ],
@@ -416,17 +415,48 @@ class _DayBars extends StatelessWidget {
   }
 }
 
-/// This week or this month: the total on the right, the money received under it.
+/// This month: the total on the right, the money received under it. With budget limits it
+/// says "RM spent of RM limit" (both for the budgeted categories only) and, in red, how many categories are over.
 class _PeriodRow extends StatelessWidget {
-  const _PeriodRow(this.summary, this.onTap);
+  const _PeriodRow(this.summary, this.budget, this.onTap);
 
   final PeriodSummary summary;
+  final BudgetMonth? budget;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
+    final limits = budget;
+    if (limits != null && !limits.isEmpty) {
+      return KobanRow(
+        title: summary.title,
+        subtitle:
+            'Budgets: ${rm(limits.totalSpent)} of ${rm(limits.totalLimit)}',
+        trailing: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MoneyText(
+              rm(summary.total),
+              style: weighted(text.titleMedium!, 700),
+              color: scheme.onSurface,
+            ),
+            if (limits.overCount > 0)
+              Text(
+                '${limits.overCount} over',
+                style: weighted(
+                  text.labelLarge!,
+                  800,
+                ).copyWith(color: scheme.error),
+              ),
+          ],
+        ),
+        showChevron: true,
+        onTap: onTap,
+      );
+    }
     return KobanRow(
       title: summary.title,
       subtitle: summary.subtitle,

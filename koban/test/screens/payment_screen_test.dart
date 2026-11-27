@@ -9,6 +9,7 @@ import 'package:koban/data/expense_repository.dart';
 import 'package:koban/data/undoable.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/screens/payment/payment_view_model.dart';
+import 'package:koban/screens/split/split_editor_screen.dart';
 import 'package:koban/ui/kit.dart';
 import 'package:koban/theme/tokens.dart';
 import 'package:material_ui/material_ui.dart';
@@ -108,12 +109,34 @@ bool saveOn(WidgetTester tester, String label) =>
     null;
 
 void main() {
+  testWidgets('Split with friends reads as a switch with its state', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await openSheet(tester, await testServices());
+    await typeAmount(tester, '8');
+    final row = find.widgetWithText(KobanRow, 'Split with friends');
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSemantics(row),
+      isSemantics(hasToggledState: true, isToggled: false),
+    );
+    await tester.tap(row);
+    await tester.pump();
+    expect(
+      tester.getSemantics(row),
+      isSemantics(hasToggledState: true, isToggled: true),
+    );
+    handle.dispose();
+  });
+
   testWidgets('a new payment opens with the keyboard and Save payment off', (
     tester,
   ) async {
     final handle = tester.ensureSemantics();
     await openSheet(tester, await testServices());
-    expect(find.text('Type the amount.'), findsOneWidget);
+    expect(find.text('Type the amount.'), findsNothing);
     expect(find.text('RM '), findsOneWidget);
     expect(find.text('Save payment'), findsOneWidget);
     expect(saveOn(tester, 'Save payment'), false);
@@ -126,7 +149,6 @@ void main() {
     expect(find.text('7'), findsNothing);
     expect(find.bySemanticsLabel(RegExp('Amount')), findsOneWidget);
     await typeAmount(tester, '12.5');
-    expect(find.text('Type the amount.'), findsNothing);
     expect(amountText(tester), '12.5');
     expect(saveOn(tester, 'Save payment'), true);
     handle.dispose();
@@ -181,7 +203,7 @@ void main() {
       final id = await addOne(s);
       await openSheet(tester, s, expenseId: id);
       expect(find.text('Payment'), findsOneWidget);
-      expect(find.text('Spent · Wed, 11 Nov, 20:15'), findsOneWidget);
+      expect(find.text('Wed, 11 Nov, 20:15'), findsOneWidget);
       expect(find.text('Save payment'), findsOneWidget);
       expect(find.text('Food & Dining'), findsOneWidget);
       expect(find.text('Kedai Contoh'), findsOneWidget);
@@ -266,24 +288,139 @@ void main() {
     expect(opener.closed, true);
   });
 
-  testWidgets('a new category with a shop shows the past payments hint', (
+  testWidgets(
+    'a new category with a shop offers to change past payments, and Undo puts them back',
+    (tester) async {
+      final s = await testServices();
+      final oldId = await addOne(s);
+      final opener = await openSheet(tester, s);
+      await typeAmount(tester, '9');
+      await tester.enterText(find.byType(TextField).at(1), 'Kedai Contoh');
+      await tester.pump();
+      const text = 'Also change 1 past Kedai Contoh payment to Health';
+      expect(find.text(text), findsNothing);
+      await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Health'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Health'));
+      await tester.pumpAndSettle();
+      expect(find.text(text), findsOneWidget);
+      expect(
+        tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+        true,
+      );
+      await tester.tap(find.text('Save payment'));
+      await tester.pumpAndSettle();
+      Future<String?> categoryOf(String id) async => (await (s.db.select(
+        s.db.expenses,
+      )..where((e) => e.id.equals(id))).getSingle()).categoryId;
+      expect(await categoryOf(oldId), 'health');
+      final saved = opener.result as PaymentClosed;
+      expect(
+        saved.message,
+        'Payment saved. 1 past Kedai Contoh payment now Health',
+      );
+      final undo = saved.undo!;
+      await undo.undo();
+      expect(await categoryOf(oldId), 'food');
+    },
+  );
+
+  testWidgets('the past payments box, unchecked, leaves them as they are', (
     tester,
   ) async {
-    await openSheet(tester, await testServices());
-    const hint = 'A new category also applies to past payments from this shop';
-    await tester.ensureVisible(find.text('Shop'));
-    await tester.tap(find.text('Shop'));
-    await tester.pumpAndSettle();
+    final s = await testServices();
+    final oldId = await addOne(s);
+    final opener = await openSheet(tester, s);
+    await typeAmount(tester, '9');
     await tester.enterText(find.byType(TextField).at(1), 'Kedai Contoh');
-    await tester.pump();
-    expect(find.text(hint), findsNothing);
-    await tester.tap(find.text('Health'));
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Health'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Health'));
     await tester.pumpAndSettle();
-    expect(find.text(hint), findsOneWidget);
+    await tester.ensureVisible(find.byType(CheckboxListTile));
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pump();
+    await tester.tap(find.text('Save payment'));
+    await tester.pumpAndSettle();
+    final old = await (s.db.select(
+      s.db.expenses,
+    )..where((e) => e.id.equals(oldId))).getSingle();
+    expect(old.categoryId, 'food');
+    expect((opener.result as PaymentClosed).undo, null);
   });
 
   testWidgets(
-    'the category chips show four, More opens the full sheet, a pick moves the chip',
+    'Split with friends saves, then asks for the split of the new payment',
+    (tester) async {
+      final s = await testServices();
+      await openSheet(tester, s);
+      await typeAmount(tester, '20');
+      expect(find.text('Save and split'), findsNothing);
+      await tester.ensureVisible(find.text('Split with friends'));
+      await tester.tap(find.text('Split with friends'));
+      await tester.pump();
+      await tester.tap(find.text('Save and split'));
+      await tester.pumpAndSettle();
+      final saved = (await s.db.select(s.db.expenses).get()).single;
+      expect(
+        tester
+            .widget<SplitEditorScreen>(find.byType(SplitEditorScreen))
+            .expenseId,
+        saved.id,
+      );
+    },
+  );
+
+  testWidgets('Split on, then Receive, saves with no split editor', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final opener = await openSheet(tester, s);
+    await typeAmount(tester, '20');
+    await tester.ensureVisible(find.text('Split with friends'));
+    await tester.tap(find.text('Split with friends'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Received'));
+    await tester.tap(find.text('Received'));
+    await tester.pump();
+    expect(find.text('Save payment'), findsOneWidget);
+    await tester.tap(find.text('Save payment'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SplitEditorScreen), findsNothing);
+    expect(opener.result, isA<PaymentClosed>());
+  });
+
+  testWidgets('Split with friends keeps the Undo for changed past payments', (
+    tester,
+  ) async {
+    final s = await testServices();
+    final oldId = await addOne(s);
+    final opener = await openSheet(tester, s);
+    await typeAmount(tester, '9');
+    await tester.enterText(find.byType(TextField).at(1), 'Kedai Contoh');
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Health'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Health'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Split with friends'));
+    await tester.tap(find.text('Split with friends'));
+    await tester.pump();
+    await tester.tap(find.text('Save and split'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SplitEditorScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    final closed = opener.result as PaymentClosed;
+    expect(
+      closed.message,
+      'Payment saved. 1 past Kedai Contoh payment now Health',
+    );
+    await closed.undo!.undo();
+    final old = await (s.db.select(
+      s.db.expenses,
+    )..where((e) => e.id.equals(oldId))).getSingle();
+    expect(old.categoryId, 'food');
+  });
+
+  testWidgets(
+    'the category chips show six, More opens the full sheet, a pick moves the chip',
     (tester) async {
       final handle = tester.ensureSemantics();
       final s = await testServices();
@@ -297,6 +434,8 @@ void main() {
         'Entertainment',
         'Food & Dining',
         'Health',
+        'Other',
+        'Shopping',
       ]) {
         expect(find.widgetWithText(ChoiceChip, n), findsOneWidget);
       }
@@ -323,19 +462,8 @@ void main() {
       await tester.pumpAndSettle();
       // The chosen category takes the last chip.
       expect(chip('Transport').selected, true);
-      expect(find.widgetWithText(ChoiceChip, 'Health'), findsNothing);
+      expect(find.widgetWithText(ChoiceChip, 'Shopping'), findsNothing);
       handle.dispose();
-    },
-  );
-
-  testWidgets(
-    'a new payment hints how to type the amount, then the date line',
-    (tester) async {
-      await openSheet(tester, await testServices());
-      expect(find.text('Type the amount.'), findsOneWidget);
-      await typeAmount(tester, '5');
-      expect(find.text('Type the amount.'), findsNothing);
-      expect(find.textContaining('Spent · '), findsOneWidget);
     },
   );
 
@@ -392,7 +520,7 @@ void main() {
   });
 
   testWidgets(
-    'recent shops: three distinct chips, a tap fills Shop and its last category',
+    'recent shops: four distinct chips, a tap fills Shop and its last category',
     (tester) async {
       final s = await testServices();
       Future<void> add(String shop, String? cat, int day) =>
@@ -404,7 +532,8 @@ void main() {
             notes: null,
             type: TransactionType.withdraw,
           );
-      await add('Old Shop', 'other', 1);
+      await add('Oldest Shop', 'other', 1);
+      await add('Old Shop', 'other', 2);
       await add('Grab', 'transport', 5);
       await add('Mamak Corner', 'food', 8);
       await add('grab', 'transport', 9);
@@ -414,7 +543,8 @@ void main() {
       expect(find.widgetWithText(ChoiceChip, '7-Eleven'), findsOneWidget);
       expect(find.widgetWithText(ChoiceChip, 'grab'), findsOneWidget);
       expect(find.widgetWithText(ChoiceChip, 'Mamak Corner'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'Old Shop'), findsNothing);
+      expect(find.widgetWithText(ChoiceChip, 'Old Shop'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, 'Oldest Shop'), findsNothing);
       await tester.ensureVisible(
         find.widgetWithText(ChoiceChip, 'Mamak Corner'),
       );
@@ -441,7 +571,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await openSheet(tester, await testServices());
-    await tester.tap(find.text('Today'));
+    await tester.tap(find.byIcon(Icons.calendar_month));
     await tester.pumpAndSettle();
     final picker = tester.widget<CalendarDatePicker>(
       find.byType(CalendarDatePicker),
@@ -450,7 +580,7 @@ void main() {
     await tester.tap(find.text('12'));
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
-    expect(find.text('Yesterday'), findsOneWidget);
+    expect(find.textContaining('Thu, 12 Nov'), findsOneWidget);
   });
 
   testWidgets('Count in group totals does not show without groups', (
@@ -499,9 +629,14 @@ void main() {
       await s.online.groups.refresh();
       expect(s.inGroups.value, true);
 
+      final handle = tester.ensureSemantics();
       await openSheet(tester, s);
       await typeAmount(tester, '8');
       final row = find.text('Count in group totals');
+      final rowSemantics = find.widgetWithText(
+        KobanRow,
+        'Count in group totals',
+      );
       await tester.ensureVisible(row);
       await tester.pumpAndSettle();
       expect(row, findsOneWidget);
@@ -509,12 +644,21 @@ void main() {
         find.text('Group members see this in your totals'),
         findsOneWidget,
       );
+      expect(
+        tester.getSemantics(rowSemantics),
+        isSemantics(hasToggledState: true, isToggled: true),
+      );
       await tester.tap(row);
       await tester.pump();
       expect(
         find.text('Group members do not see this payment'),
         findsOneWidget,
       );
+      expect(
+        tester.getSemantics(rowSemantics),
+        isSemantics(hasToggledState: true, isToggled: false),
+      );
+      handle.dispose();
       await tester.tap(find.text('Save payment'));
       await tester.pumpAndSettle();
 
@@ -641,7 +785,7 @@ class _GatedExpenses extends ExpenseRepository {
   final Completer<void> gate;
 
   @override
-  Future<void> addManualExpense({
+  Future<({String id, Undoable? undo})> addManualExpense({
     required Decimal amount,
     String? merchant,
     required int postTime,
@@ -649,6 +793,7 @@ class _GatedExpenses extends ExpenseRepository {
     String? notes,
     required TransactionType type,
     bool privateToGroups = false,
+    bool applyToPast = true,
   }) async {
     await gate.future;
     return super.addManualExpense(
@@ -659,6 +804,7 @@ class _GatedExpenses extends ExpenseRepository {
       notes: notes,
       type: type,
       privateToGroups: privateToGroups,
+      applyToPast: applyToPast,
     );
   }
 

@@ -87,5 +87,5 @@ _Avoid_: hidden payment, excluded payment
 ## Budgets
 
 **Personal budget**:
-A spending limit that a person sets for one category, or for the total, for each week or month. A local feature; in a group, members see each other's personal budgets and progress.
+A monthly spending limit that a person sets for one expense category. A local feature; in a group, members see each other's personal budgets and progress. The total is the sum of the category limits, not a limit of its own.
 _Avoid_: goal, cap, challenge (a challenge is the group use of personal budgets)

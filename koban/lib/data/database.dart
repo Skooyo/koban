@@ -30,11 +30,20 @@ const legacyTableOrder = <String>[
     'split_queries.drift',
     'expense_queries.drift',
     'group_queries.drift',
+    'budget_queries.drift',
   },
 )
 class KobanDatabase extends _$KobanDatabase {
   KobanDatabase(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  /// Version 2 adds `budget_limits`. Every other table and row stays.
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      if (from < 2) await m.createTable(budgetLimits);
+    },
+  );
 }

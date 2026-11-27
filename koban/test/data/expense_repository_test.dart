@@ -221,23 +221,27 @@ void main() {
     expect(rows.map((r) => r.categoryId), ['health', 'food']);
   });
 
-  test('week summaries of a month cover full Monday to Sunday weeks', () async {
+  test('week summaries of a month are cut to the days of the month', () async {
     await add('first', '3.00', postTime: at(2026, 11, 1, 9));
     await add('second', '4.00', postTime: at(2026, 11, 3, 9));
+    await add('last', '5.00', postTime: at(2026, 11, 30, 9));
+    await add('october', '6.00', postTime: at(2026, 10, 30, 9));
 
     final weeks = await repo.weekSummariesForMonth(2026, 10);
 
     expect(weeks, hasLength(6));
-    expect(weeks.first.label, 'Mon 26 Oct – Sun 1 Nov');
-    expect(weeks.first.startMs, at(2026, 10, 26, 0));
+    expect(weeks.first.label, '1 Nov');
+    expect(weeks.first.startMs, at(2026, 11, 1, 0));
     expect(weeks.first.endMs, at(2026, 11, 2, 0));
+    expect(weeks.last.label, '30 Nov');
+    expect(weeks.last.endMs, at(2026, 12, 1, 0));
     expect(weeks.map((w) => w.total), [
       d('3.00'),
       d('4.00'),
       d('0'),
       d('0'),
       d('0'),
-      d('0'),
+      d('5.00'),
     ]);
   });
 

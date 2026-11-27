@@ -35,6 +35,27 @@ class ListGroup extends StatelessWidget {
   }
 }
 
+/// A quiet line while data loads. Show empty copy only after the load ends.
+class LoadingLine extends StatelessWidget {
+  const LoadingLine({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(KobanSpace.s24),
+      child: Center(
+        child: Text(
+          'Loading',
+          style: theme.textTheme.bodyMedium!.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// One row with a warning icon and [text], for a problem the user must know about.
 class WarningRow extends StatelessWidget {
   const WarningRow(this.text, {super.key});
@@ -345,7 +366,7 @@ class TonalButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
-          Text(text),
+          Flexible(child: Text(text)),
         ],
       ),
     );
@@ -470,12 +491,15 @@ class _Segment extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Center(
-              child: Text(
-                label,
-                style: weighted(theme.textTheme.titleSmall!, 600).copyWith(
-                  color: on
-                      ? scheme.onPrimaryContainer
-                      : scheme.onSurfaceVariant,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  label,
+                  style: weighted(theme.textTheme.titleSmall!, 600).copyWith(
+                    color: on
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),
@@ -592,11 +616,15 @@ class DialogTextField extends StatefulWidget {
     this.keyboardType,
     this.textCapitalization = TextCapitalization.none,
     this.inputFormatters,
+    this.prefixText,
   });
 
   final String value;
   final ValueChanged<String> onChanged;
   final String label;
+
+  /// Text in front of the typed value, such as "RM". It shows from the start.
+  final String? prefixText;
   final bool isError;
   final String? supportingText;
   final TextInputType? keyboardType;
@@ -642,6 +670,10 @@ class _DialogTextFieldState extends State<DialogTextField> {
       inputFormatters: widget.inputFormatters,
       decoration: InputDecoration(
         labelText: widget.label,
+        prefixText: widget.prefixText,
+        floatingLabelBehavior: widget.prefixText == null
+            ? null
+            : FloatingLabelBehavior.always,
         errorText: widget.isError ? (widget.supportingText ?? '') : null,
         helperText: widget.isError ? null : widget.supportingText,
         filled: true,

@@ -13,6 +13,7 @@ import '../capture/capture_host.dart';
 import '../capture/listener_control.dart';
 import '../capture/payment_apps.dart';
 import '../data/activity_selection.dart';
+import '../data/budget_repository.dart';
 import '../data/category_repository.dart';
 import '../data/database.dart';
 import '../data/expense_repository.dart';
@@ -61,12 +62,13 @@ class AppServices {
     ReceiptOcr? ocr,
     ReceiptPhotos? photos,
     UpdateInstaller? updateInstaller,
-    Duration checkHold = const Duration(milliseconds: 4000),
+    Duration checkHold = const Duration(milliseconds: 6000),
   }) {
     int nowMs() => now().millisecondsSinceEpoch;
     receiptReader = ReceiptReader(ocr ?? MlKitReceiptOcr(), now: nowMs);
     receiptPhotos = photos ?? PhoneReceiptPhotos();
     categories = CategoryRepository(db);
+    budgets = BudgetRepository(db, now: now);
     merchants = MerchantCategoryRepository(db, now: nowMs);
     splits = SplitRepository(db, now: nowMs);
     qr = QrStore(filesDir: filesDir, device: device);
@@ -128,6 +130,9 @@ class AppServices {
   late final ReceiptPhotos receiptPhotos;
 
   late final CategoryRepository categories;
+
+  /// The personal monthly limits of the categories.
+  late final BudgetRepository budgets;
   late final MerchantCategoryRepository merchants;
   late final SplitRepository splits;
   late final QrStore qr;

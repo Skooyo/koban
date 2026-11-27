@@ -51,8 +51,10 @@ void main() {
     expect(amounts(vm), ['5', '7', '3']);
     expect(vm.state.monthTotal, Decimal.parse('15'));
     expect(vm.state.weeks.length, 6);
-    // The week of 26 Oct holds the payment of 30 Oct.
-    expect(vm.state.weeks.first.total, Decimal.parse('9'));
+    // The first chip is 1 Nov only. The payment of 30 Oct is in no chip.
+    expect(vm.state.weeks.first.label, '1 Nov');
+    expect(vm.state.weeks.first.total, Decimal.zero);
+    expect(vm.state.weeks.last.label, '30 Nov');
     expect(vm.state.categoryNames['food'], 'Food & Dining');
     expect(vm.allMonths, isNull);
   });
@@ -184,21 +186,24 @@ void main() {
   );
 
   test(
-    'a week that crosses the month edge counts its days in both months',
+    'a week that crosses the month edge counts only the days of the month',
     () async {
       final s = await testServices();
       await pay(s, '9.00', DateTime(2026, 10, 30, 9));
       await pay(s, '2.00', DateTime(2026, 11, 1, 9));
       await pay(s, '3.00', DateTime(2026, 11, 2, 9));
       final vm = await open(s);
-      final week = DateTime(2026, 10, 26).millisecondsSinceEpoch;
-      expect(vm.state.weeks.first.label, 'Mon 26 Oct – Sun 1 Nov');
-      vm.toggleWeek(week);
+      final first = DateTime(2026, 11, 1).millisecondsSinceEpoch;
+      expect(vm.state.weeks.first.startMs, first);
+      expect(vm.state.weeks.first.label, '1 Nov');
+      expect(vm.state.weeks.first.total, Decimal.parse('2'));
+      expect(vm.state.weeks[1].label, '2 Nov – 8 Nov');
+      vm.toggleWeek(first);
       await settle();
-      expect(vm.state.selectedWeek, week);
+      expect(vm.state.selectedWeek, first);
       expect(vm.state.month, const YearMonth(2026, 11));
-      expect(amounts(vm), ['2', '9']);
-      expect(vm.state.monthTotal, Decimal.parse('11'));
+      expect(amounts(vm), ['2']);
+      expect(vm.state.monthTotal, Decimal.parse('2'));
     },
   );
 }

@@ -185,24 +185,14 @@ void main() {
     },
   );
 
-  testWidgets('the status banner shows Turn on when tracking is off', (
-    tester,
-  ) async {
+  testWidgets('the status banner shows Turn on', (tester) async {
     var taps = 0;
-    await tester.pumpWidget(
-      app(ListenerStatusBanner(isAccessGranted: false, onEnable: () => taps++)),
-    );
+    await tester.pumpWidget(app(ListenerStatusBanner(onEnable: () => taps++)));
     expect(find.text('Tracking is off'), findsOneWidget);
     expect(find.text('Koban cannot read notifications.'), findsOneWidget);
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await tester.tap(find.text('Turn on'));
     expect(taps, 1);
-
-    await tester.pumpWidget(
-      app(ListenerStatusBanner(isAccessGranted: true, onEnable: () => taps++)),
-    );
-    expect(find.text('Tracking on'), findsOneWidget);
-    expect(find.text('Turn on'), findsNothing);
   });
 }

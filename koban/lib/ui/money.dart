@@ -149,11 +149,18 @@ class NoteStrip extends StatelessWidget {
 
 /// A thin bar that compares [total] with the largest total in a list.
 class RelativeBar extends StatelessWidget {
-  const RelativeBar({super.key, required this.total, this.max, this.color});
+  const RelativeBar({
+    super.key,
+    required this.total,
+    this.max,
+    this.color,
+    this.height = 4,
+  });
 
   final Decimal total;
   final Decimal? max;
   final Color? color;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -167,9 +174,9 @@ class RelativeBar extends StatelessWidget {
               .toDouble()
               .clamp(0.0, 1.0);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(2),
+      borderRadius: BorderRadius.circular(height / 2),
       child: Container(
-        height: 4,
+        height: height,
         color: scheme.outlineVariant,
         alignment: Alignment.centerLeft,
         child: FractionallySizedBox(
