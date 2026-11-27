@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -390,6 +391,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(inDialog('You are in 5 groups, the most allowed.'), findsOneWidget);
+    // The whole error shows, not cut with "...".
+    expect(
+      tester
+          .renderObject<RenderParagraph>(
+            inDialog('You are in 5 groups, the most allowed.'),
+          )
+          .didExceedMaxLines,
+      isFalse,
+    );
     expect(find.byType(SnackBar), findsNothing);
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller!.text,

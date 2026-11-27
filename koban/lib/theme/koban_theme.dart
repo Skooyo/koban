@@ -397,5 +397,11 @@ ThemeData kobanTheme(Brightness brightness) {
     ),
     outlinedButtonTheme: const OutlinedButtonThemeData(style: buttonStyle),
     textButtonTheme: const TextButtonThemeData(style: buttonStyle),
+    // Without a max, an error or helper line under a field is cut with "...".
+    // A narrow phone at text scale 1.3 cut "You are in 5 groups, the most allowed."
+    inputDecorationTheme: const InputDecorationTheme(
+      errorMaxLines: 3,
+      helperMaxLines: 3,
+    ),
   );
 }
