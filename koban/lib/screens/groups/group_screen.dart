@@ -238,6 +238,9 @@ class _GroupScreenState extends State<GroupScreen> {
   /// Hides the request at once, and tells the server only when the Undo window ends.
   void _decline(GroupsViewModel vm, JoinRequest r) {
     final messenger = ScaffoldMessenger.of(context);
+    // ponytail: the decline is only held on this phone. If the app dies inside the
+    // Undo window, the request stays open on the server. Upgrade: a server undecline
+    // RPC, so the decline can run at once and Undo can take it back.
     setState(() => _declined.add(r.userId));
     showUndoSnackBar(
       messenger,
@@ -247,6 +250,10 @@ class _GroupScreenState extends State<GroupScreen> {
           if (mounted) setState(() => _declined.remove(r.userId));
         },
         commit: () async {
+          // run() returns at once while another action runs, so wait for it.
+          while (vm.busy) {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+          }
           await vm.run(
             (x) => x.answer(r, false),
             onError: (e) => messenger.showSnackBar(SnackBar(content: Text(e))),

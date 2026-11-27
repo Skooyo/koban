@@ -13,6 +13,7 @@ class FakeBackend {
       requests.add(r);
       final reply = _routes['${r.method} ${r.url.path}'];
       if (reply != null) {
+        await gates['${r.method} ${r.url.path}'];
         // A real client gives the request with the response. PostgREST reads it.
         final res = reply(r);
         return http.Response.bytes(
@@ -34,6 +35,9 @@ class FakeBackend {
   final List<http.Request> requests = [];
   final _routes = <String, http.Response Function(http.Request r)>{};
   final _unexpected = <String>[];
+
+  /// A route waits for its gate before it answers. Complete the future to let it go on.
+  final gates = <String, Future<void>>{};
 
   /// Answers each [method] request to [path] (the path without the query) with [reply].
   void on(

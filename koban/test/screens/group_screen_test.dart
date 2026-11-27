@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -446,6 +447,47 @@ void main() {
     });
     expect(onPageText('1 join request'), findsNothing);
   });
+
+  testWidgets(
+    'a decline still goes out when another action runs at the end of Undo',
+    (tester) async {
+      final s = await open();
+      routes();
+      final slow = Completer<void>();
+      backend.gates['POST /rest/v1/rpc/rename_group'] = slow.future;
+      backend.on('POST', '/rest/v1/rpc/rename_group', (r) => jsonReply('ok'));
+      backend.on(
+        'POST',
+        '/rest/v1/rpc/answer_request',
+        (r) => jsonReply('declined'),
+      );
+      await openGroup(tester, s);
+
+      await tester.tap(onPageText('Decline'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(find.byTooltip('Group actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rename group'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Lunch Club');
+      await tester.pump();
+      await tester.tap(inDialog('Save'));
+      await tester.pump();
+
+      // The Undo window ends while the rename still runs.
+      await tester.pump(undoDuration + const Duration(seconds: 1));
+      expect(sent('/rest/v1/rpc/answer_request'), isEmpty);
+      slow.complete();
+      await tester.pumpAndSettle();
+
+      expect(jsonDecode(sent('/rest/v1/rpc/answer_request').single.body), {
+        'p_group': 'g1',
+        'p_user': 'user-4',
+        'p_approve': false,
+      });
+    },
+  );
 
   testWidgets('leaving the group closes the page', (tester) async {
     final s = await open();
