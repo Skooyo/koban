@@ -50,12 +50,15 @@ abstract final class OnboardingRules {
     return step;
   }
 
-  /// The number of the step in "Step n of 4". Welcome has none.
+  /// The steps the bar counts: Notifications, Payment apps, Keep it running.
+  static const stepCount = 3;
+
+  /// The number of the step in "Step n of 3". Welcome and Ready have none.
   static int? stepNumber(OnboardingStep step) => switch (step) {
     OnboardingStep.welcome => null,
     OnboardingStep.access || OnboardingStep.blocked => 1,
     OnboardingStep.apps => 2,
     OnboardingStep.running => 3,
-    OnboardingStep.ready => 4,
+    OnboardingStep.ready => null,
   };
 }
