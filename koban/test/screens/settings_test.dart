@@ -221,7 +221,7 @@ void main() {
     await tester.pump();
     expect(
       find.text(
-        'Still disconnected after 60s — tap the alert notification or open notification access settings.$reconnectHint',
+        'Still disconnected after 60 s — tap the notification or open notification access settings.$reconnectHint',
       ),
       findsOneWidget,
     );
@@ -400,6 +400,69 @@ void main() {
     await tester.pumpAndSettle();
     expect((await s.budgets.getMonth()).isEmpty, true);
     expect(tester.widget<TextField>(box()).controller!.text, '');
+  });
+
+  testWidgets('a failed limit save says so and the field keeps the old limit', (
+    tester,
+  ) async {
+    final s = await settingsServices();
+    await s.budgets.setLimit('food', Decimal.parse('300'));
+    await pumpSettings(tester, s);
+    await openSection(tester, 'Categories and budgets');
+    final box = find.descendant(
+      of: find.byKey(const ValueKey('limit-food')),
+      matching: find.byType(TextField),
+    );
+    await s.db.customStatement('DROP TABLE budget_limits');
+    await tester.tap(box);
+    await tester.enterText(box, '500');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.text('Could not save the limit. Try again.'), findsOneWidget);
+    expect(tester.widget<TextField>(box).controller!.text, '300.00');
+  });
+
+  testWidgets('a typed limit is saved when the app goes to the background', (
+    tester,
+  ) async {
+    final s = await settingsServices();
+    await pumpSettings(tester, s);
+    await openSection(tester, 'Categories and budgets');
+    final box = find.descendant(
+      of: find.byKey(const ValueKey('limit-food')),
+      matching: find.byType(TextField),
+    );
+    await tester.tap(box);
+    await tester.enterText(box, '250');
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pumpAndSettle();
+    expect(
+      (await s.budgets.getMonth()).items.single.limit,
+      Decimal.parse('250'),
+    );
+  });
+
+  testWidgets('at text scale 1.3 the limit field goes under the name', (
+    tester,
+  ) async {
+    final s = await settingsServices();
+    await pumpSettings(tester, s, textScale: 1.3);
+    tester.view.physicalSize = const Size(360, 5000);
+    await tester.pumpAndSettle();
+    await openSection(tester, 'Categories and budgets');
+    final name = find.descendant(
+      of: find.byKey(const ValueKey('entertainment')),
+      matching: find.text('Entertainment'),
+    );
+    final field = find.byKey(const ValueKey('limit-entertainment'));
+    expect(
+      tester.getTopLeft(field).dy,
+      greaterThanOrEqualTo(tester.getBottomLeft(name).dy),
+    );
+    // The field has the row's width, not the 144 dp of the inline layout.
+    expect(tester.getSize(field).width, greaterThan(200));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a saved limit shows on the field and in the Settings count', (

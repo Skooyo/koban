@@ -127,9 +127,12 @@ final class PaymentClosed extends PaymentResult {
 
 /// The payment is saved and the split editor opens for it.
 final class PaymentOpenSplit extends PaymentResult {
-  const PaymentOpenSplit(this.expenseId, {this.undo});
+  const PaymentOpenSplit(this.expenseId, {this.message, this.undo});
 
   final String expenseId;
+
+  /// The snackbar text for [undo].
+  final String? message;
 
   /// The Undo for past payments the save changed. The caller shows it after the split editor closes.
   final Undoable? undo;
@@ -368,8 +371,14 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
         privateToGroups: f.privateToGroups,
         applyToPast: _changePast,
       );
-      if (split) return PaymentOpenSplit(added.id, undo: added.undo);
       undo = added.undo;
+      if (split) {
+        return PaymentOpenSplit(
+          added.id,
+          message: _savedMessage(undo, f),
+          undo: undo,
+        );
+      }
     } else {
       undo = await _s.expenses.updateExpense(
         id,
@@ -382,12 +391,28 @@ class PaymentViewModel extends ChangeNotifier with LoadErrors {
         privateToGroups: f.privateToGroups,
         applyToPast: _changePast,
       );
-      if (split) return PaymentOpenSplit(id, undo: undo);
+      if (split) {
+        return PaymentOpenSplit(
+          id,
+          message: _savedMessage(undo, f),
+          undo: undo,
+        );
+      }
     }
     return PaymentClosed(
-      id != null && undo == null ? null : 'Payment saved',
+      id != null && undo == null ? null : _savedMessage(undo, f),
       undo: undo,
     );
+  }
+
+  /// With past payments changed, the message says what Undo puts back.
+  String _savedMessage(Undoable? undo, PaymentForm f) {
+    final n = undo?.changed ?? 0;
+    if (n == 0) return 'Payment saved';
+    final category = _categories.where((c) => c.id == f.categoryId);
+    final name = category.isEmpty ? 'this category' : category.first.name;
+    return 'Payment saved. $n past ${f.merchant.trim()} '
+        '${n == 1 ? 'payment' : 'payments'} now $name';
   }
 
   /// The payment no longer counts in totals. Returns null when a save or delete is under way.

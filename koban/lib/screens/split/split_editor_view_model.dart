@@ -576,7 +576,7 @@ class SplitEditorViewModel extends ChangeNotifier {
         readsLeft: readsLeft ?? s.readsLeft,
         canReadAgain: _canReadAgain(s.onlineAccess),
         message: draft == null
-            ? "Couldn't read this receipt. Add the items by hand."
+            ? "Could not read this receipt. Add the items by hand."
             : draft.printedTotal == null
             ? 'No total found on the receipt. Check the items.'
             : null,

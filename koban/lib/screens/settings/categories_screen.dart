@@ -1,7 +1,10 @@
+import 'dart:developer' as developer;
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../data/database.dart' show Category;
 import '../../rules/amount_formatter.dart';
 import '../../theme/koban_theme.dart';
 import '../../ui/kit.dart';
@@ -59,6 +62,55 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     }, undo: result.undo);
   }
 
+  Widget _row(BuildContext context, Category c) {
+    final vm = widget.vm;
+    final field = _LimitField(
+      key: ValueKey('limit-${c.id}'),
+      name: c.name,
+      limit: vm.limits[c.id],
+      onSave: (v) => vm.saveLimit(c.id, v),
+    );
+    final delete = c.isDefault
+        ? null
+        : IconButton(
+            onPressed: () => _delete(c.id, c.name),
+            tooltip: 'Delete category ${c.name}',
+            icon: const Icon(Icons.delete),
+          );
+    // Large text leaves the name too little room beside the field, so the field goes under it.
+    final large = MediaQuery.textScalerOf(context).scale(1) > 1;
+    final dot = CategoryDot(categoryColor(context, c.id));
+    final subtitle = c.isDefault ? null : 'Your own';
+    if (!large) {
+      return KobanRow(
+        key: ValueKey(c.id),
+        title: c.name,
+        subtitle: subtitle,
+        leading: dot,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 144, child: field),
+            ?delete,
+          ],
+        ),
+      );
+    }
+    return Column(
+      key: ValueKey(c.id),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        KobanRow(
+          title: c.name,
+          subtitle: subtitle,
+          leading: dot,
+          trailing: delete,
+        ),
+        Padding(padding: const EdgeInsets.fromLTRB(68, 0, 16, 8), child: field),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = widget.vm;
@@ -78,35 +130,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           ),
           if (vm.categories.isNotEmpty)
             ListGroup(
-              children: [
-                for (final c in vm.categories)
-                  KobanRow(
-                    key: ValueKey(c.id),
-                    title: c.name,
-                    subtitle: c.isDefault ? null : 'Your own',
-                    leading: CategoryDot(categoryColor(context, c.id)),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 144,
-                          child: _LimitField(
-                            key: ValueKey('limit-${c.id}'),
-                            name: c.name,
-                            limit: vm.limits[c.id],
-                            onSave: (v) => vm.saveLimit(c.id, v),
-                          ),
-                        ),
-                        if (!c.isDefault)
-                          IconButton(
-                            onPressed: () => _delete(c.id, c.name),
-                            tooltip: 'Delete category ${c.name}',
-                            icon: const Icon(Icons.delete),
-                          ),
-                      ],
-                    ),
-                  ),
-              ],
+              children: [for (final c in vm.categories) _row(context, c)],
             ),
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -164,7 +188,7 @@ class _LimitField extends StatefulWidget {
 
   final String name;
   final Decimal? limit;
-  final void Function(Decimal? amount) onSave;
+  final Future<void> Function(Decimal? amount) onSave;
 
   @override
   State<_LimitField> createState() => _LimitFieldState();
@@ -175,6 +199,8 @@ class _LimitFieldState extends State<_LimitField> {
     text: _show(widget.limit),
   );
   final _focus = FocusNode();
+  late final AppLifecycleListener _lifecycle;
+  ScaffoldMessengerState? _messenger;
 
   static String _show(Decimal? v) =>
       v == null ? '' : AmountFormatter.formatDisplay(v);
@@ -185,6 +211,18 @@ class _LimitFieldState extends State<_LimitField> {
     _focus.addListener(() {
       if (!_focus.hasFocus) _commit();
     });
+    // Leaving the app with the keyboard open must not lose what was typed.
+    _lifecycle = AppLifecycleListener(
+      onHide: () {
+        if (_focus.hasFocus) _commit();
+      },
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _messenger = ScaffoldMessenger.maybeOf(context);
   }
 
   @override
@@ -199,15 +237,35 @@ class _LimitFieldState extends State<_LimitField> {
   @override
   void dispose() {
     if (_focus.hasFocus) _commit();
+    _lifecycle.dispose();
     _focus.dispose();
     _text.dispose();
     super.dispose();
   }
 
+  Future<void> _save(Decimal? value) async {
+    final shown = widget.limit;
+    final messenger = _messenger;
+    try {
+      await widget.onSave(value);
+    } catch (e, st) {
+      developer.log(
+        'Save limit failed',
+        name: 'Budgets',
+        error: e,
+        stackTrace: st,
+      );
+      if (mounted) _text.text = _show(shown);
+      messenger?.showSnackBar(
+        const SnackBar(content: Text('Could not save the limit. Try again.')),
+      );
+    }
+  }
+
   void _commit() {
     final raw = _text.text.trim();
     if (raw.isEmpty) {
-      if (widget.limit != null) widget.onSave(null);
+      if (widget.limit != null) _save(null);
       return;
     }
     final value = AmountFormatter.parseInput(raw);
@@ -216,7 +274,7 @@ class _LimitFieldState extends State<_LimitField> {
       return;
     }
     _text.text = _show(value);
-    if (value != widget.limit) widget.onSave(value);
+    if (value != widget.limit) _save(value);
   }
 
   @override

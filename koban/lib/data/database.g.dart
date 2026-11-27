@@ -6224,23 +6224,6 @@ abstract class _$KobanDatabase extends GeneratedDatabase {
     );
   }
 
-  Future<int> setCategoryForMerchant(
-    String? categoryId,
-    String? merchantKey,
-    TransactionType type,
-  ) {
-    return customUpdate(
-      'UPDATE expenses SET categoryId = ?1 WHERE lower(trim(merchant)) = ?2 AND transactionType = ?3',
-      variables: [
-        Variable<String>(categoryId),
-        Variable<String>(merchantKey),
-        Variable<String>(Expenses.$convertertransactionType.toSql(type)),
-      ],
-      updates: {this.expenses},
-      updateKind: UpdateKind.update,
-    );
-  }
-
   Selectable<MonthlyTotalsResult> monthlyTotals() {
     return customSelect(
       'SELECT(CAST(strftime(\'%Y\', notificationPostTime / 1000, \'unixepoch\', \'localtime\') AS INTEGER) * 100 + CAST(strftime(\'%m\', notificationPostTime / 1000, \'unixepoch\', \'localtime\') AS INTEGER))AS yearMonth, CAST(COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN 0 ELSE COALESCE(countedAmount, amount) END), 0) AS TEXT) AS total, CAST(COALESCE(SUM(CASE WHEN transactionType = \'RECEIVE\' THEN amount ELSE 0 END), 0) AS TEXT) AS received FROM expenses WHERE status != \'DISMISSED\' GROUP BY yearMonth ORDER BY yearMonth DESC',

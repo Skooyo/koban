@@ -226,40 +226,51 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       if (_vm.inGroups && !income)
                         ListGroup(
                           children: [
-                            KobanRow(
-                              title: 'Count in group totals',
-                              subtitle: f.privateToGroups
-                                  ? 'Group members do not see this payment'
-                                  : 'Group members see this in your totals',
-                              trailing: ExcludeSemantics(
-                                child: IgnorePointer(
-                                  child: Switch(
-                                    value: !f.privateToGroups,
-                                    onChanged: (_) {},
+                            MergeSemantics(
+                              child: Semantics(
+                                toggled: !f.privateToGroups,
+                                child: KobanRow(
+                                  title: 'Count in group totals',
+                                  subtitle: f.privateToGroups
+                                      ? 'Group members do not see this payment'
+                                      : 'Group members see this in your totals',
+                                  trailing: ExcludeSemantics(
+                                    child: IgnorePointer(
+                                      child: Switch(
+                                        value: !f.privateToGroups,
+                                        onChanged: (_) {},
+                                      ),
+                                    ),
+                                  ),
+                                  onTap: () => _vm.setPrivateToGroups(
+                                    !f.privateToGroups,
                                   ),
                                 ),
                               ),
-                              onTap: () =>
-                                  _vm.setPrivateToGroups(!f.privateToGroups),
                             ),
                           ],
                         ),
                       if (!editing && !income)
                         ListGroup(
                           children: [
-                            KobanRow(
-                              title: 'Split with friends',
-                              subtitle: 'Pick people after you save',
-                              trailing: ExcludeSemantics(
-                                child: IgnorePointer(
-                                  child: Switch(
-                                    value: splitting,
-                                    onChanged: (_) {},
+                            MergeSemantics(
+                              child: Semantics(
+                                toggled: splitting,
+                                child: KobanRow(
+                                  title: 'Split with friends',
+                                  subtitle: 'Pick people after you save',
+                                  trailing: ExcludeSemantics(
+                                    child: IgnorePointer(
+                                      child: Switch(
+                                        value: splitting,
+                                        onChanged: (_) {},
+                                      ),
+                                    ),
+                                  ),
+                                  onTap: () => _vm.setSplitWithFriends(
+                                    !_vm.splitWithFriends,
                                   ),
                                 ),
-                              ),
-                              onTap: () => _vm.setSplitWithFriends(
-                                !_vm.splitWithFriends,
                               ),
                             ),
                           ],

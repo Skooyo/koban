@@ -582,7 +582,7 @@ void main() {
       expect(vm.state.items, isEmpty);
       expect(
         vm.state.message,
-        "Couldn't read this receipt. Add the items by hand.",
+        "Could not read this receipt. Add the items by hand.",
       );
     });
 

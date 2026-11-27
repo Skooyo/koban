@@ -6,6 +6,7 @@ import 'package:koban/capture/listener_control.dart';
 import 'package:koban/data/legacy_import.dart';
 import 'package:koban/rules/types.dart';
 import 'package:koban/theme/koban_theme.dart';
+import 'package:koban/ui/kit.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/harness.dart';
@@ -286,7 +287,15 @@ void main() {
     );
     await s.budgets.setLimit('food', Decimal.parse('100'));
     await pumpHome(tester, s);
-    expect(find.text('RM 120.00 of RM 100.00'), findsOneWidget);
+    expect(find.text('Budgets: RM 120.00 of RM 100.00'), findsOneWidget);
+    // The month total stays on the row.
+    expect(
+      find.descendant(
+        of: find.widgetWithText(KobanRow, 'This month'),
+        matching: find.text('RM 150.00'),
+      ),
+      findsOneWidget,
+    );
     final over = find.text('1 over');
     expect(over, findsOneWidget);
     expect(
@@ -308,7 +317,7 @@ void main() {
     await pay(s, '520.00', DateTime(2026, 11, 13, 9), categoryId: 'shopping');
     await s.budgets.setLimit('food', Decimal.parse('100'));
     await pumpHome(tester, s);
-    expect(find.text('RM 0.00 of RM 100.00'), findsOneWidget);
+    expect(find.text('Budgets: RM 0.00 of RM 100.00'), findsOneWidget);
     expect(find.textContaining(' over'), findsNothing);
   });
 
@@ -319,7 +328,7 @@ void main() {
     await pay(s, '20.00', DateTime(2026, 11, 13, 9));
     await s.budgets.setLimit('food', Decimal.parse('100'));
     await pumpHome(tester, s);
-    expect(find.text('RM 20.00 of RM 100.00'), findsOneWidget);
+    expect(find.text('Budgets: RM 20.00 of RM 100.00'), findsOneWidget);
     expect(find.textContaining(' over'), findsNothing);
   });
 

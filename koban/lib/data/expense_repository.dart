@@ -392,6 +392,7 @@ class ExpenseRepository {
       }
     });
     return Undoable(
+      changed: rows.length,
       undo: () => _db.transaction(() async {
         for (final r in rows) {
           await _setCategory(r.id, r.categoryId);

@@ -241,7 +241,7 @@ Future<PaymentResult?> _openPayment(
     await openSplitNew(context, expenseId: result.expenseId);
     // The caller shows the Undo for the changed past payments once the split editor is closed.
     final undo = result.undo;
-    if (undo != null) return PaymentClosed('Payment saved', undo: undo);
+    if (undo != null) return PaymentClosed(result.message, undo: undo);
   }
   return result;
 }

@@ -109,6 +109,28 @@ bool saveOn(WidgetTester tester, String label) =>
     null;
 
 void main() {
+  testWidgets('Split with friends reads as a switch with its state', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await openSheet(tester, await testServices());
+    await typeAmount(tester, '8');
+    final row = find.widgetWithText(KobanRow, 'Split with friends');
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSemantics(row),
+      isSemantics(hasToggledState: true, isToggled: false),
+    );
+    await tester.tap(row);
+    await tester.pump();
+    expect(
+      tester.getSemantics(row),
+      isSemantics(hasToggledState: true, isToggled: true),
+    );
+    handle.dispose();
+  });
+
   testWidgets('a new payment opens with the keyboard and Save payment off', (
     tester,
   ) async {
@@ -291,7 +313,12 @@ void main() {
         s.db.expenses,
       )..where((e) => e.id.equals(id))).getSingle()).categoryId;
       expect(await categoryOf(oldId), 'health');
-      final undo = (opener.result as PaymentClosed).undo!;
+      final saved = opener.result as PaymentClosed;
+      expect(
+        saved.message,
+        'Payment saved. 1 past Kedai Contoh payment now Health',
+      );
+      final undo = saved.undo!;
       await undo.undo();
       expect(await categoryOf(oldId), 'food');
     },
@@ -381,7 +408,10 @@ void main() {
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     final closed = opener.result as PaymentClosed;
-    expect(closed.message, 'Payment saved');
+    expect(
+      closed.message,
+      'Payment saved. 1 past Kedai Contoh payment now Health',
+    );
     await closed.undo!.undo();
     final old = await (s.db.select(
       s.db.expenses,
@@ -599,9 +629,14 @@ void main() {
       await s.online.groups.refresh();
       expect(s.inGroups.value, true);
 
+      final handle = tester.ensureSemantics();
       await openSheet(tester, s);
       await typeAmount(tester, '8');
       final row = find.text('Count in group totals');
+      final rowSemantics = find.widgetWithText(
+        KobanRow,
+        'Count in group totals',
+      );
       await tester.ensureVisible(row);
       await tester.pumpAndSettle();
       expect(row, findsOneWidget);
@@ -609,12 +644,21 @@ void main() {
         find.text('Group members see this in your totals'),
         findsOneWidget,
       );
+      expect(
+        tester.getSemantics(rowSemantics),
+        isSemantics(hasToggledState: true, isToggled: true),
+      );
       await tester.tap(row);
       await tester.pump();
       expect(
         find.text('Group members do not see this payment'),
         findsOneWidget,
       );
+      expect(
+        tester.getSemantics(rowSemantics),
+        isSemantics(hasToggledState: true, isToggled: false),
+      );
+      handle.dispose();
       await tester.tap(find.text('Save payment'));
       await tester.pumpAndSettle();
 

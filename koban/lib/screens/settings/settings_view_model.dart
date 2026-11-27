@@ -173,7 +173,7 @@ class SettingsViewModel extends ChangeNotifier with LoadErrors {
     try {
       final connected = await _s.listener.isConnected();
       _setReconnect(
-        connected ? 'Tracking is connected.' : 'Still disconnected after 60s — tap the alert notification or open notification access settings.',
+        connected ? 'Tracking is connected.' : 'Still disconnected after 60 s — tap the notification or open notification access settings.',
       );
     } catch (e, s) {
       _log('Reconnect check failed', e, s);

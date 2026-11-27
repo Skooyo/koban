@@ -432,16 +432,27 @@ class _PeriodRow extends StatelessWidget {
     if (limits != null && !limits.isEmpty) {
       return KobanRow(
         title: summary.title,
-        subtitle: '${rm(limits.totalSpent)} of ${rm(limits.totalLimit)}',
-        trailing: limits.overCount > 0
-            ? Text(
+        subtitle:
+            'Budgets: ${rm(limits.totalSpent)} of ${rm(limits.totalLimit)}',
+        trailing: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MoneyText(
+              rm(summary.total),
+              style: weighted(text.titleMedium!, 700),
+              color: scheme.onSurface,
+            ),
+            if (limits.overCount > 0)
+              Text(
                 '${limits.overCount} over',
                 style: weighted(
                   text.labelLarge!,
                   800,
                 ).copyWith(color: scheme.error),
-              )
-            : null,
+              ),
+          ],
+        ),
         showChevron: true,
         onTap: onTap,
       );
