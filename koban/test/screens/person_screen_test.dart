@@ -405,11 +405,19 @@ void main() {
     final picked = File(p.join(files.path, 'cache', 'picked.png'))
       ..createSync(recursive: true)
       ..writeAsBytesSync(wideBytes);
+    // As ImagePicker: each pick is a new copy in the cache. A discarded pick
+    // deletes its copy, so a reused path would be gone on the next pick.
+    var picks = 0;
     final s = await testServices(
       filesDir: files,
       cacheDir: Directory(p.join(files.path, 'cache')),
       device: device,
-      pickImage: () async => picked.path,
+      pickImage: () async {
+        if (picks++ == 0) return picked.path;
+        return (File(
+          p.join(files.path, 'cache', 'picked$picks.png'),
+        )..writeAsBytesSync(wideBytes)).path;
+      },
     );
     final ali = await seedAli(s);
     // The 0.1.1 import keeps the path of the old app: <files>/qr/<id>.img.
